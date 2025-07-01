@@ -1,0 +1,110 @@
+# Development Docker Compose configuration
+# For local development with hot reload and easy debugging
+
+version: '3.8'
+
+services:
+  # Main application service
+  radio-app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+      args:
+        NODE_VERSION: 18-alpine
+    container_name: radio-wifi-dev
+    hostname: radio
+    ports:
+      - "3000:3000"    # Main application port
+      - "24678:24678"  # Nuxt DevTools (if enabled)
+    volumes:
+      # Source code mounting for hot reload
+      - ./app:/app/app:cached
+      - ./config:/app/config:ro
+      - ./scripts:/app/scripts:ro
+      # Node modules volume to avoid overwriting
+      - radio_node_modules:/app/node_modules
+      # Development cache
+      - radio_nuxt_cache:/app/.nuxt
+    environment:
+      # Application settings
+      - NODE_ENV=development
+      - NUXT_HOST=0.0.0.0
+      - NUXT_PORT=3000
+      - NUXT_DEVTOOLS=true
+
+      # Network settings
+      - HOSTNAME=radio
+      - WIFI_INTERFACE=wlan0
+
+      # Hotspot configuration
+      - HOTSPOT_SSID=Radio-Setup
+      - HOTSPOT_PASSWORD=radio123
+
+      # Development flags
+      - DEBUG=radio:*
+      - CHOKIDAR_USEPOLLING=true  # For file watching in containers
+    networks:
+      - radio-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.radio.rule=Host(`radio.local`)"
+      - "traefik.http.services.radio.loadbalancer.server.port=3000"
+
+  # Optional: Traefik for local .local domain routing
+  traefik:
+    image: traefik:v3.0
+    container_name: radio-traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"      # HTTP
+      - "8080:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - radio-network
+    profiles:
+      - traefik
+    restart: unless-stopped
+
+  # Optional: Avahi for mDNS (only on Linux hosts)
+  avahi:
+    image: solidnerd/avahi:latest
+    container_name: radio-avahi
+    hostname: radio
+    network_mode: host
+    environment:
+      - AVAHI_HOST_NAME=radio
+      - AVAHI_SERVICES=http:3000:path=/
+    volumes:
+      - ./config/avahi:/etc/avahi:ro
+    profiles:
+      - mdns
+    restart: unless-stopped
+    depends_on:
+      - radio-app
+
+# Named volumes for development
+volumes:
+  radio_node_modules:
+    driver: local
+  radio_nuxt_cache:
+    driver: local
+
+# Custom network
+networks:
+  radio-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

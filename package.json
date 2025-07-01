@@ -1,0 +1,90 @@
+{
+  "name": "radio-wifi-configuration",
+  "version": "1.0.0",
+  "description": "A modern WiFi provisioning solution for Raspberry Pi Zero 2 W, built with Nuxt 3 and Docker",
+  "private": true,
+  "type": "module",
+  "author": "Radio Project",
+  "license": "MIT",
+  "homepage": "https://github.com/your-username/radio001",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/radio001.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/radio001/issues"
+  },
+  "keywords": [
+    "raspberry-pi",
+    "wifi",
+    "configuration",
+    "nuxt",
+    "docker",
+    "iot",
+    "provisioning",
+    "hotspot",
+    "captive-portal"
+  ],
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "scripts": {
+    "dev": "cd app && npm run dev",
+    "dev:docker": "docker-compose up --build",
+    "dev:logs": "docker-compose logs -f radio-app",
+    "dev:restart": "docker-compose restart radio-app",
+    "dev:down": "docker-compose down",
+    "dev:clean": "docker-compose down -v --remove-orphans",
+    "build": "cd app && npm run build",
+    "build:docker": "docker build -f docker/Dockerfile -t radio-wifi:latest .",
+    "build:multi-arch": "docker buildx build --platform linux/amd64,linux/arm64 -f docker/Dockerfile -t radio-wifi:latest .",
+    "preview": "cd app && npm run preview",
+    "prod:up": "docker-compose -f docker-compose.prod.yml up -d",
+    "prod:down": "docker-compose -f docker-compose.prod.yml down",
+    "prod:logs": "docker-compose -f docker-compose.prod.yml logs -f",
+    "prod:restart": "docker-compose -f docker-compose.prod.yml restart",
+    "prod:build": "docker-compose -f docker-compose.prod.yml build --no-cache",
+    "install:app": "cd app && npm install",
+    "install:all": "npm run install:app",
+    "lint": "cd app && npm run lint",
+    "lint:fix": "cd app && npm run lint:fix",
+    "type-check": "cd app && npm run type-check",
+    "test": "echo \"No tests specified yet\"",
+    "health": "curl -f http://localhost:3000/api/health || curl -f http://radio.local:3000/api/health",
+    "setup:pi": "./scripts/setup-pi.sh",
+    "deploy:pi": "./scripts/deploy-pi.sh",
+    "backup:config": "./scripts/backup-config.sh",
+    "restore:config": "./scripts/restore-config.sh",
+    "clean": "rm -rf app/.nuxt app/.output app/dist app/node_modules node_modules",
+    "clean:docker": "docker system prune -f && docker volume prune -f",
+    "docs:dev": "echo \"Documentation development not set up yet\"",
+    "docs:build": "echo \"Documentation build not set up yet\"",
+    "release": "echo \"Release process not set up yet\"",
+    "prepare": "chmod +x scripts/*.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.4",
+    "typescript": "^5.3.3"
+  },
+  "optionalDependencies": {},
+  "workspaces": [
+    "app"
+  ],
+  "config": {
+    "app_name": "Radio WiFi Configuration",
+    "default_hostname": "radio",
+    "default_port": 3000,
+    "supported_architectures": [
+      "linux/amd64",
+      "linux/arm64"
+    ]
+  },
+  "directories": {
+    "app": "./app",
+    "config": "./config",
+    "scripts": "./scripts",
+    "docker": "./docker",
+    "docs": "./docs"
+  }
+}

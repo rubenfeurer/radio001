@@ -1,0 +1,32 @@
+{
+  "name": "radio-wifi-backend",
+  "version": "1.0.0",
+  "description": "FastAPI backend for Radio WiFi Configuration",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "python3 main.py",
+    "dev": "python3 main.py --reload",
+    "install": "pip3 install -r requirements.txt",
+    "test": "python3 -m pytest tests/",
+    "lint": "python3 -m flake8 .",
+    "format": "python3 -m black .",
+    "check": "python3 -m mypy ."
+  },
+  "keywords": [
+    "fastapi",
+    "wifi",
+    "raspberry-pi",
+    "configuration"
+  ],
+  "author": "Radio Project",
+  "license": "MIT",
+  "engines": {
+    "python": ">=3.8"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/radio001.git",
+    "directory": "backend"
+  }
+}

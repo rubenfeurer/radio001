@@ -1,0 +1,49 @@
+# Development Dockerfile for local development
+# Optimized for hot reload and development workflow
+
+FROM node:18-alpine
+
+# Install development dependencies
+RUN apk add --no-cache \
+    git \
+    python3 \
+    make \
+    g++ \
+    wireless-tools \
+    curl \
+    bash \
+    && rm -rf /var/cache/apk/*
+
+# Create app directory
+WORKDIR /app
+
+# Create non-root user for development
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nuxt -u 1001 -G nodejs
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including dev dependencies)
+RUN npm install
+
+# Change ownership of node_modules
+RUN chown -R nuxt:nodejs node_modules
+
+# Switch to non-root user
+USER nuxt
+
+# Expose development port
+EXPOSE 3000
+
+# Set development environment
+ENV NODE_ENV=development \
+    NUXT_HOST=0.0.0.0 \
+    NUXT_PORT=3000
+
+# Health check for development
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:3000 || exit 1
+
+# Start development server with hot reload
+CMD ["npm", "run", "dev"]

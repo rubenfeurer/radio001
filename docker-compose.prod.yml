@@ -1,0 +1,193 @@
+# Production Docker Compose configuration
+# Optimized for Raspberry Pi Zero 2 W deployment
+
+version: '3.8'
+
+services:
+  # Main application service
+  radio-app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      platforms:
+        - linux/arm64
+      args:
+        NODE_VERSION: 18-alpine
+    image: radio-wifi:latest
+    container_name: radio-wifi-prod
+    hostname: radio
+    ports:
+      - "80:3000"      # HTTP (standard web port)
+      - "53:53/udp"    # DNS
+      - "67:67/udp"    # DHCP
+      - "5353:5353/udp" # mDNS
+    volumes:
+      # Persistent data
+      - radio_data:/app/data
+      - radio_logs:/app/logs
+      - radio_config:/app/config
+
+      # System integration (host networking for WiFi management)
+      - /etc/wpa_supplicant:/etc/wpa_supplicant:rw
+      - /etc/hostapd:/etc/hostapd:rw
+      - /etc/dnsmasq.conf:/etc/dnsmasq.conf:rw
+
+      # Device access for WiFi management
+      - /dev:/dev:rw
+      - /sys/class/net:/sys/class/net:ro
+      - /proc/net:/proc/net:ro
+    environment:
+      # Production settings
+      - NODE_ENV=production
+      - NUXT_HOST=0.0.0.0
+      - NUXT_PORT=3000
+
+      # Network configuration
+      - HOSTNAME=radio
+      - WIFI_INTERFACE=wlan0
+      - ETH_INTERFACE=eth0
+
+      # Hotspot configuration
+      - HOTSPOT_SSID=Radio-Setup
+      - HOTSPOT_PASSWORD=Configure123!
+      - HOTSPOT_CHANNEL=6
+      - HOTSPOT_IP=192.168.4.1
+      - HOTSPOT_SUBNET=192.168.4.0/24
+      - DHCP_RANGE=192.168.4.2,192.168.4.20,12h
+
+      # Security settings
+      - ADMIN_PASSWORD_HASH=
+      - SESSION_SECRET=
+      - JWT_SECRET=
+
+      # Feature flags
+      - ENABLE_CAPTIVE_PORTAL=true
+      - ENABLE_AUTO_CONNECT=true
+      - ENABLE_MONITORING=false
+    privileged: true  # Required for network management
+    network_mode: host  # Required for WiFi interface access
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_MODULE
+    devices:
+      - /dev/rfkill:/dev/rfkill
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - "com.radio.service=main"
+      - "com.radio.environment=production"
+
+  # Avahi mDNS service (separate container for better isolation)
+  avahi:
+    image: alpine:latest
+    container_name: radio-avahi
+    hostname: radio
+    network_mode: host
+    command: >
+      sh -c "
+        apk add --no-cache avahi avahi-tools dbus &&
+        mkdir -p /var/run/dbus /var/run/avahi-daemon &&
+        dbus-daemon --system --fork &&
+        avahi-daemon --no-drop-root --no-chroot
+      "
+    volumes:
+      - ./config/avahi:/etc/avahi:ro
+      - avahi_data:/var/lib/avahi-autoipd
+    environment:
+      - AVAHI_HOST_NAME=radio
+    restart: unless-stopped
+    depends_on:
+      - radio-app
+    healthcheck:
+      test: ["CMD", "avahi-browse", "-t", "_http._tcp"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Optional: Watchtower for automatic updates
+  watchtower:
+    image: containrrr/watchtower:arm64v8-latest
+    container_name: radio-watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=86400  # Check daily
+      - WATCHTOWER_INCLUDE_STOPPED=true
+      - WATCHTOWER_REVIVE_STOPPED=true
+    restart: unless-stopped
+    profiles:
+      - auto-update
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Optional: Log aggregation
+  syslog:
+    image: balabit/syslog-ng:latest
+    container_name: radio-syslog
+    ports:
+      - "514:514/udp"
+    volumes:
+      - radio_logs:/var/log
+      - ./config/syslog-ng.conf:/etc/syslog-ng/syslog-ng.conf:ro
+    restart: unless-stopped
+    profiles:
+      - logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+# Named volumes for persistent data
+volumes:
+  radio_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/radio/data
+
+  radio_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/radio/logs
+
+  radio_config:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/radio/config
+
+  avahi_data:
+    driver: local
+
+# Production deployment notes:
+# 1. Ensure directories exist: sudo mkdir -p /opt/radio/{data,logs,config}
+# 2. Set proper permissions: sudo chown -R 1001:1001 /opt/radio
+# 3. Configure environment variables in .env file
+# 4. Deploy with: docker-compose -f docker-compose.prod.yml up -d
+# 5. Monitor with: docker-compose -f docker-compose.prod.yml logs -f
+# 6. Enable auto-updates: docker-compose -f docker-compose.prod.yml --profile auto-update up -d
