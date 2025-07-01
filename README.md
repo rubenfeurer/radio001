@@ -47,14 +47,13 @@ radio001/
 
 ## 🚀 Quick Start
 
-### Development Setup
+### Development Setup (Docker)
 
-For local development, you can run the frontend and backend separately:
+The project is fully containerized for consistent development across all platforms:
 
 #### Prerequisites
 
-- Node.js 18+ and npm
-- Python 3.8+ and pip
+- Docker and Docker Compose
 - Git
 
 #### Development Server
@@ -65,16 +64,20 @@ For local development, you can run the frontend and backend separately:
    cd radio001
    ```
 
-2. **Start development services:**
+2. **Start development environment:**
    ```bash
-   ./scripts/start-dev.sh
+   # Basic development environment
+   ./scripts/docker-dev.sh start
+   
+   # Or use Docker Compose directly
+   docker-compose up -d
    ```
 
    This will:
-   - Install frontend dependencies (Nuxt 3)
-   - Install backend dependencies (FastAPI)
+   - Build both frontend (Nuxt 3) and backend (FastAPI) containers
    - Start the frontend on http://localhost:3000
    - Start the backend on http://localhost:8000
+   - Enable hot reload for both services
 
 3. **Access the application:**
    - Frontend: http://localhost:3000
@@ -84,34 +87,39 @@ For local development, you can run the frontend and backend separately:
 #### Development Commands
 
 ```bash
-# Stop all services
-./scripts/start-dev.sh --stop
+# Basic commands
+./scripts/docker-dev.sh start     # Start services
+./scripts/docker-dev.sh stop      # Stop services
+./scripts/docker-dev.sh restart   # Restart services
+./scripts/docker-dev.sh status    # Check status
 
-# Check service status
-./scripts/start-dev.sh --status
+# Advanced commands
+./scripts/docker-dev.sh logs                    # View all logs
+./scripts/docker-dev.sh logs radio-backend     # View backend logs
+./scripts/docker-dev.sh shell radio-app        # Open shell in frontend
+./scripts/docker-dev.sh rebuild                # Rebuild all images
 
-# Custom ports
-./scripts/start-dev.sh --frontend-port 3001 --backend-port 8001
+# With additional services
+./scripts/docker-dev.sh start --traefik        # Start with radio.local access
+./scripts/docker-dev.sh start --all            # Start with all services
 ```
 
-#### Manual Setup
+#### Manual Docker Commands
 
-If you prefer to run services manually:
+If you prefer using Docker Compose directly:
 
-**Frontend (Nuxt):**
 ```bash
-cd app
-npm install
-npm run dev
-```
+# Start services
+docker-compose up -d
 
-**Backend (FastAPI):**
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-python main.py
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+
+# Rebuild and restart
+docker-compose up -d --build
 ```
 
 ### Production Deployment

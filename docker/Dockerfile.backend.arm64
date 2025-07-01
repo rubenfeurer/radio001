@@ -1,0 +1,72 @@
+# Backend Dockerfile optimized for Apple Silicon (arm64) development
+# Lightweight version that addresses pydantic-core build issues
+
+FROM --platform=linux/arm64 python:3.11-slim
+
+# Set platform environment
+ENV DOCKER_BUILDPLATFORM=linux/arm64
+ENV TARGETPLATFORM=linux/arm64
+
+# Install minimal system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    procps \
+    net-tools \
+    iputils-ping \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Create non-root user
+RUN groupadd -r radio && useradd -r -g radio radio
+
+# Set environment variables for Python
+ENV PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies with pre-built wheels for arm64
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --only-binary=all --no-compile \
+    fastapi==0.104.1 \
+    uvicorn[standard]==0.24.0 \
+    pydantic==2.4.2 \
+    python-multipart==0.0.6 \
+    typing-extensions>=4.0.0 \
+    annotated-types>=0.4.0
+
+# Copy entrypoint script
+COPY docker/entrypoint-backend.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Copy application code
+COPY . .
+
+# Change ownership to radio user
+RUN chown -R radio:radio /app
+
+# Switch to non-root user
+USER radio
+
+# Expose the application port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Set environment variables
+ENV API_PORT=8000 \
+    NODE_ENV=development
+
+# Set entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Default command
+CMD ["start"]

@@ -1,10 +1,48 @@
 # Development Docker Compose configuration
 # For local development with hot reload and easy debugging
 
-version: '3.8'
-
 services:
-  # Main application service
+  # Backend API service
+  radio-backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend
+    container_name: radio-backend-dev
+    hostname: radio-backend
+    ports:
+      - "8000:8000" # FastAPI port
+    volumes:
+      # Source code mounting for hot reload
+      - ./backend:/app:cached
+      # Python cache
+      - radio_python_cache:/root/.cache/pip
+    environment:
+      # Application settings
+      - NODE_ENV=development
+      - API_PORT=8000
+      - WIFI_INTERFACE=wlan0
+      - HOSTNAME=radio
+
+      # Hotspot configuration
+      - HOTSPOT_SSID=Radio-Setup
+      - HOTSPOT_PASSWORD=radio123
+      - HOTSPOT_IP=192.168.4.1
+      - HOTSPOT_RANGE=192.168.4.2,192.168.4.20
+
+      # Development flags
+      - DEBUG=1
+    networks:
+      - radio-network
+    restart: unless-stopped
+    depends_on: []
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Frontend application service
   radio-app:
     build:
       context: .
@@ -14,8 +52,8 @@ services:
     container_name: radio-wifi-dev
     hostname: radio
     ports:
-      - "3000:3000"    # Main application port
-      - "24678:24678"  # Nuxt DevTools (if enabled)
+      - "3000:3000" # Main application port
+      - "24678:24678" # Nuxt DevTools (if enabled)
     volumes:
       # Source code mounting for hot reload
       - ./app:/app/app:cached
@@ -32,6 +70,10 @@ services:
       - NUXT_PORT=3000
       - NUXT_DEVTOOLS=true
 
+      # Backend API configuration
+      - API_HOST=radio-backend
+      - API_PORT=8000
+
       # Network settings
       - HOSTNAME=radio
       - WIFI_INTERFACE=wlan0
@@ -42,10 +84,12 @@ services:
 
       # Development flags
       - DEBUG=radio:*
-      - CHOKIDAR_USEPOLLING=true  # For file watching in containers
+      - CHOKIDAR_USEPOLLING=true # For file watching in containers
     networks:
       - radio-network
     restart: unless-stopped
+    depends_on:
+      - radio-backend
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
@@ -67,8 +111,8 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
     ports:
-      - "80:80"      # HTTP
-      - "8080:8080"  # Traefik dashboard
+      - "80:80" # HTTP
+      - "8080:8080" # Traefik dashboard
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
@@ -99,6 +143,8 @@ volumes:
   radio_node_modules:
     driver: local
   radio_nuxt_cache:
+    driver: local
+  radio_python_cache:
     driver: local
 
 # Custom network
