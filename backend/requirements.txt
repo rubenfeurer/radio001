@@ -1,5 +1,5 @@
 # FastAPI backend dependencies for Radio WiFi Configuration
-# Compatible versions for Apple Silicon and Raspberry Pi
+# Python 3.13 compatible versions for Apple Silicon and Raspberry Pi
 
 # Core FastAPI framework
 fastapi==0.104.1
@@ -7,15 +7,15 @@ fastapi==0.104.1
 # ASGI server for production
 uvicorn[standard]==0.24.0
 
-# Data validation and settings (compatible version)
-pydantic==2.4.2
+# Data validation and settings (Python 3.13 compatible)
+pydantic==2.5.3
 
 # Form data handling
 python-multipart==0.0.6
 
 # Additional dependencies for compatibility
-typing-extensions>=4.0.0
-annotated-types>=0.4.0
+typing-extensions>=4.8.0
+annotated-types>=0.6.0
 
 # Optional: Development dependencies (install with --dev flag)
 # pytest==7.4.3

@@ -18,14 +18,6 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"
 COMPOSE_PROD_FILE="$PROJECT_DIR/docker-compose.prod.yml"
 
-# Detect platform for Apple Silicon optimization
-PLATFORM=$(uname -m)
-COMPOSE_OVERRIDE=""
-if [[ "$PLATFORM" == "arm64" || "$PLATFORM" == "aarch64" ]]; then
-    COMPOSE_OVERRIDE="-f $PROJECT_DIR/docker-compose.override.yml"
-    print_info "Detected Apple Silicon (arm64) - using optimized configuration"
-fi
-
 # Function to print colored output
 print_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -42,6 +34,14 @@ print_warning() {
 print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
+
+# Detect platform for Apple Silicon optimization
+PLATFORM=$(uname -m)
+COMPOSE_OVERRIDE=""
+if [[ "$PLATFORM" == "arm64" || "$PLATFORM" == "aarch64" ]]; then
+    COMPOSE_OVERRIDE="-f $PROJECT_DIR/docker-compose.override.yml"
+    print_info "Detected Apple Silicon (arm64) - using optimized configuration"
+fi
 
 # Function to check if Docker is running
 check_docker() {

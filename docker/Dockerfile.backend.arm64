@@ -29,24 +29,24 @@ ENV PYTHONPATH=/app \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # Copy requirements first for better caching
-COPY requirements.txt .
+COPY backend/requirements.txt .
 
 # Install Python dependencies with pre-built wheels for arm64
 RUN pip install --upgrade pip setuptools wheel && \
     pip install --only-binary=all --no-compile \
     fastapi==0.104.1 \
     uvicorn[standard]==0.24.0 \
-    pydantic==2.4.2 \
+    pydantic==2.5.3 \
     python-multipart==0.0.6 \
-    typing-extensions>=4.0.0 \
-    annotated-types>=0.4.0
+    typing-extensions>=4.8.0 \
+    annotated-types>=0.6.0
 
 # Copy entrypoint script
 COPY docker/entrypoint-backend.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Copy application code
-COPY . .
+COPY backend/ .
 
 # Change ownership to radio user
 RUN chown -R radio:radio /app

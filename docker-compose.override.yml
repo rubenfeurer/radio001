@@ -5,8 +5,8 @@ services:
   # Backend service override for Apple Silicon
   radio-backend:
     build:
-      context: ./backend
-      dockerfile: ../docker/Dockerfile.backend.arm64
+      context: .
+      dockerfile: docker/Dockerfile.backend.arm64
       platforms:
         - linux/arm64
     platform: linux/arm64

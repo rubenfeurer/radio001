@@ -5,8 +5,8 @@ services:
   # Backend API service
   radio-backend:
     build:
-      context: ./backend
-      dockerfile: ../docker/Dockerfile.backend
+      context: .
+      dockerfile: docker/Dockerfile.backend
     container_name: radio-backend-dev
     hostname: radio-backend
     ports:
