@@ -61,7 +61,7 @@
     "docs:dev": "echo \"Documentation development not set up yet\"",
     "docs:build": "echo \"Documentation build not set up yet\"",
     "release": "echo \"Release process not set up yet\"",
-    "prepare": "chmod +x scripts/*.sh"
+    "prepare": "echo 'Skipping script permissions - handled by Docker'"
   },
   "devDependencies": {
     "@types/node": "^20.10.4",

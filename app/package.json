@@ -15,9 +15,9 @@
     "type-check": "nuxt typecheck"
   },
   "dependencies": {
+    "nuxt": "^3.8.4",
     "@nuxt/ui": "^2.11.1",
     "@pinia/nuxt": "^0.5.1",
-    "nuxt": "^3.8.4",
     "pinia": "^2.1.7",
     "vue": "^3.3.8",
     "vue-router": "^4.2.5",
@@ -25,10 +25,7 @@
   },
   "devDependencies": {
     "@nuxt/devtools": "^1.0.6",
-    "@nuxt/eslint-config": "^0.2.0",
-    "@nuxt/typescript": "^2.8.1",
     "@types/node": "^20.10.4",
-    "eslint": "^8.55.0",
     "typescript": "^5.3.3"
   },
   "engines": {

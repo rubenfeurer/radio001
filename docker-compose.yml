@@ -55,12 +55,13 @@ services:
       - "3000:3000" # Main application port
       - "24678:24678" # Nuxt DevTools (if enabled)
     volumes:
-      # Source code mounting for hot reload
-      - ./app:/app/app:cached
+      # Source code mounting for hot reload (disabled for stable environment)
+      # - ./app:/app/app:cached
       - ./config:/app/config:ro
       - ./scripts:/app/scripts:ro
-      # Node modules volume to avoid overwriting
-      - radio_node_modules:/app/node_modules
+      # Node modules volume to avoid overwriting (disabled for stable environment)
+      # - radio_node_modules:/app/node_modules
+      # - radio_app_node_modules:/app/app/node_modules
       # Development cache
       - radio_nuxt_cache:/app/.nuxt
     environment:
@@ -141,6 +142,8 @@ services:
 # Named volumes for development
 volumes:
   radio_node_modules:
+    driver: local
+  radio_app_node_modules:
     driver: local
   radio_nuxt_cache:
     driver: local
