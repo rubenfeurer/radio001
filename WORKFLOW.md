@@ -30,14 +30,22 @@ npm run workflow:status
 
 ### Daily Development
 ```bash
-# Quick local checks
+# Start Docker development environment (recommended)
+npm run dev
+# or directly:
+./scripts/docker-dev.sh start
+
+# Check service status
+npm run dev:status
+
+# View logs
+npm run dev:logs
+
+# Quick local checks (without Docker)
 npm run quick:check
 
 # Auto-fix common issues
 npm run quick:fix
-
-# Start development
-npm run dev
 ```
 
 ## 📋 Testing Strategy
@@ -83,15 +91,21 @@ npm run dev
 git checkout develop
 git pull origin develop
 
+# Start Docker development environment
+npm run dev
+
 # Make changes
 # ... code ...
 
-# Quick local validation
+# Optional: Quick local validation (without Docker)
 npm run quick:check
 
 # Commit (triggers light pre-commit checks)
 git add .
 git commit -m "feat: add new feature"
+
+# Stop development environment
+npm run dev:stop
 
 # Push to trigger develop CI
 git push origin develop
@@ -127,16 +141,27 @@ npm run workflow:pr       # Helper to create PR develop → main
 
 ### Development Commands
 ```bash
-npm run dev              # Start development server
+npm run dev              # Start Docker development environment
+npm run dev:stop         # Stop development environment
+npm run dev:restart      # Restart development services
+npm run dev:status       # Check service status
+npm run dev:logs         # View service logs
+npm run dev:shell        # Open shell in container
+npm run dev:rebuild      # Rebuild Docker images
+npm run dev:clean        # Clean up Docker resources
+npm run dev:traefik      # Start with Traefik (access via radio.local)
+```
+
+### Quick Commands (Non-Docker)
+```bash
 npm run quick:check      # Run linting + type checking
 npm run quick:fix        # Auto-fix linting issues
 npm run build            # Build for production
 npm run type-check       # TypeScript validation
 ```
 
-### Docker Commands
+### Production Commands
 ```bash
-npm run dev:docker       # Development with Docker
 npm run prod:up          # Production deployment
 npm run health           # Health check
 ```
@@ -158,7 +183,7 @@ npm run health           # Health check
 ### 🚫 Avoid:
 - Direct commits to main (use PRs)
 - Pushing broken code to develop
-- Skipping local quick checks
+- Skipping Docker development environment
 - Large, unfocused commits
 
 ## 🔧 Troubleshooting
@@ -171,6 +196,23 @@ cd app && npx husky install
 # If type checking fails on develop:
 npm run type-check
 # Fix issues or commit with warnings (develop allows this)
+```
+
+### Docker Development Issues
+```bash
+# If services won't start:
+npm run dev:clean       # Clean up Docker resources
+npm run dev:rebuild     # Rebuild all images
+
+# Check service status:
+npm run dev:status
+
+# View detailed logs:
+npm run dev:logs
+
+# Open shell for debugging:
+npm run dev:shell radio-app      # Frontend
+npm run dev:shell radio-backend  # Backend
 ```
 
 ### CI Failures
@@ -224,10 +266,12 @@ git push origin develop
 
 ## 💡 Pro Tips
 
-1. **Use develop for daily work** - it's designed for fast iterations
-2. **Keep commits focused** - easier to review and debug
-3. **Watch the CI feedback** - it provides helpful next steps
-4. **Create PRs early** - even for work in progress (use draft PRs)
-5. **Keep main clean** - only merge completed, tested features
+1. **Use Docker for development** - mirrors production environment perfectly
+2. **Use develop for daily work** - it's designed for fast iterations
+3. **Keep commits focused** - easier to review and debug
+4. **Watch the CI feedback** - it provides helpful next steps
+5. **Create PRs early** - even for work in progress (use draft PRs)
+6. **Keep main clean** - only merge completed, tested features
+7. **Access via radio.local** - use `npm run dev:traefik` for Pi-like experience
 
-This workflow balances speed with reliability, giving you quick feedback during development while ensuring production quality on the main branch.
+This workflow balances speed with reliability, giving you quick feedback during development while ensuring production quality on the main branch. The Docker development environment ensures your code works exactly the same way it will on the Raspberry Pi.

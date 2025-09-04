@@ -190,6 +190,8 @@ echo
 echo "1. Set up branch protection (above)"
 echo "2. Read the workflow guide: cat WORKFLOW.md"
 echo "3. Initialize develop branch: npm run workflow:init"
-echo "4. Start developing: npm run dev"
+echo "4. Start Docker development: npm run dev"
+echo "5. Check status: npm run dev:status"
+echo "6. View logs: npm run dev:logs"
 echo
 echo -e "${GREEN}🎉 Happy coding!${NC}"
