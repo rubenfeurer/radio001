@@ -347,9 +347,6 @@ useHead({
   title: 'System Status - Radio WiFi'
 })
 
-// Runtime config
-const config = useRuntimeConfig()
-
 // Reactive state
 const systemStatus = ref<SystemStatus | null>(null)
 const networkInterfaces = ref<NetworkInterface[]>([])

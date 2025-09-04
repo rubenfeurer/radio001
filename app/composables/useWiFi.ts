@@ -13,8 +13,7 @@ export const useWiFi = () => {
   const error = ref<string | null>(null)
   const lastScanTime = ref<number | null>(null)
 
-  // Configuration
-  const config = useRuntimeConfig()
+
 
   // Clear error after a delay
   const clearError = () => {

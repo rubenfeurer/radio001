@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
   }
 })
 
-async function saveDeviceConfig(newConfig: AppConfig, runtimeConfig: any): Promise<void> {
+async function saveDeviceConfig(newConfig: AppConfig, runtimeConfig: ReturnType<typeof useRuntimeConfig>): Promise<void> {
   const isDevelopment = runtimeConfig.public.isDevelopment
 
   if (isDevelopment) {

@@ -3,12 +3,11 @@
 
 import { exec } from 'child_process'
 import { promisify } from 'util'
-import { writeFile, unlink } from 'fs/promises'
-import { existsSync } from 'fs'
+import { writeFile } from 'fs/promises'
 
 const execAsync = promisify(exec)
 
-export default defineEventHandler(async (event) => {
+export default defineEventHandler(async (_event) => {
   const config = useRuntimeConfig()
 
   try {
@@ -30,7 +29,7 @@ export default defineEventHandler(async (event) => {
   }
 })
 
-async function resetToHotspotMode(config: any): Promise<void> {
+async function resetToHotspotMode(config: ReturnType<typeof useRuntimeConfig>): Promise<void> {
   const isDevelopment = config.public.isDevelopment
 
   if (isDevelopment) {
@@ -124,7 +123,7 @@ async function resetToHotspotMode(config: any): Promise<void> {
   }
 }
 
-async function configureHotspot(config: any): Promise<void> {
+async function configureHotspot(config: ReturnType<typeof useRuntimeConfig>): Promise<void> {
   const wifiInterface = config.wifiInterface || 'wlan0'
   const hotspotSSID = config.hotspotSsid || 'Radio-Setup'
   const hotspotPassword = config.hotspotPassword || 'radio123'

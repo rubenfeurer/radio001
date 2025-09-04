@@ -5,7 +5,7 @@ import { readFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import type { AppConfig } from '~/types'
 
-export default defineEventHandler(async (event) => {
+export default defineEventHandler(async (_event) => {
   const config = useRuntimeConfig()
 
   try {
@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
   }
 })
 
-async function getDeviceConfig(config: any): Promise<AppConfig> {
+async function getDeviceConfig(config: ReturnType<typeof useRuntimeConfig>): Promise<AppConfig> {
   const isDevelopment = config.public.isDevelopment
 
   // Default configuration

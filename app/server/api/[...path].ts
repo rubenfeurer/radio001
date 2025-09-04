@@ -2,8 +2,6 @@
 // This allows the Nuxt frontend to communicate with the FastAPI backend seamlessly
 
 export default defineEventHandler(async (event) => {
-  const config = useRuntimeConfig()
-
   // Get the path after /api/
   const path = getRouterParam(event, 'path') || ''
   const method = getMethod(event)
