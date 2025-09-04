@@ -9,6 +9,7 @@ const execAsync = promisify(exec)
 
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
+  // Test comment to trigger pre-commit linting
 
   try {
     const wifiStatus = await getWiFiStatus(config)
