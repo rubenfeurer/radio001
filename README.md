@@ -293,10 +293,10 @@ CHOKIDAR_USEPOLLING=true
 ### Application Structure
 
 #### Frontend (Nuxt 3)
-- **Dashboard** (`/`) - System overview and status
-- **WiFi Setup** (`/setup`) - Network scanning and connection
-- **System Status** (`/status`) - Detailed system information
-- **Settings** (`/settings`) - Device configuration
+- **Dashboard** (`/`) - System overview and live status with auto-refresh
+- **WiFi Setup** (`/setup`) - Network scanning, connection wizard, and signal visualization
+- **System Status** (`/status`) - Detailed system information, service monitoring, and system controls
+- **Settings** (`/settings`) - Device configuration, WiFi preferences, and hotspot settings
 
 #### Backend (FastAPI)
 - **WiFi Management** - Scan, connect, status APIs
@@ -304,11 +304,40 @@ CHOKIDAR_USEPOLLING=true
 - **Configuration** - Save/load device settings
 - **Health Monitoring** - Service status and diagnostics
 
+### WiFi Management Implementation
+
+The WiFi management system is **inspired by [RaspiWiFi](https://github.com/jasbur/RaspiWiFi)** but implemented as a **custom solution** with minimal dependencies and modern architecture:
+
+#### **Design Philosophy**
+- **RaspiWiFi-Inspired Patterns**: Uses proven methods for network scanning, configuration management, and mode switching
+- **Minimal Dependencies**: Custom implementation instead of direct dependency for better reliability and maintainability
+- **Modern Architecture**: Built with FastAPI and async Python for better performance
+
+#### **Core Implementation Details**
+- **Network Scanning**: Uses `iwlist scan` command (same as RaspiWiFi)
+- **Configuration Management**: Creates and manages `wpa_supplicant.conf` files following RaspiWiFi conventions
+- **Mode Switching**: Host mode ↔ Client mode switching using marker files (`/etc/raspiwifi/host_mode`)
+- **Status Monitoring**: Uses `iwconfig` for connection status checking
+- **File Structure**: Follows RaspiWiFi directory conventions (`/etc/raspiwifi/`) for compatibility
+
+#### **Why Custom Implementation?**
+1. **Reliability**: Fewer dependencies reduce potential failure points
+2. **Maintainability**: Full control over codebase for specific requirements
+3. **Compatibility**: Built specifically for Python 3.13 and Raspberry Pi Zero 2 W
+4. **Modern Patterns**: Combines RaspiWiFi's proven methods with FastAPI's async architecture
+
+This approach provides the reliability of established WiFi management patterns while maintaining the project's philosophy of minimal dependencies and clean architecture.
+
 #### Key Components
-- **SignalStrength.vue** - Visual WiFi signal indicator
-- **useWiFi.ts** - Reactive WiFi state management
-- **API Proxy** - Seamless frontend-backend communication
-- **Docker Services** - Containerized frontend and backend
+- **Live Dashboard** - Real-time system status with auto-refresh every 30 seconds
+- **Network Scanner** - WiFi discovery with signal strength visualization and security indicators  
+- **Connection Manager** - Secure network connection with proper error handling and feedback
+- **System Monitor** - CPU, memory, temperature, and service status monitoring
+- **Settings Interface** - Device configuration with validation and persistence
+- **API Integration** - Robust error handling and response processing for all endpoints
+- **useWiFi.ts** - Reactive WiFi state management composable
+- **API Proxy** - Seamless frontend-backend communication with proper error handling
+- **Docker Services** - Containerized frontend and backend with health checks
 
 ## 📱 Usage
 
@@ -516,13 +545,25 @@ docker info
 - [x] Signal strength visualization
 
 ### Phase 3: User Interface ✅
-- [x] Mobile-responsive dashboard
-- [x] WiFi setup wizard
-- [x] System status and monitoring
-- [x] Configuration management
-- [x] Signal strength indicators
+- [x] Mobile-responsive dashboard with live data
+- [x] WiFi setup wizard with network scanning
+- [x] System status and monitoring with real-time updates
+- [x] Configuration management with settings persistence
+- [x] Signal strength indicators and visual feedback
 - [x] Removed @nuxt/ui for faster builds (replaced with minimal Tailwind CSS)
+- [x] Fixed all frontend pages with proper API integration
+- [x] Added error handling and loading states across all pages
+- [x] Implemented auto-refresh functionality for live data updates
 
+### Phase 4: Frontend Completion ✅ (December 2024)
+- [x] Fixed index page with live WiFi and system status data
+- [x] Updated setup page with proper network scanning and connection flow
+- [x] Enhanced status page with real-time system monitoring
+- [x] Simplified settings page with device and WiFi configuration
+- [x] Implemented proper API response handling across all pages
+- [x] Added consistent error handling and success messaging
+- [x] Integrated auto-refresh functionality for real-time updates
+- [x] Removed UI library dependencies for faster builds and better reliability
 
 ## 📄 License
 
@@ -530,6 +571,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
+- **[RaspiWiFi](https://github.com/jasbur/RaspiWiFi)** for inspiring the WiFi management architecture and proven patterns
 - **Nuxt.js team** for the excellent framework
 - **Raspberry Pi Foundation** for amazing hardware
 - **Docker** for containerization technology

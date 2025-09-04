@@ -59,7 +59,15 @@ export default defineEventHandler(async (event) => {
         },
         performance: {
           responseTime: `${responseTime}ms`,
-          loadAverage: process.platform !== 'win32' ? process.loadavg() : [0, 0, 0]
+          loadAverage: (() => {
+            try {
+              return process.platform !== 'win32' && typeof process.loadavg === 'function'
+                ? process.loadavg()
+                : [0, 0, 0]
+            } catch {
+              return [0, 0, 0]
+            }
+          })()
         }
       }
     }

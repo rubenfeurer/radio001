@@ -111,10 +111,8 @@ export default defineNuxtConfig({
     // Compression
     compressPublicAssets: true,
 
-    // Memory optimizations
-    storage: {
-      redis: false // Use in-memory storage for simplicity
-    }
+    // Memory optimizations - use default in-memory storage
+    storage: {}
   },
 
   // =============================================================================

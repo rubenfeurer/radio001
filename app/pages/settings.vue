@@ -2,16 +2,17 @@
   <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
     <!-- Header -->
     <header class="bg-white dark:bg-gray-800 shadow">
-      <div class="radio-container">
+      <div class="max-w-md mx-auto px-4">
         <div class="flex items-center justify-between py-4">
           <div class="flex items-center space-x-3">
-            <UButton
-              variant="ghost"
-              size="sm"
+            <button
               @click="navigateTo('/')"
+              class="inline-flex items-center px-2 py-2 border border-gray-300 rounded-md text-sm text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600"
             >
-              <Icon name="heroicons:arrow-left" class="w-4 h-4" />
-            </UButton>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+              </svg>
+            </button>
             <div>
               <h1 class="text-xl font-bold text-gray-900 dark:text-white">
                 Settings
@@ -21,760 +22,562 @@
               </p>
             </div>
           </div>
-          <UButton
+          <button
             v-if="hasUnsavedChanges"
-            color="primary"
-            size="sm"
             @click="saveSettings"
-            :loading="isSaving"
+            :disabled="isSaving"
+            class="inline-flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Save Changes
-          </UButton>
+            <svg v-if="isSaving" class="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            {{ isSaving ? 'Saving...' : 'Save Changes' }}
+          </button>
         </div>
       </div>
     </header>
 
     <!-- Main Content -->
-    <main class="radio-container py-6 space-y-6">
-      <!-- Device Settings -->
-      <UCard>
-        <template #header>
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-            Device Settings
-          </h2>
-        </template>
-
-        <div class="space-y-6">
-          <!-- Hostname -->
-          <UFormGroup
-            label="Device Hostname"
-            description="This is how the device appears on your network"
-          >
-            <UInput
-              v-model="settings.hostname"
-              placeholder="radio"
-              @input="markAsChanged"
-            />
-          </UFormGroup>
-
-          <!-- Theme -->
-          <UFormGroup
-            label="Theme"
-            description="Choose your preferred interface theme"
-          >
-            <USelect
-              v-model="settings.theme"
-              :options="themeOptions"
-              @change="markAsChanged"
-            />
-          </UFormGroup>
-
-          <!-- Language -->
-          <UFormGroup
-            label="Language"
-            description="Interface language preference"
-          >
-            <USelect
-              v-model="settings.language"
-              :options="languageOptions"
-              @change="markAsChanged"
-            />
-          </UFormGroup>
-        </div>
-      </UCard>
-
-      <!-- WiFi Settings -->
-      <UCard>
-        <template #header>
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-            WiFi Configuration
-          </h2>
-        </template>
-
-        <div class="space-y-6">
-          <!-- Auto-connect -->
-          <UFormGroup
-            label="Auto-connect"
-            description="Automatically connect to saved networks"
-          >
-            <UToggle
-              v-model="settings.autoConnect"
-              @change="markAsChanged"
-            />
-          </UFormGroup>
-
-          <!-- WiFi Interface -->
-          <UFormGroup
-            label="WiFi Interface"
-            description="Network interface for WiFi connections"
-          >
-            <USelect
-              v-model="settings.wifiInterface"
-              :options="interfaceOptions"
-              @change="markAsChanged"
-            />
-          </UFormGroup>
-
-          <!-- Connection Timeout -->
-          <UFormGroup
-            label="Connection Timeout"
-            description="Maximum time to wait for WiFi connection (seconds)"
-          >
-            <UInput
-              v-model.number="settings.connectionTimeout"
-              type="number"
-              min="10"
-              max="120"
-              @input="markAsChanged"
-            />
-          </UFormGroup>
-
-          <!-- Scan Interval -->
-          <UFormGroup
-            label="Auto-scan Interval"
-            description="How often to automatically scan for networks (minutes)"
-          >
-            <UInput
-              v-model.number="settings.scanInterval"
-              type="number"
-              min="1"
-              max="60"
-              @input="markAsChanged"
-            />
-          </UFormGroup>
-        </div>
-      </UCard>
-
-      <!-- Hotspot Settings -->
-      <UCard>
-        <template #header>
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-              Hotspot Configuration
-            </h2>
-            <UButton
-              variant="outline"
-              size="sm"
-              @click="testHotspot"
-              :loading="isTesting"
-            >
-              Test Hotspot
-            </UButton>
+    <main class="max-w-md mx-auto px-4 py-6 space-y-6">
+      <!-- Success Message -->
+      <div v-if="successMessage" class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+            </svg>
           </div>
-        </template>
-
-        <div class="space-y-6">
-          <!-- Hotspot SSID -->
-          <UFormGroup
-            label="Hotspot Name (SSID)"
-            description="Name of the WiFi hotspot when in setup mode"
-          >
-            <UInput
-              v-model="settings.hotspotSSID"
-              placeholder="Radio-Setup"
-              @input="markAsChanged"
-            />
-          </UFormGroup>
-
-          <!-- Hotspot Password -->
-          <UFormGroup
-            label="Hotspot Password"
-            description="Password for the setup hotspot (leave empty for open network)"
-          >
-            <UInput
-              v-model="settings.hotspotPassword"
-              type="password"
-              placeholder="Enter password"
-              @input="markAsChanged"
-            />
-          </UFormGroup>
-
-          <!-- Hotspot Channel -->
-          <UFormGroup
-            label="WiFi Channel"
-            description="WiFi channel for the hotspot (1-11 for 2.4GHz)"
-          >
-            <USelect
-              v-model="settings.hotspotChannel"
-              :options="channelOptions"
-              @change="markAsChanged"
-            />
-          </UFormGroup>
-
-          <!-- Hotspot IP -->
-          <UFormGroup
-            label="Hotspot IP Address"
-            description="IP address for the hotspot interface"
-          >
-            <UInput
-              v-model="settings.hotspotIP"
-              placeholder="192.168.4.1"
-              @input="markAsChanged"
-            />
-          </UFormGroup>
-
-          <!-- Hidden Network -->
-          <UFormGroup
-            label="Hidden Network"
-            description="Hide the hotspot from network lists"
-          >
-            <UToggle
-              v-model="settings.hotspotHidden"
-              @change="markAsChanged"
-            />
-          </UFormGroup>
-        </div>
-      </UCard>
-
-      <!-- Advanced Settings -->
-      <UCard>
-        <template #header>
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-              Advanced Settings
-            </h2>
-            <UButton
-              variant="ghost"
-              size="sm"
-              @click="showAdvanced = !showAdvanced"
-            >
-              <Icon
-                :name="showAdvanced ? 'heroicons:chevron-up' : 'heroicons:chevron-down'"
-                class="w-4 h-4"
-              />
-            </UButton>
-          </div>
-        </template>
-
-        <UCollapse :open="showAdvanced">
-          <div class="space-y-6 pt-4">
-            <!-- Captive Portal -->
-            <UFormGroup
-              label="Captive Portal"
-              description="Automatically redirect users to setup page when connected to hotspot"
-            >
-              <UToggle
-                v-model="settings.captivePortal"
-                @change="markAsChanged"
-              />
-            </UFormGroup>
-
-            <!-- Debug Mode -->
-            <UFormGroup
-              label="Debug Mode"
-              description="Enable detailed logging for troubleshooting"
-            >
-              <UToggle
-                v-model="settings.debugMode"
-                @change="markAsChanged"
-              />
-            </UFormGroup>
-
-            <!-- Monitoring -->
-            <UFormGroup
-              label="Network Monitoring"
-              description="Continuously monitor connection quality"
-            >
-              <UToggle
-                v-model="settings.monitoring"
-                @change="markAsChanged"
-              />
-            </UFormGroup>
-
-            <!-- Auto-restart -->
-            <UFormGroup
-              label="Auto-restart on Failure"
-              description="Automatically restart network services if connection fails"
-            >
-              <UToggle
-                v-model="settings.autoRestart"
-                @change="markAsChanged"
-              />
-            </UFormGroup>
-
-            <!-- Reset Button -->
-            <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
-              <UFormGroup
-                label="Factory Reset"
-                description="Reset all settings to default values"
-              >
-                <UButton
-                  color="red"
-                  variant="outline"
-                  @click="showResetModal = true"
-                >
-                  <Icon name="heroicons:exclamation-triangle" class="w-4 h-4 mr-2" />
-                  Reset to Defaults
-                </UButton>
-              </UFormGroup>
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-green-800 dark:text-green-200">
+              Settings Saved
+            </h3>
+            <div class="mt-2 text-sm text-green-700 dark:text-green-300">
+              <p>{{ successMessage }}</p>
             </div>
           </div>
-        </UCollapse>
-      </UCard>
+        </div>
+      </div>
 
-      <!-- System Information -->
-      <UCard>
-        <template #header>
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-            System Information
-          </h2>
-        </template>
-
-        <div class="grid grid-cols-2 gap-4">
-          <div class="space-y-1">
-            <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Version</p>
-            <p class="text-sm text-gray-900 dark:text-white">
-              {{ config.public.version }}
-            </p>
+      <!-- Error Message -->
+      <div v-if="error" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+            </svg>
           </div>
-          <div class="space-y-1">
-            <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Build</p>
-            <p class="text-sm text-gray-900 dark:text-white">
-              {{ config.public.isDevelopment ? 'Development' : 'Production' }}
-            </p>
-          </div>
-          <div class="space-y-1">
-            <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Config File</p>
-            <p class="text-sm text-gray-900 dark:text-white font-mono">
-              /etc/radio/config.json
-            </p>
-          </div>
-          <div class="space-y-1">
-            <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Last Updated</p>
-            <p class="text-sm text-gray-900 dark:text-white">
-              {{ formatDate(lastUpdated) }}
-            </p>
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-red-800 dark:text-red-200">
+              Error
+            </h3>
+            <div class="mt-2 text-sm text-red-700 dark:text-red-300">
+              <p>{{ error }}</p>
+            </div>
+            <div class="mt-4">
+              <button
+                @click="clearError"
+                type="button"
+                class="bg-red-50 dark:bg-red-900/20 px-2 py-1.5 rounded-md text-sm font-medium text-red-800 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900/40 focus:outline-none focus:ring-2 focus:ring-red-600"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         </div>
-      </UCard>
+      </div>
 
-      <!-- Actions -->
-      <UCard>
-        <template #header>
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-            Configuration Actions
+      <!-- Device Settings -->
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+        <div class="p-6">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-6">
+            Device Settings
           </h2>
-        </template>
 
-        <div class="grid grid-cols-2 gap-3">
-          <UButton
-            variant="outline"
-            @click="exportConfig"
-            :loading="isExporting"
-          >
-            <Icon name="heroicons:document-arrow-down" class="w-4 h-4 mr-2" />
-            Export Config
-          </UButton>
-          <UButton
-            variant="outline"
-            @click="$refs.importInput.click()"
-          >
-            <Icon name="heroicons:document-arrow-up" class="w-4 h-4 mr-2" />
-            Import Config
-          </UButton>
-          <UButton
-            variant="outline"
-            @click="validateConfig"
-            :loading="isValidating"
-          >
-            <Icon name="heroicons:shield-check" class="w-4 h-4 mr-2" />
-            Validate Config
-          </UButton>
-          <UButton
-            variant="outline"
-            @click="navigateTo('/status')"
-          >
-            <Icon name="heroicons:chart-bar" class="w-4 h-4 mr-2" />
-            View Status
-          </UButton>
+          <div class="space-y-6">
+            <!-- Hostname -->
+            <div>
+              <label for="hostname" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Device Hostname
+              </label>
+              <input
+                id="hostname"
+                v-model="settings.hostname"
+                type="text"
+                placeholder="radio"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                maxlength="63"
+                pattern="[a-zA-Z0-9-]+"
+                @input="checkChanges"
+              />
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Used for mDNS discovery ({{ settings.hostname }}.local)
+              </p>
+            </div>
+
+            <!-- Theme -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Theme
+              </label>
+              <div class="space-y-2">
+                <label class="flex items-center">
+                  <input
+                    v-model="settings.theme"
+                    type="radio"
+                    value="light"
+                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                    @change="checkChanges"
+                  />
+                  <span class="ml-2 text-sm text-gray-900 dark:text-white">Light</span>
+                </label>
+                <label class="flex items-center">
+                  <input
+                    v-model="settings.theme"
+                    type="radio"
+                    value="dark"
+                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                    @change="checkChanges"
+                  />
+                  <span class="ml-2 text-sm text-gray-900 dark:text-white">Dark</span>
+                </label>
+                <label class="flex items-center">
+                  <input
+                    v-model="settings.theme"
+                    type="radio"
+                    value="system"
+                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                    @change="checkChanges"
+                  />
+                  <span class="ml-2 text-sm text-gray-900 dark:text-white">System</span>
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
-      </UCard>
+      </div>
 
-      <!-- Hidden file input for config import -->
-      <input
-        ref="importInput"
-        type="file"
-        accept=".json"
-        class="hidden"
-        @change="importConfig"
-      />
+      <!-- WiFi Settings -->
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+        <div class="p-6">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-6">
+            WiFi Settings
+          </h2>
+
+          <div class="space-y-6">
+            <!-- Auto-connect -->
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-sm font-medium text-gray-900 dark:text-white">
+                  Auto-connect to saved networks
+                </h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  Automatically connect to known networks on startup
+                </p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input
+                  v-model="settings.autoConnect"
+                  type="checkbox"
+                  class="sr-only peer"
+                  @change="checkChanges"
+                />
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+
+            <!-- Scan Interval -->
+            <div>
+              <label for="scanInterval" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Network Scan Interval (seconds)
+              </label>
+              <input
+                id="scanInterval"
+                v-model.number="settings.scanInterval"
+                type="number"
+                min="10"
+                max="300"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                @input="checkChanges"
+              />
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                How often to scan for available networks (10-300 seconds)
+              </p>
+            </div>
+
+            <!-- Connection Timeout -->
+            <div>
+              <label for="connectionTimeout" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Connection Timeout (seconds)
+              </label>
+              <input
+                id="connectionTimeout"
+                v-model.number="settings.connectionTimeout"
+                type="number"
+                min="10"
+                max="120"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                @input="checkChanges"
+              />
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Maximum time to wait for WiFi connection (10-120 seconds)
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hotspot Settings -->
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+        <div class="p-6">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-6">
+            Hotspot Settings
+          </h2>
+
+          <div class="space-y-6">
+            <!-- SSID -->
+            <div>
+              <label for="hotspotSsid" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Hotspot SSID
+              </label>
+              <input
+                id="hotspotSsid"
+                v-model="settings.hotspotSsid"
+                type="text"
+                placeholder="Radio-Setup"
+                maxlength="32"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                @input="checkChanges"
+              />
+            </div>
+
+            <!-- Password -->
+            <div>
+              <label for="hotspotPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Hotspot Password
+              </label>
+              <input
+                id="hotspotPassword"
+                v-model="settings.hotspotPassword"
+                type="password"
+                placeholder="Enter password"
+                minlength="8"
+                maxlength="63"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                @input="checkChanges"
+              />
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Minimum 8 characters for WPA2 security
+              </p>
+            </div>
+
+            <!-- Channel -->
+            <div>
+              <label for="hotspotChannel" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                WiFi Channel
+              </label>
+              <select
+                id="hotspotChannel"
+                v-model.number="settings.hotspotChannel"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                @change="checkChanges"
+              >
+                <option v-for="channel in [1, 6, 11]" :key="channel" :value="channel">
+                  Channel {{ channel }} ({{ channel === 1 ? '2.412' : channel === 6 ? '2.437' : '2.462' }} GHz)
+                </option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Advanced Settings -->
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+        <div class="p-6">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-6">
+            Advanced Settings
+          </h2>
+
+          <div class="space-y-6">
+            <!-- Enable Captive Portal -->
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-sm font-medium text-gray-900 dark:text-white">
+                  Enable Captive Portal
+                </h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  Automatically redirect users to setup page in hotspot mode
+                </p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input
+                  v-model="settings.captivePortal"
+                  type="checkbox"
+                  class="sr-only peer"
+                  @change="checkChanges"
+                />
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+
+            <!-- Debug Mode -->
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-sm font-medium text-gray-900 dark:text-white">
+                  Debug Mode
+                </h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  Enable detailed logging for troubleshooting
+                </p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input
+                  v-model="settings.debugMode"
+                  type="checkbox"
+                  class="sr-only peer"
+                  @change="checkChanges"
+                />
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reset Settings -->
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+        <div class="p-6">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Reset Settings
+          </h2>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Reset all settings to their default values. This action cannot be undone.
+          </p>
+          <button
+            @click="confirmReset"
+            class="inline-flex items-center px-4 py-2 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-white hover:bg-red-50 focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:border-red-600 dark:text-red-300 dark:hover:bg-red-900"
+          >
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            Reset to Defaults
+          </button>
+        </div>
+      </div>
     </main>
 
     <!-- Reset Confirmation Modal -->
-    <UModal v-model="showResetModal">
-      <UCard>
-        <template #header>
-          <h3 class="text-lg font-semibold text-red-600">
-            Confirm Factory Reset
-          </h3>
-        </template>
-
-        <div class="py-4">
-          <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            This will reset all settings to their default values. This action cannot be undone.
-          </p>
-          <p class="text-sm font-medium text-gray-900 dark:text-white">
-            Are you sure you want to continue?
-          </p>
+    <div v-if="showResetModal" class="fixed inset-0 z-50 overflow-y-auto">
+      <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+          <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
         </div>
 
-        <template #footer>
-          <div class="flex justify-end space-x-3">
-            <UButton
-              variant="outline"
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+          <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <div class="sm:flex sm:items-start">
+              <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">
+                  Reset Settings
+                </h3>
+                <div class="mt-2">
+                  <p class="text-sm text-gray-500">
+                    Are you sure you want to reset all settings to their default values? This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+            <button
+              @click="resetSettings"
+              type="button"
+              class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+            >
+              Reset Settings
+            </button>
+            <button
               @click="showResetModal = false"
+              type="button"
+              class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
             >
               Cancel
-            </UButton>
-            <UButton
-              color="red"
-              @click="resetToDefaults"
-              :loading="isResetting"
-            >
-              Reset All Settings
-            </UButton>
+            </button>
           </div>
-        </template>
-      </UCard>
-    </UModal>
-
-    <!-- Save Confirmation -->
-    <div
-      v-if="showSaveSuccess"
-      class="fixed bottom-4 right-4 z-50"
-    >
-      <UAlert
-        icon="heroicons:check-circle"
-        color="green"
-        variant="solid"
-        title="Settings Saved"
-        description="Your changes have been applied successfully"
-        @close="showSaveSuccess = false"
-        :close-button="{ icon: 'heroicons:x-mark', color: 'white', variant: 'link' }"
-      />
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { UserPreferences, AppConfig } from '~/types'
-
 // Meta
 definePageMeta({
-  title: 'Settings',
-  description: 'Configure device settings and preferences'
+  title: 'Settings - Radio WiFi Configuration',
+  description: 'Configure device preferences and WiFi settings'
 })
-
-// Runtime config
-const config = useRuntimeConfig()
-const toast = useToast()
 
 // Reactive state
 const settings = ref({
-  // Device Settings
+  // Device settings
   hostname: 'radio',
   theme: 'system',
-  language: 'en',
 
-  // WiFi Settings
+  // WiFi settings
   autoConnect: true,
-  wifiInterface: 'wlan0',
+  scanInterval: 60,
   connectionTimeout: 30,
-  scanInterval: 5,
 
-  // Hotspot Settings
-  hotspotSSID: 'Radio-Setup',
+  // Hotspot settings
+  hotspotSsid: 'Radio-Setup',
   hotspotPassword: 'radio123',
   hotspotChannel: 6,
-  hotspotIP: '192.168.4.1',
-  hotspotHidden: false,
 
-  // Advanced Settings
+  // Advanced settings
   captivePortal: true,
-  debugMode: false,
-  monitoring: true,
-  autoRestart: true
+  debugMode: false
 })
 
-const originalSettings = ref({})
+const originalSettings = ref(null)
 const hasUnsavedChanges = ref(false)
-const showAdvanced = ref(false)
-const showResetModal = ref(false)
-const showSaveSuccess = ref(false)
-
 const isSaving = ref(false)
-const isExporting = ref(false)
-const isValidating = ref(false)
-const isResetting = ref(false)
-const isTesting = ref(false)
+const error = ref('')
+const successMessage = ref('')
+const showResetModal = ref(false)
 
-const lastUpdated = ref(new Date())
-
-// Options
-const themeOptions = [
-  { label: 'System', value: 'system' },
-  { label: 'Light', value: 'light' },
-  { label: 'Dark', value: 'dark' }
-]
-
-const languageOptions = [
-  { label: 'English', value: 'en' },
-  { label: 'Spanish', value: 'es' },
-  { label: 'French', value: 'fr' },
-  { label: 'German', value: 'de' }
-]
-
-const interfaceOptions = [
-  { label: 'wlan0', value: 'wlan0' },
-  { label: 'wlan1', value: 'wlan1' }
-]
-
-const channelOptions = Array.from({ length: 11 }, (_, i) => ({
-  label: `Channel ${i + 1}`,
-  value: i + 1
-}))
-
-// Methods
-const markAsChanged = () => {
-  hasUnsavedChanges.value = true
+// Auto-clear messages
+const clearError = () => {
+  error.value = ''
 }
 
+const clearSuccess = () => {
+  successMessage.value = ''
+}
+
+const setError = (message) => {
+  error.value = message
+  setTimeout(clearError, 7000)
+}
+
+const setSuccess = (message) => {
+  successMessage.value = message
+  setTimeout(clearSuccess, 5000)
+}
+
+// Check for changes
+const checkChanges = () => {
+  if (!originalSettings.value) return
+
+  hasUnsavedChanges.value = JSON.stringify(settings.value) !== JSON.stringify(originalSettings.value)
+}
+
+// Load settings from API
 const loadSettings = async () => {
   try {
-    const response = await $fetch<{ success: boolean; data: AppConfig }>('/api/config')
+    const response = await $fetch('/api/config')
     if (response.success && response.data) {
-      Object.assign(settings.value, response.data)
-      originalSettings.value = { ...settings.value }
-      hasUnsavedChanges.value = false
+      // Map API response to our settings structure
+      const config = response.data
+      settings.value = {
+        hostname: config.hostname || 'radio',
+        theme: config.theme || 'system',
+        autoConnect: config.features?.autoConnect ?? true,
+        scanInterval: config.scanInterval || 60,
+        connectionTimeout: config.connectionTimeout || 30,
+        hotspotSsid: config.hotspot?.ssid || 'Radio-Setup',
+        hotspotPassword: config.hotspot?.password || 'radio123',
+        hotspotChannel: config.hotspot?.channel || 6,
+        captivePortal: config.features?.captivePortal ?? true,
+        debugMode: config.features?.monitoring ?? false
+      }
     }
-  } catch (error) {
-    console.error('Failed to load settings:', error)
-    toast.add({
-      title: 'Error',
-      description: 'Failed to load settings',
-      color: 'red'
-    })
+
+    // Store original settings for comparison
+    originalSettings.value = JSON.parse(JSON.stringify(settings.value))
+  } catch (err) {
+    console.error('Failed to load settings:', err)
+    // Keep default values
+    originalSettings.value = JSON.parse(JSON.stringify(settings.value))
   }
 }
 
+// Save settings to API
 const saveSettings = async () => {
+  if (!hasUnsavedChanges.value) return
+
   isSaving.value = true
+  clearError()
+  clearSuccess()
+
   try {
-    const response = await $fetch<{ success: boolean; message: string }>('/api/config', {
+    // Map our settings to API format
+    const config = {
+      hostname: settings.value.hostname,
+      theme: settings.value.theme,
+      scanInterval: settings.value.scanInterval,
+      connectionTimeout: settings.value.connectionTimeout,
+      hotspot: {
+        ssid: settings.value.hotspotSsid,
+        password: settings.value.hotspotPassword,
+        channel: settings.value.hotspotChannel
+      },
+      features: {
+        autoConnect: settings.value.autoConnect,
+        captivePortal: settings.value.captivePortal,
+        monitoring: settings.value.debugMode
+      }
+    }
+
+    const response = await $fetch('/api/config', {
       method: 'POST',
-      body: settings.value
+      body: config
     })
 
     if (response.success) {
-      originalSettings.value = { ...settings.value }
+      originalSettings.value = JSON.parse(JSON.stringify(settings.value))
       hasUnsavedChanges.value = false
-      showSaveSuccess.value = true
-      lastUpdated.value = new Date()
-
-      // Auto-hide success message
-      setTimeout(() => {
-        showSaveSuccess.value = false
-      }, 3000)
+      setSuccess('Settings saved successfully. Some changes may require a system restart.')
     } else {
-      throw new Error(response.message)
+      throw new Error(response.error || 'Failed to save settings')
     }
-  } catch (error) {
-    console.error('Failed to save settings:', error)
-    toast.add({
-      title: 'Error',
-      description: 'Failed to save settings',
-      color: 'red'
-    })
+  } catch (err) {
+    console.error('Failed to save settings:', err)
+    const message = err instanceof Error ? err.message : 'Failed to save settings. Please try again.'
+    setError(message)
   } finally {
     isSaving.value = false
   }
 }
 
-const exportConfig = async () => {
-  isExporting.value = true
-  try {
-    const response = await fetch('/api/config/export')
-    if (response.ok) {
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `radio-config-${new Date().toISOString().split('T')[0]}.json`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-
-      toast.add({
-        title: 'Success',
-        description: 'Configuration exported',
-        color: 'green'
-      })
-    } else {
-      throw new Error('Export failed')
-    }
-  } catch (error) {
-    console.error('Failed to export config:', error)
-    toast.add({
-      title: 'Error',
-      description: 'Failed to export configuration',
-      color: 'red'
-    })
-  } finally {
-    isExporting.value = false
-  }
+// Reset settings
+const confirmReset = () => {
+  showResetModal.value = true
 }
 
-const importConfig = async (event: Event) => {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  if (!file) return
+const resetSettings = async () => {
+  showResetModal.value = false
 
-  try {
-    const text = await file.text()
-    const importedConfig = JSON.parse(text)
-
-    // Validate imported config
-    if (typeof importedConfig !== 'object' || !importedConfig) {
-      throw new Error('Invalid configuration file')
-    }
-
-    // Merge with current settings
-    Object.assign(settings.value, importedConfig)
-    markAsChanged()
-
-    toast.add({
-      title: 'Success',
-      description: 'Configuration imported successfully',
-      color: 'green'
-    })
-  } catch (error) {
-    console.error('Failed to import config:', error)
-    toast.add({
-      title: 'Error',
-      description: 'Failed to import configuration',
-      color: 'red'
-    })
+  // Reset to defaults
+  settings.value = {
+    hostname: 'radio',
+    theme: 'system',
+    autoConnect: true,
+    scanInterval: 60,
+    connectionTimeout: 30,
+    hotspotSsid: 'Radio-Setup',
+    hotspotPassword: 'radio123',
+    hotspotChannel: 6,
+    captivePortal: true,
+    debugMode: false
   }
 
-  // Reset file input
-  ;(event.target as HTMLInputElement).value = ''
+  checkChanges()
+  setSuccess('Settings reset to defaults. Click "Save Changes" to apply.')
 }
-
-const validateConfig = async () => {
-  isValidating.value = true
-  try {
-    const response = await $fetch<{ success: boolean; message: string; errors?: string[] }>('/api/config/validate', {
-      method: 'POST',
-      body: settings.value
-    })
-
-    if (response.success) {
-      toast.add({
-        title: 'Valid Configuration',
-        description: 'All settings are valid',
-        color: 'green'
-      })
-    } else {
-      const errors = response.errors?.join(', ') || response.message
-      toast.add({
-        title: 'Configuration Errors',
-        description: errors,
-        color: 'red'
-      })
-    }
-  } catch (error) {
-    console.error('Failed to validate config:', error)
-    toast.add({
-      title: 'Error',
-      description: 'Failed to validate configuration',
-      color: 'red'
-    })
-  } finally {
-    isValidating.value = false
-  }
-}
-
-const testHotspot = async () => {
-  isTesting.value = true
-  try {
-    const response = await $fetch<{ success: boolean; message: string }>('/api/system/test-hotspot', {
-      method: 'POST',
-      body: {
-        ssid: settings.value.hotspotSSID,
-        password: settings.value.hotspotPassword,
-        channel: settings.value.hotspotChannel
-      }
-    })
-
-    if (response.success) {
-      toast.add({
-        title: 'Test Successful',
-        description: 'Hotspot configuration is valid',
-        color: 'green'
-      })
-    } else {
-      throw new Error(response.message)
-    }
-  } catch (error) {
-    console.error('Hotspot test failed:', error)
-    toast.add({
-      title: 'Test Failed',
-      description: 'Hotspot configuration has issues',
-      color: 'red'
-    })
-  } finally {
-    isTesting.value = false
-  }
-}
-
-const resetToDefaults = async () => {
-  isResetting.value = true
-  try {
-    const response = await $fetch<{ success: boolean; message: string }>('/api/config/reset', {
-      method: 'POST'
-    })
-
-    if (response.success) {
-      await loadSettings()
-      showResetModal.value = false
-      toast.add({
-        title: 'Reset Complete',
-        description: 'All settings have been reset to defaults',
-        color: 'green'
-      })
-    } else {
-      throw new Error(response.message)
-    }
-  } catch (error) {
-    console.error('Failed to reset settings:', error)
-    toast.add({
-      title: 'Error',
-      description: 'Failed to reset settings',
-      color: 'red'
-    })
-  } finally {
-    isResetting.value = false
-  }
-}
-
-// Utility functions
-const formatDate = (date: Date): string => {
-  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-// Watch for unsaved changes warning
-onBeforeRouteLeave((to, from, next) => {
-  if (hasUnsavedChanges.value) {
-    const answer = confirm('You have unsaved changes. Are you sure you want to leave?')
-    if (answer) {
-      next()
-    } else {
-      next(false)
-    }
-  } else {
-    next()
-  }
-})
 
 // Initialize
 onMounted(async () => {
@@ -783,15 +586,9 @@ onMounted(async () => {
 
 // Head configuration
 useHead({
-  title: 'Settings - Radio',
+  title: 'Settings - Radio WiFi Configuration',
   meta: [
-    { name: 'description', content: 'Configure device settings and preferences' }
+    { name: 'description', content: 'Configure device preferences and WiFi settings for your Raspberry Pi Radio' }
   ]
 })
 </script>
-
-<style scoped>
-.radio-container {
-  @apply max-w-2xl mx-auto px-4;
-}
-</style>

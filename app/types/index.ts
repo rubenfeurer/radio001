@@ -55,9 +55,7 @@ export interface SystemStatus {
     }
   }
   services: {
-    avahi: boolean
-    hostapd: boolean
-    dnsmasq: boolean
+    [key: string]: boolean
   }
 }
 
