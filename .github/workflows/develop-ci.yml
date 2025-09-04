@@ -25,16 +25,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: |
-            package-lock.json
-            app/package-lock.json
+          cache: "npm"
+          cache-dependency-path: package-lock.json
 
-      - name: Install root dependencies
+      - name: Install dependencies
         run: npm ci
-
-      - name: Install app dependencies
-        run: cd app && npm ci
 
       - name: Run ESLint
         run: npm run lint
@@ -58,15 +53,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: |
-            package-lock.json
-            app/package-lock.json
+          cache: "npm"
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: |
-          npm ci
-          cd app && npm ci
+        run: npm ci
 
       - name: Build application
         run: npm run build
