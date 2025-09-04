@@ -1,171 +1,127 @@
-# Troubleshooting Guide - Radio WiFi Configuration
+# Troubleshooting Guide
 
-This guide covers common issues and solutions for the Radio WiFi Configuration project.
+Common issues and solutions for the Radio WiFi Configuration project.
 
 ## 🐳 Docker Issues
 
 ### Docker Not Running
-
-**Error:**
-```
-Cannot connect to the Docker daemon at unix:///Users/username/.docker/run/docker.sock. Is the docker daemon running?
-```
-
-**Solution:**
 ```bash
+# Check Docker status
+docker info
+
 # Start Docker Desktop (macOS/Windows)
 open -a Docker
 
-# Or start Docker service (Linux)
+# Start Docker service (Linux)
 sudo systemctl start docker
-
-# Verify Docker is running
-docker info
 ```
 
-### Pydantic Build Errors on Apple Silicon
+### Build Failures on Apple Silicon
+**Error**: `Failed to build installable wheels for pydantic-core`
 
-**Error:**
-```
-ERROR: Failed to build installable wheels for some pyproject.toml based projects (pydantic-core)
-```
-
-**Solutions:**
-
-1. **Use the Apple Silicon optimized build:**
-   ```bash
-   # The script automatically detects Apple Silicon and uses optimized configuration
-   ./scripts/docker-dev.sh start
-   ```
-
-2. **Manual Docker Compose with override:**
-   ```bash
-   # Force use of arm64 optimized images
-   docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d --build
-   ```
-
-3. **Clear Docker cache and rebuild:**
-   ```bash
-   # Clean all Docker resources
-   ./scripts/docker-dev.sh cleanup
-   
-   # Rebuild from scratch
-   ./scripts/docker-dev.sh rebuild
-   ```
-
-4. **Alternative: Use pre-built images (when available):**
-   ```bash
-   # Pull instead of building locally
-   docker-compose pull
-   docker-compose up -d
-   ```
-
-### Memory Issues
-
-**Error:**
-```
-ERROR: Container killed due to memory usage
-```
-
-**Solution:**
+**Solution**: Use the setup script (handles platform detection automatically)
 ```bash
-# Increase Docker Desktop memory limit to 4GB+
-# Docker Desktop → Settings → Resources → Memory
-
-# Or use resource limits in docker-compose.override.yml (already configured)
-# The override file limits backend to 512MB and frontend to 1GB
+./scripts/setup-dev.sh
+./scripts/docker-dev.sh start
 ```
 
-### Port Already in Use
+### Port Conflicts
+**Error**: `Port 3000 is already in use`
 
-**Error:**
-```
-Error starting userland proxy: listen tcp 0.0.0.0:3000: bind: address already in use
-```
-
-**Solution:**
+**Solution**:
 ```bash
 # Find and kill process using the port
 lsof -ti:3000 | xargs kill -9
 lsof -ti:8000 | xargs kill -9
 
 # Or use different ports
-FRONTEND_PORT=3001 BACKEND_PORT=8001 docker-compose up -d
+FRONTEND_PORT=3001 BACKEND_PORT=8001 ./scripts/docker-dev.sh start
 ```
 
-## 🔧 Build Issues
+### Memory Issues
+**Error**: Container exits with out of memory errors
 
-### Version Compatibility
+**Solution**: Increase Docker Desktop memory to 4GB+ in Settings → Resources
 
-**Error:**
-```
-WARN: the attribute `version` is obsolete, it will be ignored
-```
-
-**Solution:**
-This warning can be safely ignored. The `version` field has been removed from newer docker-compose files.
-
-### Node.js Module Issues
-
-**Error:**
-```
-Module not found: Can't resolve 'some-module'
-```
-
-**Solution:**
+### Container Won't Start
 ```bash
-# Rebuild node_modules volume
-docker-compose down -v
-docker volume rm radio001_radio_node_modules
-docker-compose up -d --build
+# Clean restart
+./scripts/docker-dev.sh stop
+./scripts/docker-dev.sh cleanup
+./scripts/docker-dev.sh start
+
+# Check logs
+./scripts/docker-dev.sh logs
 ```
 
-### Python Package Issues
+## 🛠️ Development Issues
 
-**Error:**
-```
-ModuleNotFoundError: No module named 'fastapi'
-```
+### TypeScript Import Errors in IDE
+**Issue**: IDE shows import errors for packages
 
-**Solution:**
+**Solution**: This is expected behavior - packages are installed in Docker containers
 ```bash
-# Rebuild backend container
-./scripts/docker-dev.sh rebuild radio-backend
+# For accurate type checking, use Docker
+./scripts/docker-dev.sh shell radio-app
+npm run type-check
+```
 
-# Or rebuild all services
-./scripts/docker-dev.sh rebuild
+### Pre-commit Hooks Not Working
+```bash
+# Reinstall hooks
+cd app && npm run prepare
+chmod +x .husky/pre-commit .husky/commit-msg
+
+# Test hooks manually
+npm run lint:fix
+npm run type-check
+```
+
+### Hot Reload Not Working
+```bash
+# For macOS users - enable polling
+export CHOKIDAR_USEPOLLING=true
+export WATCHPACK_POLLING=true
+./scripts/docker-dev.sh restart
+```
+
+### TypeScript Union Type Errors
+**Error**: `Property 'data' does not exist on type...`
+
+**Solution**: Use proper type guards
+```typescript
+// ✅ Correct
+if (response.success && 'data' in response) {
+  data.value = response.data
+} else if (!response.success && 'error' in response) {
+  throw new Error(response.error)
+}
+
+// ❌ Wrong
+if (response.success) {
+  data.value = response.data
+}
 ```
 
 ## 🌐 Network Issues
 
-### Services Can't Communicate
+### Cannot Access radio.local
+**Issue**: mDNS resolution not working
 
-**Error:**
-```
-Connection refused when frontend tries to reach backend
-```
-
-**Solution:**
+**Solutions**:
 ```bash
-# Check if both services are running
-./scripts/docker-dev.sh status
+# Check if containers are running
+docker ps
 
-# Check network connectivity
-docker-compose exec radio-app ping radio-backend
+# Use direct IP instead
+curl http://localhost:3000/api/health
+curl http://localhost:8000/health
 
-# Restart with fresh network
-docker-compose down
-docker-compose up -d
+# Check mDNS service (Linux)
+systemctl status avahi-daemon
 ```
 
-### API Proxy Issues
-
-**Error:**
-```
-504 Gateway Timeout from API proxy
-```
-
-**Solution:**
+### API Connection Timeouts
 ```bash
 # Check backend health
 curl http://localhost:8000/health
@@ -174,89 +130,158 @@ curl http://localhost:8000/health
 ./scripts/docker-dev.sh logs radio-backend
 
 # Restart backend service
-docker-compose restart radio-backend
+./scripts/docker-dev.sh restart
 ```
 
-## 📱 Application Issues
-
-### Frontend Not Loading
-
-**Symptoms:**
-- Blank page at http://localhost:3000
-- Build errors in logs
-
-**Solution:**
+### Frontend Blank Page
 ```bash
 # Check frontend logs
 ./scripts/docker-dev.sh logs radio-app
 
-# Common fixes:
-./scripts/docker-dev.sh rebuild radio-app
+# Rebuild frontend
+./scripts/docker-dev.sh shell radio-app
+npm run build
 
-# If TypeScript errors:
-docker-compose exec radio-app npm run typecheck
+# Check for JavaScript errors in browser console
 ```
 
-### Backend API Errors
+## 📱 Application Issues
 
-**Symptoms:**
-- 500 errors from API endpoints
-- Backend container keeps restarting
+### WiFi Scan Fails on Raspberry Pi
+**Issue**: No networks found or scan errors
 
-**Solution:**
+**Solutions**:
 ```bash
-# Check backend logs
-./scripts/docker-dev.sh logs radio-backend
+# Check WiFi interface
+sudo ip addr show wlan0
+sudo iwconfig wlan0
 
-# Check if main.py exists
-docker-compose exec radio-backend ls -la
+# Check permissions
+sudo usermod -aG netdev $USER
 
-# Restart backend
-docker-compose restart radio-backend
+# Manual scan test
+sudo iwlist wlan0 scan
+
+# Check system logs
+journalctl -u wpa_supplicant
+sudo dmesg | grep wlan
 ```
 
-### Hot Reload Not Working
+### Connection Fails After Entering Password
+**Possible causes**:
+1. **Incorrect password** - Double-check WiFi credentials
+2. **Weak signal** - Move closer to router
+3. **Network issues** - Check if network accepts new devices
+4. **Interface busy** - Restart networking service
 
-**Symptoms:**
-- Changes to code don't trigger reload
-- Need to manually restart containers
-
-**Solution:**
+**Debug steps**:
 ```bash
-# Check volume mounts
-docker-compose exec radio-app ls -la /app/app
+# Check wpa_supplicant logs
+journalctl -u wpa_supplicant -f
 
-# For macOS users - ensure file watching works
-export CHOKIDAR_USEPOLLING=true
-export WATCHPACK_POLLING=true
-docker-compose up -d --force-recreate
+# Check network manager logs
+journalctl -u NetworkManager -f
+
+# Restart networking
+sudo systemctl restart networking
+```
+
+### Hotspot Mode Not Working
+```bash
+# Check hostapd service
+sudo systemctl status hostapd
+journalctl -u hostapd
+
+# Check hostapd configuration
+sudo hostapd -dd /etc/hostapd/hostapd.conf
+
+# Check IP forwarding
+cat /proc/sys/net/ipv4/ip_forward
+
+# Restart hostapd
+sudo systemctl restart hostapd
+```
+
+## 🔧 System Issues
+
+### High CPU Usage
+```bash
+# Check container resource usage
+docker stats
+
+# Check system processes
+./scripts/docker-dev.sh shell radio-backend
+top
+
+# Restart services
+./scripts/docker-dev.sh restart
+```
+
+### Low Memory on Raspberry Pi
+**Solutions**:
+1. **Increase swap space**:
+   ```bash
+   sudo dphys-swapfile swapoff
+   sudo nano /etc/dphys-swapfile  # Set CONF_SWAPSIZE=1024
+   sudo dphys-swapfile setup
+   sudo dphys-swapfile swapon
+   ```
+
+2. **Optimize Docker memory limits** (already configured in docker-compose.prod.yml)
+
+### Service Won't Start on Boot
+```bash
+# Enable Docker service
+sudo systemctl enable docker
+
+# Create systemd service for the application
+sudo nano /etc/systemd/system/radio-wifi.service
+```
+
+Example systemd service:
+```ini
+[Unit]
+Description=Radio WiFi Configuration
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/docker-compose -f /home/pi/radio001/docker-compose.prod.yml up -d
+ExecStop=/usr/local/bin/docker-compose -f /home/pi/radio001/docker-compose.prod.yml down
+WorkingDirectory=/home/pi/radio001
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then enable it:
+```bash
+sudo systemctl enable radio-wifi
+sudo systemctl start radio-wifi
 ```
 
 ## 🔍 Debugging Commands
 
-### Useful Docker Commands
-
+### Container Diagnostics
 ```bash
 # View all containers
 docker ps -a
 
-# View container logs
-docker logs radio-wifi-dev -f
-docker logs radio-backend-dev -f
+# Check container logs
+./scripts/docker-dev.sh logs radio-app
+./scripts/docker-dev.sh logs radio-backend
 
 # Execute commands in containers
-docker-compose exec radio-app sh
-docker-compose exec radio-backend bash
+./scripts/docker-dev.sh shell radio-app
+./scripts/docker-dev.sh shell radio-backend
 
-# Check container resource usage
+# Check container resources
 docker stats
-
-# Inspect container details
-docker inspect radio-wifi-dev
 ```
 
 ### Health Checks
-
 ```bash
 # Manual health checks
 curl http://localhost:3000/api/health
@@ -265,111 +290,56 @@ curl http://localhost:8000/health
 # Check service status
 ./scripts/docker-dev.sh status
 
-# View detailed container info
-docker-compose ps
+# Test WiFi APIs
+curl http://localhost:3000/api/wifi/status
+curl -X POST http://localhost:3000/api/wifi/scan
 ```
 
-### Network Debugging
-
+### Log Analysis
 ```bash
-# List Docker networks
-docker network ls
+# Follow all logs
+./scripts/docker-dev.sh logs -f
 
-# Inspect project network
-docker network inspect radio001_radio-network
+# Frontend logs only
+./scripts/docker-dev.sh logs radio-app
 
-# Test connectivity between containers
-docker-compose exec radio-app ping radio-backend
-docker-compose exec radio-backend ping radio-app
+# Backend logs only
+./scripts/docker-dev.sh logs radio-backend
+
+# System logs (Raspberry Pi)
+journalctl -f
 ```
 
-## 🧹 Clean Reset
+## 🚀 Performance Optimization
 
-When all else fails, perform a complete reset:
+### Raspberry Pi Zero 2 W Optimization
 
+**Already implemented**:
+- Memory limits for containers
+- Resource-efficient Docker images
+- Optimized Nuxt configuration
+- Minimal dependencies
+
+**Additional optimizations**:
 ```bash
-# Stop all services
-./scripts/docker-dev.sh stop
+# Disable unnecessary services
+sudo systemctl disable bluetooth
+sudo systemctl disable cups
 
-# Clean up everything
-./scripts/docker-dev.sh cleanup
+# Optimize GPU memory split
+echo "gpu_mem=16" | sudo tee -a /boot/config.txt
 
-# Remove all project containers and images
-docker-compose down -v --rmi all
-
-# Remove Docker build cache
-docker builder prune -a
-
-# Start fresh
-./scripts/docker-dev.sh start
+# Enable I2C/SPI only if needed
+sudo raspi-config
 ```
 
-## 🍎 Apple Silicon Specific Issues
+## 🆘 Getting Help
 
-### Rosetta Emulation
+If issues persist:
 
-If you encounter platform issues:
+1. **Check logs**: Run `./scripts/docker-dev.sh logs` for detailed error information
+2. **Platform issues**: Verify you're using the correct Docker Compose configuration for your platform
+3. **Network connectivity**: Test basic network connectivity before WiFi configuration
+4. **System resources**: Ensure adequate memory and storage space
 
-```bash
-# Force arm64 platform
-export DOCKER_DEFAULT_PLATFORM=linux/arm64
-
-# Or use platform-specific compose
-docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
-```
-
-### Performance Issues
-
-```bash
-# Enable VirtioFS for better performance
-# Docker Desktop → Settings → General → "Use VirtioFS"
-
-# Increase resource limits
-# Docker Desktop → Settings → Resources
-# CPU: 4+ cores
-# Memory: 4+ GB
-# Disk: 32+ GB
-```
-
-## 📞 Getting Help
-
-### Log Collection
-
-When reporting issues, include:
-
-```bash
-# System information
-uname -a
-docker --version
-docker-compose --version
-
-# Service status
-./scripts/docker-dev.sh status
-
-# Recent logs
-./scripts/docker-dev.sh logs > debug-logs.txt
-```
-
-### Common Diagnostics
-
-```bash
-# Check disk space
-docker system df
-
-# Check Docker daemon logs (macOS)
-tail -f ~/Library/Containers/com.docker.docker/Data/log/vm/console-ring
-
-# Check Docker daemon logs (Linux)
-journalctl -u docker.service -f
-```
-
-## 📚 Additional Resources
-
-- [Docker Desktop Troubleshooting](https://docs.docker.com/desktop/troubleshoot/)
-- [Docker Compose Reference](https://docs.docker.com/compose/compose-file/)
-- [Nuxt 3 Troubleshooting](https://nuxt.com/docs/guide/concepts/auto-imports#troubleshooting)
-- [FastAPI Deployment](https://fastapi.tiangolo.com/deployment/)
-
----
-
-💡 **Pro Tip**: Most issues can be resolved with `./scripts/docker-dev.sh cleanup` followed by `./scripts/docker-dev.sh start`
+For development issues, see [DEVELOPMENT.md](DEVELOPMENT.md) for detailed setup and workflow guidance.

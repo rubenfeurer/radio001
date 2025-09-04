@@ -52,9 +52,9 @@ if ! command_exists docker; then
 fi
 
 # Check Docker Compose
-if ! command_exists docker-compose && ! docker compose version >/dev/null 2>&1; then
+if ! docker compose version >/dev/null 2>&1; then
     print_error "Docker Compose is not available"
-    echo "Please install Docker Compose or use Docker Desktop"
+    echo "Please install Docker Compose v2 or use Docker Desktop"
     exit 1
 fi
 

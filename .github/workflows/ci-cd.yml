@@ -26,11 +26,64 @@ jobs:
 
       - name: Build and test with Docker
         run: |
-          docker-compose build
-          docker-compose up -d
-          sleep 20
-          curl -f http://localhost:3000/api/health || exit 1
-          docker-compose down
+          # Build containers
+          docker compose build --no-cache
+
+          # Start services
+          docker compose up -d
+
+          # Wait for services to be ready
+          echo "Waiting for services to start..."
+          sleep 30
+
+          # Show running containers for debugging
+          docker compose ps
+
+          # Test frontend health
+          echo "Testing frontend health..."
+          for i in {1..5}; do
+            if curl -f http://localhost:3000/api/health; then
+              echo "Frontend health check passed"
+              break
+            else
+              echo "Frontend health check failed (attempt $i/5)"
+              if [ $i -eq 5 ]; then
+                echo "Frontend logs:"
+                docker compose logs radio-app
+                exit 1
+              fi
+              sleep 10
+            fi
+          done
+
+          # Test backend health
+          echo "Testing backend health..."
+          for i in {1..5}; do
+            if curl -f http://localhost:8000/health; then
+              echo "Backend health check passed"
+              break
+            else
+              echo "Backend health check failed (attempt $i/5)"
+              if [ $i -eq 5 ]; then
+                echo "Backend logs:"
+                docker compose logs radio-backend
+                exit 1
+              fi
+              sleep 10
+            fi
+          done
+
+          echo "All health checks passed!"
+
+        env:
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose logs
+          docker compose down -v
 
   # =============================================================================
   # Security Scanning
