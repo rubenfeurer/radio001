@@ -1,4 +1,9 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
+# Run lint-staged for linting and auto-fixes
 cd app && npx lint-staged
+
+# Run type checking separately (only if lint-staged passes)
+echo "Running TypeScript type checking..."
+cd app && npm run type-check
