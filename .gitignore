@@ -179,7 +179,9 @@ tramp
 # Build artifacts
 build/
 dist/
-lib/
+/lib/
+build/lib/
+dist/lib/
 es/
 
 # Testing
