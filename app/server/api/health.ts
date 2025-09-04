@@ -61,8 +61,9 @@ export default defineEventHandler(async (event) => {
           responseTime: `${responseTime}ms`,
           loadAverage: (() => {
             try {
-              return process.platform !== 'win32' && typeof process.loadavg === 'function'
-                ? process.loadavg()
+              const os = require('os')
+              return process.platform !== 'win32' && typeof os.loadavg === 'function'
+                ? os.loadavg()
                 : [0, 0, 0]
             } catch {
               return [0, 0, 0]

@@ -205,7 +205,7 @@ export class WiFiError extends Error {
 export class NetworkError extends Error {
   constructor(
     message: string,
-    public interface: string,
+    public networkInterface: string,
     public details?: any
   ) {
     super(message)

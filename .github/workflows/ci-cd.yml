@@ -2,11 +2,11 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   release:
-    types: [ published ]
+    types: [published]
 
 env:
   REGISTRY: ghcr.io
@@ -27,13 +27,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: app/package-lock.json
+          node-version: "18"
 
-      - name: Install dependencies
+      - name: Install app dependencies
         working-directory: ./app
-        run: npm ci
+        run: npm install
 
       - name: Run type checking
         working-directory: ./app
@@ -47,13 +45,16 @@ jobs:
         working-directory: ./app
         run: npm run build
 
-      - name: Test health endpoint
-        working-directory: ./app
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and test with Docker
         run: |
-          npm run preview &
-          sleep 10
+          docker-compose build
+          docker-compose up -d
+          sleep 20
           curl -f http://localhost:3000/api/health || exit 1
-          pkill -f "node"
+          docker-compose down
 
   # =============================================================================
   # Security Scanning
@@ -70,16 +71,16 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "trivy-results.sarif"
 
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: "trivy-results.sarif"
 
   # =============================================================================
   # Docker Build & Push
@@ -130,7 +131,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./docker/Dockerfile
+          file: ./docker/Dockerfile.dev
           platforms: ${{ matrix.platform }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -231,14 +232,15 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: "18"
 
       - name: Build documentation
         run: |
           echo "Documentation build would happen here"
           echo "This could generate:"
-          echo "- API documentation"
-          echo "- User guides"
+          echo "- API documentation from FastAPI"
+          echo "- Component documentation from Vue"
+          echo "- User guides from README"
           echo "- Installation instructions"
 
       - name: Deploy to GitHub Pages

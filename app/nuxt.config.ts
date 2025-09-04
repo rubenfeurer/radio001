@@ -15,7 +15,37 @@ export default defineNuxtConfig({
   // =============================================================================
   typescript: {
     typeCheck: false,
-    strict: false
+    strict: false,
+    tsConfig: {
+      compilerOptions: {
+        types: ['node']
+      }
+    }
+  },
+
+  // =============================================================================
+  // Nitro Configuration
+  // =============================================================================
+  nitro: {
+    typescript: {
+      tsConfig: {
+        compilerOptions: {
+          types: ['node']
+        }
+      }
+    },
+    // Optimizations for Pi Zero 2 W
+    experimental: {
+      wasm: false // Disable WASM for ARM compatibility
+    },
+    minify: process.env.NODE_ENV === 'production',
+    sourceMap: process.env.NODE_ENV === 'development',
+
+    // Compression
+    compressPublicAssets: true,
+
+    // Memory optimizations - use default in-memory storage
+    storage: {}
   },
 
   // =============================================================================
@@ -97,23 +127,7 @@ export default defineNuxtConfig({
     cssPath: '~/assets/css/main.css',
   },
 
-  // =============================================================================
-  // Server Configuration
-  // =============================================================================
-  nitro: {
-    // Optimizations for Pi Zero 2 W
-    experimental: {
-      wasm: false // Disable WASM for ARM compatibility
-    },
-    minify: process.env.NODE_ENV === 'production',
-    sourceMap: process.env.NODE_ENV === 'development',
 
-    // Compression
-    compressPublicAssets: true,
-
-    // Memory optimizations - use default in-memory storage
-    storage: {}
-  },
 
   // =============================================================================
   // Build Configuration - Pi Zero 2 W Optimizations
@@ -148,8 +162,7 @@ export default defineNuxtConfig({
   // Experimental Features (Memory Optimizations)
   // =============================================================================
   experimental: {
-    payloadExtraction: false,
-    inlineSSRStyles: false
+    payloadExtraction: false
   },
 
   // =============================================================================
@@ -157,17 +170,7 @@ export default defineNuxtConfig({
   // =============================================================================
   compatibilityDate: '2024-01-01',
 
-  // =============================================================================
-  // Error Handling
-  // =============================================================================
-  hooks: {
-    'render:errorMiddleware': (app) => {
-      app.use('/__nuxt_error', (error, req, res, next) => {
-        console.error('Nuxt Error:', error)
-        next(error)
-      })
-    }
-  },
+
 
   // =============================================================================
   // Build Configuration

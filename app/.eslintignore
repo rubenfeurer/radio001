@@ -1,0 +1,43 @@
+# Build outputs
+.nuxt/
+.output/
+dist/
+node_modules/
+
+# Generated files
+*.d.ts
+
+# Config files
+nuxt.config.ts
+tailwind.config.js
+tsconfig.json
+
+# Cache directories
+.cache/
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md

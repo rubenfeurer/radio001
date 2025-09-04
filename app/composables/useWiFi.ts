@@ -72,8 +72,8 @@ export const useWiFi = () => {
       if (response.success) {
         // Update status to show connecting
         if (status.value) {
-          status.value.status = 'connecting'
-          status.value.ssid = credentials.ssid
+          status.value.network.wifi.status = 'connecting'
+          status.value.network.wifi.ssid = credentials.ssid
         }
         return true
       } else {
@@ -124,8 +124,8 @@ export const useWiFi = () => {
       if (response.success) {
         // Update status to show hotspot mode
         if (status.value) {
-          status.value.mode = 'hotspot'
-          status.value.status = 'disconnected'
+          status.value.network.wifi.mode = 'hotspot'
+          status.value.network.wifi.status = 'disconnected'
         }
         return true
       } else {
@@ -166,7 +166,7 @@ export const useWiFi = () => {
 
   // Check if network requires password
   const requiresPassword = (network: WiFiNetwork) => {
-    return network.security !== 'Open' && network.security !== 'open'
+    return network.security !== 'Open'
   }
 
   // Format signal strength for display
@@ -197,17 +197,17 @@ export const useWiFi = () => {
 
   // Current network info
   const currentNetwork = computed(() => {
-    if (!status.value?.ssid) return null
-    return getNetworkBySSID(status.value.ssid)
+    if (!status.value?.network.wifi.ssid) return null
+    return getNetworkBySSID(status.value.network.wifi.ssid)
   })
 
   // Connection state
   const isConnected = computed(() => {
-    return status.value?.status === 'connected'
+    return status.value?.network.wifi.status === 'connected'
   })
 
   const isInHotspotMode = computed(() => {
-    return status.value?.mode === 'hotspot'
+    return status.value?.network.wifi.mode === 'hotspot'
   })
 
   // Initialize on mount

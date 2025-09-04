@@ -4,11 +4,10 @@ Inspired by RaspiWiFi with minimal dependencies and clean architecture
 """
 
 import os
-import subprocess
-import json
+import sys
 import asyncio
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Any
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
@@ -25,10 +24,10 @@ class Config:
     """Application configuration - inspired by RaspiWiFi's simple approach"""
 
     # Paths (following RaspiWiFi convention)
-    RASPIWIFI_DIR = Path("/etc/raspiwifi")
-    CONFIG_FILE = RASPIWIFI_DIR / "raspiwifi.conf"
+    RASPIWIFI_DIR = Path("/tmp/radio") if os.getenv("NODE_ENV") == "development" else Path("/etc/raspiwifi")
+    config_file = RASPIWIFI_DIR / "raspiwifi.conf"
     HOST_MODE_FILE = RASPIWIFI_DIR / "host_mode"
-    WPA_SUPPLICANT_FILE = Path("/etc/wpa_supplicant/wpa_supplicant.conf")
+    WPA_SUPPLICANT_FILE = Path("/tmp/wpa_supplicant.conf" if os.getenv("NODE_ENV") == "development" else "/etc/wpa_supplicant/wpa_supplicant.conf")
 
     # Network interfaces
     WIFI_INTERFACE = os.getenv("WIFI_INTERFACE", "wlan0")
@@ -39,6 +38,13 @@ class Config:
     # Server settings
     HOST = "0.0.0.0"
     PORT = int(os.getenv("API_PORT", "8000"))
+
+    # Ensure paths exist
+    @classmethod
+    def ensure_paths(cls):
+        """Create necessary directories for the application"""
+        cls.RASPIWIFI_DIR.mkdir(parents=True, exist_ok=True)
+        # Additional path creation for logs, etc.
 
 
 # =============================================================================
@@ -83,6 +89,81 @@ class WiFiManager:
     """WiFi management class inspired by RaspiWiFi's approach"""
 
     @staticmethod
+    def _parse_signal_strength(line: str) -> Optional[int]:
+        """Parse signal strength from iwlist output line"""
+        try:
+            signal_part = line.split('Signal level=')[1].split()[0]
+            if 'dBm' in signal_part:
+                signal = int(signal_part.replace('dBm', ''))
+                # Convert dBm to percentage (rough approximation)
+                return max(0, min(100, 2 * (signal + 100)))
+        except (ValueError, IndexError):
+            pass
+        return None
+
+    @staticmethod
+    def _parse_encryption(line: str) -> str:
+        """Parse encryption type from iwlist output line"""
+        if 'off' in line:
+            return 'Open'
+        return 'WPA'
+
+    @staticmethod
+    def _parse_frequency(line: str) -> Optional[str]:
+        """Parse frequency from iwlist output line"""
+        try:
+            return line.split('Frequency:')[1].split()[0]
+        except IndexError:
+            return None
+
+    @staticmethod
+    def _parse_ssid(line: str) -> Optional[str]:
+        """Parse SSID from iwlist output line"""
+        ssid = line.split('ESSID:')[1].strip('"')
+        if ssid and ssid != '':
+            return ssid
+        return None
+
+    @staticmethod
+    def _parse_iwlist_output(output: str) -> List[WiFiNetwork]:
+        """Parse iwlist output into WiFiNetwork objects"""
+        networks = []
+        current_network = {}
+
+        for line in output.split('\n'):
+            line = line.strip()
+
+            if 'ESSID:' in line:
+                ssid = WiFiManager._parse_ssid(line)
+                if ssid:
+                    current_network['ssid'] = ssid
+
+            elif 'Signal level=' in line:
+                signal = WiFiManager._parse_signal_strength(line)
+                if signal is not None:
+                    current_network['signal'] = signal
+
+            elif 'Encryption key:' in line:
+                current_network['encryption'] = WiFiManager._parse_encryption(line)
+
+            elif 'Frequency:' in line:
+                freq = WiFiManager._parse_frequency(line)
+                if freq:
+                    current_network['frequency'] = freq
+
+            # If we have a complete network, add it
+            elif 'ssid' in current_network and line.startswith('Cell'):
+                if len(current_network) > 1:  # Has more than just SSID
+                    networks.append(WiFiNetwork(**current_network))
+                current_network = {}
+
+        # Don't forget the last network
+        if 'ssid' in current_network and len(current_network) > 1:
+            networks.append(WiFiNetwork(**current_network))
+
+        return networks
+
+    @staticmethod
     async def scan_networks() -> List[WiFiNetwork]:
         """Scan for available WiFi networks using iwlist (RaspiWiFi method)"""
 
@@ -106,57 +187,10 @@ class WiFiManager:
             if process.returncode != 0:
                 raise Exception(f"iwlist scan failed: {stderr.decode()}")
 
-            # Parse iwlist output (simplified version of RaspiWiFi logic)
-            networks = []
-            current_network = {}
-
-            for line in stdout.decode().split('\n'):
-                line = line.strip()
-
-                if 'ESSID:' in line:
-                    ssid = line.split('ESSID:')[1].strip('"')
-                    if ssid and ssid != '':
-                        current_network['ssid'] = ssid
-
-                elif 'Signal level=' in line:
-                    # Extract signal strength
-                    try:
-                        signal_part = line.split('Signal level=')[1].split()[0]
-                        if 'dBm' in signal_part:
-                            signal = int(signal_part.replace('dBm', ''))
-                            # Convert dBm to percentage (rough approximation)
-                            signal_percent = max(0, min(100, 2 * (signal + 100)))
-                            current_network['signal'] = signal_percent
-                    except (ValueError, IndexError):
-                        pass
-
-                elif 'Encryption key:' in line:
-                    if 'off' in line:
-                        current_network['encryption'] = 'Open'
-                    else:
-                        current_network['encryption'] = 'WPA'
-
-                elif 'Frequency:' in line:
-                    try:
-                        freq = line.split('Frequency:')[1].split()[0]
-                        current_network['frequency'] = freq
-                    except IndexError:
-                        pass
-
-                # If we have a complete network, add it
-                if 'ssid' in current_network and line.startswith('Cell'):
-                    if len(current_network) > 1:  # Has more than just SSID
-                        networks.append(WiFiNetwork(**current_network))
-                    current_network = {}
-
-            # Don't forget the last network
-            if 'ssid' in current_network:
-                networks.append(WiFiNetwork(**current_network))
-
-            return networks
+            return WiFiManager._parse_iwlist_output(stdout.decode())
 
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to scan networks: {str(e)}")
+            raise Exception(f"WiFi scan failed: {str(e)}")
 
     @staticmethod
     async def get_status() -> SystemStatus:
@@ -310,6 +344,13 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Ensure paths are created during startup
+@app.on_event("startup")
+async def startup_event():
+    """Perform startup configuration"""
+    Config.ensure_paths()
+    print(f"🚀 Backend starting in {'development' if Config.IS_DEVELOPMENT else 'production'} mode")
+
 # CORS middleware for frontend integration
 app.add_middleware(
     CORSMiddleware,
@@ -336,12 +377,26 @@ async def root():
 
 @app.get("/health", response_model=ApiResponse)
 async def health_check():
-    """Health check endpoint"""
-    return ApiResponse(
-        success=True,
-        message="Service healthy",
-        data={"mode": "development" if Config.IS_DEVELOPMENT else "production"}
-    )
+    """Health check endpoint with additional diagnostic information"""
+    try:
+        # Add some basic system checks for development
+        system_info = {
+            "mode": "development" if Config.IS_DEVELOPMENT else "production",
+            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+            "config_dir_exists": Config.RASPIWIFI_DIR.exists(),
+            "wifi_interface": Config.WIFI_INTERFACE
+        }
+        return ApiResponse(
+            success=True,
+            message="Service healthy",
+            data=system_info
+        )
+    except Exception as e:
+        return ApiResponse(
+            success=False,
+            message=f"Health check failed: {str(e)}",
+            data=None
+        )
 
 
 @app.get("/wifi/status", response_model=ApiResponse)
@@ -436,7 +491,7 @@ async def reset_to_host_mode():
 
 if __name__ == "__main__":
     # Check if running in development
-    import sys
+
     reload = "--reload" in sys.argv or Config.IS_DEVELOPMENT
 
     print(f"🎯 Starting Radio WiFi Backend on {Config.HOST}:{Config.PORT}")
