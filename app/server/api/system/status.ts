@@ -41,8 +41,8 @@ async function getSystemStatus(config: any): Promise<SystemStatus> {
       uptime: 3600, // 1 hour
       memory: {
         total: 1024 * 1024 * 1024, // 1GB
-        used: 512 * 1024 * 1024,   // 512MB
-        free: 512 * 1024 * 1024    // 512MB
+        used: 512 * 1024 * 1024, // 512MB
+        free: 512 * 1024 * 1024 // 512MB
       },
       cpu: {
         load: 25.5,
@@ -82,13 +82,17 @@ async function getSystemStatus(config: any): Promise<SystemStatus> {
     memory: memory.status === 'fulfilled' ? memory.value : { total: 0, used: 0, free: 0 },
     cpu: cpu.status === 'fulfilled' ? cpu.value : { load: 0, temperature: 0 },
     network: {
-      wifi: wifi.status === 'fulfilled' ? wifi.value : {
+      wifi: wifi.status === 'fulfilled'
+? wifi.value
+: {
         wifiInterface: config.wifiInterface,
         status: 'disconnected',
         mode: 'offline'
       }
     },
-    services: services.status === 'fulfilled' ? services.value : {
+    services: services.status === 'fulfilled'
+? services.value
+: {
       avahi: false,
       hostapd: false,
       dnsmasq: false

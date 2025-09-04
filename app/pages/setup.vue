@@ -419,9 +419,9 @@ const getSignalColor = (signal) => {
 const fetchWiFiStatus = async () => {
   try {
     const response = await $fetch('/api/wifi/status')
-    if (response.success) {
+    if (response.success && 'data' in response) {
       currentStatus.value = response.data
-    } else {
+    } else if (!response.success && 'error' in response) {
       throw new Error(response.error || 'Failed to get WiFi status')
     }
   } catch (err) {
@@ -439,11 +439,11 @@ const handleScanNetworks = async () => {
   try {
     const response = await $fetch('/api/wifi/scan', { method: 'POST' })
 
-    if (response.success) {
+    if (response.success && 'data' in response) {
       networks.value = response.data || []
       lastScanTime.value = Date.now()
       console.log(`Found ${networks.value.length} networks`)
-    } else {
+    } else if (!response.success && 'error' in response) {
       throw new Error(response.error || 'Failed to scan networks')
     }
   } catch (err) {
@@ -495,7 +495,7 @@ const handleConnectToNetwork = async () => {
       setTimeout(async () => {
         await fetchWiFiStatus()
       }, 2000)
-    } else {
+    } else if (!response.success && 'error' in response) {
       throw new Error(response.error || 'Failed to connect to network')
     }
   } catch (err) {

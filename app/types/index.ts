@@ -73,6 +73,9 @@ export interface AppConfig {
   hostname: string
   wifiInterface: string
   ethInterface: string
+  theme?: string
+  scanInterval?: number
+  connectionTimeout?: number
   hotspot: HotspotConfig
   features: {
     captivePortal: boolean
@@ -89,11 +92,7 @@ export interface ConnectionResult {
   error?: string
 }
 
-export interface ScanResult {
-  networks: WiFiNetwork[]
-  timestamp: number
-  wifiInterface: string
-}
+
 
 export interface ApiResponse<T = any> {
   success: boolean

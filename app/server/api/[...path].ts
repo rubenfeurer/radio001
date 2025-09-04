@@ -70,7 +70,6 @@ export default defineEventHandler(async (event) => {
     })
 
     return data
-
   } catch (error) {
     console.error('Backend proxy error:', error)
 

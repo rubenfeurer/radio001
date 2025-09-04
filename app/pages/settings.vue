@@ -479,7 +479,7 @@ const checkChanges = () => {
 const loadSettings = async () => {
   try {
     const response = await $fetch('/api/config')
-    if (response.success && response.data) {
+    if (response.success && 'data' in response && response.data) {
       // Map API response to our settings structure
       const config = response.data
       settings.value = {
@@ -541,7 +541,7 @@ const saveSettings = async () => {
       originalSettings.value = JSON.parse(JSON.stringify(settings.value))
       hasUnsavedChanges.value = false
       setSuccess('Settings saved successfully. Some changes may require a system restart.')
-    } else {
+    } else if (!response.success && 'error' in response) {
       throw new Error(response.error || 'Failed to save settings')
     }
   } catch (err) {

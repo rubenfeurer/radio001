@@ -4,6 +4,10 @@
 import { writeFile, mkdir } from 'fs/promises'
 import { dirname } from 'path'
 import { existsSync } from 'fs'
+
+// Helper function for executing commands
+import { exec } from 'child_process'
+import { promisify } from 'util'
 import type { AppConfig } from '~/types'
 
 export default defineEventHandler(async (event) => {
@@ -124,9 +128,5 @@ function validateConfig(config: AppConfig): { valid: boolean; errors: string[] }
     errors
   }
 }
-
-// Helper function for executing commands
-import { exec } from 'child_process'
-import { promisify } from 'util'
 
 const execAsync = promisify(exec)

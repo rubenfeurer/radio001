@@ -117,6 +117,13 @@ The development script will:
 - ✅ **Set up networking** between containers
 - ✅ **Configure volume mounts** for live code changes
 
+#### ⚠️ Important Development Notes
+
+- **Dependencies are containerized** - Node.js and Python packages install inside Docker containers
+- **IDE import errors are normal** - TypeScript/Python imports may show errors in your local IDE but will build correctly in Docker
+- **Type checking works in container** - Run `npm run type-check` inside the Docker environment for accurate results
+- **Hot reload is enabled** - Code changes reflect immediately without rebuilding containers
+
 #### Development Commands
 
 ```bash
@@ -151,6 +158,12 @@ The development script will:
 - Uses standard multi-platform images
 - Full compatibility with all features
 
+**🔧 Development Environment:**
+- All dependencies are containerized for consistency
+- Local IDE may show import errors - this is expected
+- TypeScript compilation and linting work correctly in Docker
+- Use `./scripts/docker-dev.sh shell radio-app` for frontend shell access
+
 #### Manual Docker Commands
 
 For direct Docker Compose usage:
@@ -173,9 +186,15 @@ docker-compose up -d --build
 
 **Common Issues:**
 - **Docker not running**: `open -a Docker` (macOS)
-- **Pydantic build errors**: Script auto-handles with platform detection
+- **IDE showing import errors**: Normal - dependencies are in containers
+- **TypeScript errors in IDE**: Run `npm run type-check` in container for accurate results
 - **Port conflicts**: Script will detect and report conflicts
 - **Memory issues**: Increase Docker Desktop memory limit to 4GB+
+
+**Development Environment Issues:**
+- **Union type errors**: Use proper type guards: `if (response.success && 'data' in response)`
+- **Property access errors**: Check nested object structure in types
+- **Build failures**: Dependencies resolve correctly in Docker environment
 
 **For detailed troubleshooting**: See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
@@ -319,12 +338,14 @@ The WiFi management system is **inspired by [RaspiWiFi](https://github.com/jasbu
 - **Mode Switching**: Host mode ↔ Client mode switching using marker files (`/etc/raspiwifi/host_mode`)
 - **Status Monitoring**: Uses `iwconfig` for connection status checking
 - **File Structure**: Follows RaspiWiFi directory conventions (`/etc/raspiwifi/`) for compatibility
+- **Development Mocking**: Provides realistic mock data for development without requiring actual WiFi hardware
 
 #### **Why Custom Implementation?**
 1. **Reliability**: Fewer dependencies reduce potential failure points
 2. **Maintainability**: Full control over codebase for specific requirements
-3. **Compatibility**: Built specifically for Python 3.13 and Raspberry Pi Zero 2 W
+3. **Compatibility**: Built specifically for Python 3.11+ and Raspberry Pi Zero 2 W
 4. **Modern Patterns**: Combines RaspiWiFi's proven methods with FastAPI's async architecture
+5. **Development Friendly**: Mock data enables full development workflow without Pi hardware
 
 This approach provides the reliability of established WiFi management patterns while maintaining the project's philosophy of minimal dependencies and clean architecture.
 
@@ -334,10 +355,10 @@ This approach provides the reliability of established WiFi management patterns w
 - **Connection Manager** - Secure network connection with proper error handling and feedback
 - **System Monitor** - CPU, memory, temperature, and service status monitoring
 - **Settings Interface** - Device configuration with validation and persistence
-- **API Integration** - Robust error handling and response processing for all endpoints
-- **useWiFi.ts** - Reactive WiFi state management composable
+- **API Integration** - TypeScript-safe API calls with proper union type handling
+- **useWiFi.ts** - Reactive WiFi state management composable with type guards
 - **API Proxy** - Seamless frontend-backend communication with proper error handling
-- **Docker Services** - Containerized frontend and backend with health checks
+- **Docker Services** - Containerized frontend and backend with platform optimization and health checks
 
 ## 📱 Usage
 
@@ -384,10 +405,10 @@ This approach provides the reliability of established WiFi management patterns w
 
 **Frontend:**
 - **Nuxt 3** - Vue.js framework with SSR/SPA support
-- **TypeScript** - Type-safe development
+- **TypeScript** - Type-safe development with strict union type handling
 - **Tailwind CSS** - Utility-first CSS framework (minimal setup)
 - **Pinia** - State management
-- **Composables** - Reactive WiFi state management
+- **Composables** - Reactive WiFi state management with type guards
 
 **Backend:**
 - **FastAPI** - Modern Python web framework
@@ -400,6 +421,24 @@ This approach provides the reliability of established WiFi management patterns w
 - **Docker Compose** - Multi-service orchestration
 - **Platform Detection** - Automatic Apple Silicon optimization
 - **Hot Reload** - Real-time code changes for both services
+
+#### Critical Development Patterns
+
+**TypeScript Union Type Handling:**
+```typescript
+// Always use proper type guards for API responses
+if (response.success && 'data' in response) {
+  data.value = response.data
+} else if (!response.success && 'error' in response) {
+  throw new Error(response.error)
+}
+```
+
+**Nested Property Access:**
+```typescript
+// Access nested WiFi status correctly
+status.value.network.wifi.ssid = network.ssid
+```
 
 #### API Reference
 

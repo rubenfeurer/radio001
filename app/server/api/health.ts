@@ -1,5 +1,7 @@
-// Health check API endpoint for Radio WiFi Configuration
-export default defineEventHandler(async (event) => {
+import { loadavg } from 'os'
+
+// Health check endpoint for Radio WiFi Configuration
+export default defineEventHandler(async (_event) => {
   const config = useRuntimeConfig()
 
   try {
@@ -61,9 +63,8 @@ export default defineEventHandler(async (event) => {
           responseTime: `${responseTime}ms`,
           loadAverage: (() => {
             try {
-              const os = require('os')
-              return process.platform !== 'win32' && typeof os.loadavg === 'function'
-                ? os.loadavg()
+              return process.platform !== 'win32' && typeof loadavg === 'function'
+                ? loadavg()
                 : [0, 0, 0]
             } catch {
               return [0, 0, 0]

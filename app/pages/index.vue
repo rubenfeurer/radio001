@@ -275,9 +275,9 @@ const setError = (message) => {
 const fetchWiFiStatus = async () => {
   try {
     const response = await $fetch('/api/wifi/status')
-    if (response.success) {
+    if (response.success && 'data' in response) {
       wifiData.value = response.data
-    } else {
+    } else if (!response.success && 'error' in response) {
       throw new Error(response.error || 'Failed to fetch WiFi status')
     }
   } catch (err) {
@@ -291,9 +291,9 @@ const fetchWiFiStatus = async () => {
 const fetchSystemStatus = async () => {
   try {
     const response = await $fetch('/api/system/status')
-    if (response.success) {
+    if (response.success && 'data' in response) {
       systemData.value = response.data
-    } else {
+    } else if (!response.success && 'error' in response) {
       throw new Error(response.error || 'Failed to fetch system status')
     }
   } catch (err) {
@@ -330,7 +330,7 @@ const handleScanNetworks = async () => {
     const response = await $fetch('/api/wifi/scan', { method: 'POST' })
     if (response.success) {
       await navigateTo('/setup')
-    } else {
+    } else if (!response.success && 'error' in response) {
       throw new Error(response.error || 'Network scan failed')
     }
   } catch (err) {

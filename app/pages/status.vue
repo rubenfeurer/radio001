@@ -405,9 +405,9 @@ const formatBytes = (bytes: number): string => {
 const fetchSystemStatus = async () => {
   try {
     const response = await $fetch('/api/system/status')
-    if (response.success) {
+    if (response.success && 'data' in response) {
       systemStatus.value = response.data
-    } else {
+    } else if (!response.success && 'error' in response) {
       throw new Error(response.error || 'Failed to fetch system status')
     }
   } catch (error) {
@@ -503,7 +503,7 @@ const restartNetwork = async () => {
     if (response.success) {
       showNotification('Network restart initiated', 'success')
       setTimeout(refreshStatus, 5000) // Refresh after 5 seconds
-    } else {
+    } else if (!response.success && 'error' in response) {
       throw new Error(response.error || 'Failed to restart network')
     }
   } catch (error) {
@@ -525,7 +525,7 @@ const rebootSystem = async () => {
     if (response.success) {
       showNotification('System reboot initiated', 'success')
       showRebootModal.value = false
-    } else {
+    } else if (!response.success && 'error' in response) {
       throw new Error(response.error || 'Failed to reboot system')
     }
   } catch (error) {
