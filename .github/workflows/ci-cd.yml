@@ -30,8 +30,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend dependencies
         run: |
@@ -76,8 +74,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -125,8 +121,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
 
       - name: Build frontend for CI
         run: |
@@ -134,20 +128,25 @@ jobs:
           npm ci
           npm run build
 
+      - name: Install Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
       - name: Build and test with Docker
         run: |
           # Build backend container
-          docker compose -f docker-compose.ci.yml build radio-backend --no-cache
+          docker-compose -f docker-compose.ci.yml build radio-backend --no-cache
 
           # Start services
-          docker compose -f docker-compose.ci.yml up -d
+          docker-compose -f docker-compose.ci.yml up -d
 
           # Wait for services to be ready
           echo "Waiting for services to start..."
           sleep 45
 
           # Show running containers for debugging
-          docker compose -f docker-compose.ci.yml ps
+          docker-compose -f docker-compose.ci.yml ps
 
           # Test backend health first (frontend depends on it)
           echo "Testing backend health..."
@@ -159,7 +158,7 @@ jobs:
               echo "Backend health check failed (attempt $i/10)"
               if [ $i -eq 10 ]; then
                 echo "Backend logs:"
-                docker compose -f docker-compose.ci.yml logs radio-backend
+                docker-compose -f docker-compose.ci.yml logs radio-backend
                 exit 1
               fi
               sleep 10
@@ -176,7 +175,7 @@ jobs:
               echo "Frontend health check failed (attempt $i/10)"
               if [ $i -eq 10 ]; then
                 echo "Frontend logs:"
-                docker compose -f docker-compose.ci.yml logs radio-frontend
+                docker-compose -f docker-compose.ci.yml logs radio-frontend
                 exit 1
               fi
               sleep 5
@@ -200,8 +199,8 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker compose -f docker-compose.ci.yml logs
-          docker compose -f docker-compose.ci.yml down -v
+          docker-compose -f docker-compose.ci.yml logs
+          docker-compose -f docker-compose.ci.yml down -v
 
   # =============================================================================
   # Security Scanning
