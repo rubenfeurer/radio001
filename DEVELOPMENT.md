@@ -1,421 +1,466 @@
 # Development Guide
 
-Complete development setup and workflow guide for the Radio WiFi Configuration project.
+Complete development setup and workflow guide for the Radio WiFi Configuration project using the **hybrid SvelteKit + FastAPI approach**.
 
 ## 🚀 Quick Start
 
 ```bash
-# Setup development environment
-./scripts/setup-dev.sh
+# 1. Clone and setup
+git clone <repository-url> radio-wifi
+cd radio-wifi
 
-# Start development
-./scripts/docker-dev.sh start
+# 2. Start backend (Docker)
+docker-compose up radio-backend -d
 
-# Make changes and commit (auto-checks run)
-git add .
-git commit -m "feat: add new WiFi feature"
-git push
+# 3. Setup and start frontend (Local)
+cd frontend
+npm install
+npm run dev
+
+# Access: http://localhost:3000
 ```
 
-## 🏗️ Architecture
+## 🏗️ New Hybrid Architecture
 
-**Frontend (Nuxt 3):**
-- Vue 3 + TypeScript + Tailwind CSS
-- Pinia state management with `useWiFi` composable
-- API proxy for backend communication
-- Hot reload enabled
+**Why This Approach?**
+- ✅ **Solves ARM64 Issues**: No more oxc-parser problems
+- ✅ **Local Development**: Fast hot reload without Docker
+- ✅ **Proven Backend**: Keep stable FastAPI backend
+- ✅ **Better Performance**: SvelteKit compiles to vanilla JS
 
-**Backend (FastAPI):**
-- Python 3.11+ with RaspiWiFi-inspired WiFi management
-- Minimal dependencies for reliability
-- Mock data for development, real system calls in production
-
-**Infrastructure:**
-- Docker containers with platform optimization
-- Automatic Apple Silicon (ARM64) vs Intel (AMD64) detection
-- Volume mounts for live code changes
-
-## 🐳 Docker Development Environment
-
-### Key Concepts
-
-- **Dependencies are containerized** - Node.js and Python packages install in Docker
-- **IDE import errors are normal** - Packages resolve correctly in containers
-- **Type checking works in container** - Use Docker for accurate results
-- **Hot reload enabled** - Code changes reflect immediately
-
-### Essential Commands
-
-```bash
-# Development workflow
-./scripts/docker-dev.sh start     # Start all services
-./scripts/docker-dev.sh stop      # Stop services  
-./scripts/docker-dev.sh logs      # View logs
-./scripts/docker-dev.sh cleanup   # Clean resources
-
-# Development access
-./scripts/docker-dev.sh shell radio-app        # Frontend shell
-./scripts/docker-dev.sh shell radio-backend    # Backend shell
-./scripts/docker-dev.sh restart               # Restart services
+**Architecture:**
 ```
-
-### Platform Optimization
-
-The system automatically detects and optimizes for your platform:
-- **Apple Silicon (M1/M2)**: ARM64 optimized images with faster builds
-- **Intel/AMD64**: Standard multi-platform images
-- **CI/CD (GitHub Actions)**: Uses `docker-compose.ci.yml` for AMD64 compatibility
-
-## 🔄 Development Workflow
-
-### Pre-commit Checks (Local)
-
-Automatic checks run on every commit:
-- ✅ **ESLint auto-fixes** - Code style and formatting
-- ✅ **TypeScript checking** - Type compilation validation
-- ✅ **Conventional commits** - Message format validation
-- ⚡ **30-second feedback** vs 5-10 minutes in CI
-
-### CI/CD (Push/PR)
-
-Integration tests and deployment:
-- ✅ **Docker integration tests** - Full stack validation
-- ✅ **Security scanning** - Vulnerability detection  
-- ✅ **Multi-platform builds** - ARM64 + AMD64 images
-- ✅ **Automated deployment** - Staging and production
-
-### Benefits
-
-| Aspect | Before | After |
-|--------|---------|-------|
-| Feedback Time | 5-10 min (CI) | 30 sec (local) |
-| Failed Commits | Multiple fixes | Single clean commit |
-| CI Runtime | ~15 minutes | ~8 minutes |
-| Developer Experience | Frustrating waits | Instant feedback |
-
-## 📝 Commit Guidelines
-
-### Format
-
-```
-type(scope): description
-
-[optional body]
-[optional footer]
-```
-
-### Types
-
-| Type | Description | Example |
-|------|-------------|---------|
-| `feat` | New feature | `feat: add WiFi network scanning` |
-| `fix` | Bug fix | `fix(api): handle connection timeouts` |
-| `docs` | Documentation | `docs: update setup guide` |
-| `style` | Code formatting | `style: fix ESLint warnings` |
-| `refactor` | Code restructuring | `refactor: extract parsing logic` |
-| `perf` | Performance | `perf: optimize scanning speed` |
-| `test` | Adding tests | `test: add useWiFi unit tests` |
-| `chore` | Maintenance | `chore(deps): update Docker images` |
-
-### Scopes
-
-- `api` - Backend API changes
-- `ui` - Frontend UI changes  
-- `docker` - Container configuration
-- `ci` - CI/CD pipeline
-- `deps` - Dependencies
-
-### Examples
-
-```bash
-# Good examples
-git commit -m "feat: add WiFi network scanning functionality"
-git commit -m "fix(api): handle connection timeout errors"  
-git commit -m "docs: update development setup guide"
-git commit -m "chore(deps): update Nuxt to v3.8.4"
-
-# Bad examples (will be rejected)
-git commit -m "fix stuff"
-git commit -m "Fixed the WiFi bug"
-git commit -m "update documentation"
-```
-
-## 🔧 Code Quality & Type Safety
-
-### TypeScript Best Practices
-
-**API Response Handling** - Always use type guards:
-```typescript
-// ✅ Correct - proper type guards
-if (response.success && 'data' in response) {
-  data.value = response.data
-} else if (!response.success && 'error' in response) {
-  throw new Error(response.error)
-}
-
-// ❌ Wrong - causes union type errors
-if (response.success) {
-  data.value = response.data
-}
-```
-
-**Nested Property Access**:
-```typescript
-// ✅ Correct - access nested properties
-status.value.network.wifi.ssid = network.ssid
-
-// ❌ Wrong - direct property access
-status.value.ssid = network.ssid
-```
-
-### Common Issues & Fixes
-
-1. **Union Type Errors**: Use `'property' in object` type guards
-2. **Missing Properties**: Update type definitions in `types/index.ts`
-3. **Import Errors in IDE**: Expected - packages are in Docker containers
-4. **Build Failures**: Run checks in Docker environment for accuracy
-
-### Quality Commands
-
-```bash
-# Run in Docker container for accurate results
-./scripts/docker-dev.sh shell radio-app
-npm run type-check    # TypeScript compilation
-npm run lint          # ESLint checking
-npm run lint:fix      # Auto-fix issues
-npm run build         # Build application
+┌─────────────────┐    ┌──────────────────┐
+│   SvelteKit     │────│   FastAPI        │
+│   Frontend      │ API│   Backend        │
+│   (Local)       │────│   (Docker)       │
+└─────────────────┘    └──────────────────┘
+      :3000                    :8000
 ```
 
 ## 📁 Project Structure
 
 ```
-radio001/
-├── app/                          # Frontend (Nuxt 3)
-│   ├── composables/useWiFi.ts    # WiFi state management
-│   ├── types/index.ts            # TypeScript definitions
-│   ├── pages/                    # Vue pages with API integration
-│   └── server/api/               # API proxy routes
-├── backend/main.py               # FastAPI application
-├── scripts/docker-dev.sh         # Development management
-├── docker/                       # Container configurations
-├── DEVELOPMENT.md                # This file
-├── README.md                     # Project overview
-└── TROUBLESHOOTING.md            # Issue resolution guide
+radio-wifi/
+├── frontend/              # 🆕 SvelteKit frontend
+│   ├── src/
+│   │   ├── routes/        # Pages (file-based routing)
+│   │   ├── lib/
+│   │   │   ├── components/# Reusable components  
+│   │   │   ├── stores/    # Svelte stores (state)
+│   │   │   └── types.ts   # TypeScript types
+│   │   ├── app.html       # HTML template
+│   │   └── app.postcss    # Global styles
+│   ├── static/            # Static assets
+│   ├── package.json       # Frontend dependencies
+│   └── vite.config.js     # Vite + proxy config
+├── backend/               # ✅ Unchanged FastAPI backend
+│   ├── main.py            # FastAPI application
+│   └── requirements.txt   # Python dependencies
+├── app/                   # 📦 Legacy Nuxt (deprecated)
+├── docker/                # Docker configurations
+└── scripts/               # Helper scripts
 ```
 
-## 🔌 API Integration Patterns
+## 🛠️ Development Environment
 
-### Frontend API Calls
+### Prerequisites
 
-```typescript
-const fetchData = async () => {
-  try {
-    const response = await $fetch('/api/endpoint')
-    if (response.success && 'data' in response) {
-      return response.data
-    } else if (!response.success && 'error' in response) {
-      throw new Error(response.error)
+- **Node.js 18+** (for local frontend development)
+- **Docker & Docker Compose** (for backend)
+- **Git** (for version control)
+
+### Environment Setup
+
+1. **Backend Development (Docker):**
+   ```bash
+   docker-compose up radio-backend -d    # Start backend
+   docker-compose logs radio-backend     # View logs
+   docker-compose exec radio-backend bash # Shell access
+   ```
+
+2. **Frontend Development (Local):**
+   ```bash
+   cd frontend
+   npm install                           # Install dependencies
+   npm run dev                           # Start dev server
+   npm run build                         # Build for production
+   npm run preview                       # Preview production build
+   ```
+
+### Development Workflow
+
+```bash
+# Terminal 1: Backend
+docker-compose up radio-backend
+
+# Terminal 2: Frontend  
+cd frontend && npm run dev
+
+# Terminal 3: Development
+git checkout -b feature/new-feature
+# ... make changes ...
+git add . && git commit -m "feat: add new feature"
+git push origin feature/new-feature
+```
+
+## 🔧 Configuration
+
+### Frontend Configuration
+
+**vite.config.js** - Proxy configuration for API calls:
+```javascript
+export default defineConfig({
+  plugins: [sveltekit()],
+  server: {
+    host: '0.0.0.0',
+    port: 3000,
+    proxy: {
+      '/api': 'http://localhost:8000'  // Proxy to Docker backend
     }
-  } catch (error) {
-    console.error('API call failed:', error)
+  }
+});
+```
+
+**package.json** - Development scripts:
+```json
+{
+  "scripts": {
+    "dev": "vite dev --host 0.0.0.0 --port 3000",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-kit sync && svelte-check",
+    "lint": "eslint ."
   }
 }
 ```
 
-### Backend Response Format
+### Backend Configuration
 
-```python
-# Success response
-return {
-    "success": True,
-    "data": result,
-    "message": "Operation completed",
-    "timestamp": time.time()
+Backend runs in Docker with these environment variables:
+```env
+NODE_ENV=development
+API_PORT=8000
+WIFI_INTERFACE=wlan0
+HOSTNAME=radio
+HOTSPOT_SSID=Radio-Setup
+HOTSPOT_PASSWORD=radio123
+```
+
+## 📊 State Management
+
+### Svelte Stores (replaces Nuxt composables)
+
+**Before (Nuxt composables):**
+```typescript
+const { networks, scanNetworks, isScanning } = useWiFi()
+```
+
+**After (Svelte stores):**
+```typescript
+import { networks, scanNetworks, isScanning } from '$lib/stores/wifi'
+
+// Reactive values with $ prefix
+$networks        // Array of networks
+$isScanning      // Boolean state
+scanNetworks()   // Function call
+```
+
+### Store Structure
+
+```typescript
+// lib/stores/wifi.ts
+export const networks = writable<WiFiNetwork[]>([]);
+export const isScanning = writable(false);
+export const status = writable<SystemStatus | null>(null);
+
+// Derived stores (computed values)
+export const currentNetwork = derived(
+  [status, networks], 
+  ([$status, $networks]) => { /* ... */ }
+);
+
+// Actions
+export const scanNetworks = async () => { /* ... */ };
+export const connectToNetwork = async (credentials) => { /* ... */ };
+```
+
+## 🎨 Component Development
+
+### Vue to Svelte Migration
+
+**Vue Component (Nuxt):**
+```vue
+<template>
+  <div>
+    <h1>{{ title }}</h1>
+    <button @click="handleClick" :disabled="loading">
+      {{ loading ? 'Loading...' : 'Click me' }}
+    </button>
+  </div>
+</template>
+
+<script setup>
+const title = 'Hello'
+const loading = ref(false)
+
+const handleClick = () => {
+  loading.value = true
 }
-
-# Error response  
-return {
-    "success": False,
-    "error": "Error message",
-    "timestamp": time.time()
-}
+</script>
 ```
 
-## 🔄 WiFi Management
+**Svelte Component:**
+```svelte
+<script lang="ts">
+  const title = 'Hello';
+  let loading = false;
 
-### RaspiWiFi-Inspired Implementation
+  const handleClick = () => {
+    loading = true;
+  };
+</script>
 
-- **Network Scanning**: `iwlist scan` command parsing
-- **Configuration**: `wpa_supplicant.conf` management  
-- **Mode Switching**: Marker files for hotspot ↔ client modes
-- **Status Monitoring**: `iwconfig` output parsing
-- **Development Mocking**: Realistic mock data without Pi hardware
-
-### Development vs Production
-
-```python
-if Config.IS_DEVELOPMENT:
-    # Return mock data for development
-    return mock_wifi_networks()
-else:
-    # Execute actual system commands
-    result = await execute_iwlist_scan()
+<div>
+  <h1>{title}</h1>
+  <button on:click={handleClick} disabled={loading}>
+    {loading ? 'Loading...' : 'Click me'}
+  </button>
+</div>
 ```
 
-## 🛠️ Setup & Installation
+### Key Differences
 
-### New Developer Onboarding
+| Feature | Nuxt/Vue | SvelteKit |
+|---------|----------|-----------|
+| Reactivity | `ref()`, `reactive()` | Direct assignment |
+| Events | `@click` | `on:click` |
+| Conditionals | `v-if` | `{#if}` |
+| Loops | `v-for` | `{#each}` |
+| Store access | `composable()` | `$store` |
+| Routing | `navigateTo()` | `goto()` |
+
+## 🔗 API Integration
+
+### API Calls
+
+**Nuxt approach:**
+```typescript
+const data = await $fetch('/api/wifi/status')
+```
+
+**SvelteKit approach:**
+```typescript
+const response = await fetch('/api/wifi/status');
+const data = await response.json();
+```
+
+### Error Handling
+
+```typescript
+// stores/wifi.ts
+export const scanNetworks = async () => {
+  isScanning.set(true);
+  error.set(null);
+  
+  try {
+    const response = await fetch('/api/wifi/scan', { method: 'POST' });
+    const result = await response.json();
+    
+    if (result.success) {
+      networks.set(result.data);
+    } else {
+      throw new Error(result.message);
+    }
+  } catch (err) {
+    error.set(err.message);
+  } finally {
+    isScanning.set(false);
+  }
+};
+```
+
+## 🚀 Production Deployment
+
+### Build Process
 
 ```bash
-# One-command setup
-./scripts/setup-dev.sh
+# 1. Build frontend
+cd frontend
+npm run build
 
-# What it does:
-# ✅ Checks system requirements (Docker, Git)
-# ✅ Installs dependencies in containers
-# ✅ Sets up pre-commit hooks  
-# ✅ Tests Docker environment
-# ✅ Validates development setup
+# 2. Deploy with Docker
+docker-compose -f docker-compose.prod.yml up -d
 ```
 
-### Manual Setup
+### Production Structure
 
-```bash
-# Clone repository
-git clone <repository-url>
-cd radio001
-
-# Install app dependencies (optional - runs in Docker)
-cd app && npm install
-
-# Setup Git hooks
-npm run prepare
-
-# Start development environment
-./scripts/docker-dev.sh start
-
-# Access services
-open http://localhost:3000  # Frontend
-open http://localhost:8000  # Backend API
+```yaml
+# docker-compose.prod.yml
+services:
+  radio-backend:
+    build: ./backend
+    ports: ["8000:8000"]
+    
+  radio-frontend:
+    image: nginx:alpine
+    volumes:
+      - ./frontend/build:/usr/share/nginx/html:ro
+    ports: ["80:80"]
+    depends_on: [radio-backend]
 ```
 
-## 🐛 Debugging & Troubleshooting
+## 📱 Pages & Routing
 
-### Docker Issues
+### File-based Routing
 
-```bash
-# Check Docker status
-docker info
-
-# Clean restart
-./scripts/docker-dev.sh stop
-./scripts/docker-dev.sh cleanup  
-./scripts/docker-dev.sh start
-
-# View logs
-./scripts/docker-dev.sh logs radio-app
-./scripts/docker-dev.sh logs radio-backend
-
-# For CI debugging (GitHub Actions)
-docker compose -f docker-compose.ci.yml logs
-docker compose -f docker-compose.ci.yml ps
+```
+frontend/src/routes/
+├── +layout.svelte          # Main layout
+├── +page.svelte           # Home page (/)
+├── setup/
+│   └── +page.svelte       # Setup page (/setup)
+├── settings/
+│   └── +page.svelte       # Settings page (/settings)
+└── status/
+    └── +page.svelte       # Status page (/status)
 ```
 
-### TypeScript Issues
+### Navigation
 
-1. **Import errors in IDE**: Expected - packages in Docker
-2. **Union type errors**: Add proper type guards  
-3. **Property access errors**: Check nested object structure
-4. **Build failures**: Run `npm run type-check` in container
+```svelte
+<script>
+  import { goto } from '$app/navigation';
+</script>
 
-### Pre-commit Hook Issues
+<button on:click={() => goto('/setup')}>
+  Go to Setup
+</button>
 
-```bash
-# Reinstall hooks
-cd app && npm run prepare
-chmod +x .husky/pre-commit .husky/commit-msg
-
-# Manual validation
-npm run type-check
-npm run lint:fix
+<!-- Or with links -->
+<a href="/setup">Setup</a>
 ```
 
-### API Integration Issues
+## 🧪 Testing & Quality
+
+### Development Commands
 
 ```bash
-# Test backend directly
+# Frontend checks
+cd frontend
+npm run check        # TypeScript checking
+npm run lint         # ESLint
+npm run lint:fix     # Auto-fix linting issues
+
+# Backend checks
+docker-compose exec radio-backend python -m pytest
+```
+
+### Code Quality
+
+- **TypeScript**: Full type checking for both frontend and API calls
+- **ESLint**: Code linting with Svelte-specific rules
+- **Prettier**: Code formatting with Svelte support
+- **Svelte Check**: Component validation
+
+## 🔄 Migration Status
+
+### ✅ Completed
+- [x] SvelteKit project setup
+- [x] Basic routing structure
+- [x] Tailwind CSS integration
+- [x] WiFi store (replaces useWiFi composable)
+- [x] API proxy configuration
+- [x] TypeScript types
+- [x] Development workflow
+
+### 🚧 In Progress
+- [ ] Home page component (from pages/index.vue)
+- [ ] Setup wizard (from pages/setup.vue)
+- [ ] Status page (from pages/status.vue)
+- [ ] Settings page (from pages/settings.vue)
+- [ ] SignalStrength component
+
+### 📋 Todo
+- [ ] Production deployment testing
+- [ ] Raspberry Pi deployment scripts
+- [ ] Performance optimization
+- [ ] PWA features
+- [ ] End-to-end testing
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+**1. Frontend not connecting to backend:**
+```bash
+# Check if backend is running
+docker-compose ps
+docker-compose logs radio-backend
+
+# Check proxy configuration in vite.config.js
+```
+
+**2. TypeScript errors:**
+```bash
+cd frontend
+npm run check        # Check for type errors
+npm install          # Reinstall if needed
+```
+
+**3. Port conflicts:**
+```bash
+# Change ports in package.json or docker-compose.yml
+# Frontend: 3000 (configurable)
+# Backend: 8000 (configurable)
+```
+
+**4. API calls failing:**
+```bash
+# Verify API endpoints
 curl http://localhost:8000/health
-
-# Test frontend proxy
-curl http://localhost:3000/api/wifi/status
-
-# Check network requests in browser dev tools
+curl http://localhost:3000/api/health  # Should proxy
 ```
 
-## 🚫 Emergency Bypasses
+### Debug Tools
 
-**Skip pre-commit hooks** (urgent fixes only):
-```bash
-git commit --no-verify -m "hotfix: urgent production fix"
-```
-
-**Skip specific checks**:
-```bash
-SKIP_TYPE_CHECK=true git commit -m "wip: work in progress"
-```
-
-## 🚀 Deployment
-
-### Development
-- Services: `localhost:3000` (frontend), `localhost:8000` (backend)
-- Hot reload enabled for both services
-- Mock data for WiFi operations
-
-### Production (Raspberry Pi)  
-- nginx reverse proxy
-- Real WiFi system integration
-- Available at `radio.local` via mDNS
-
-## 🤝 Contributing
-
-### Before Submitting PRs
-
-1. ✅ Run type check: `npm run type-check`
-2. ✅ Fix lint issues: `npm run lint:fix`  
-3. ✅ Test in Docker environment
-4. ✅ Update type definitions for new API endpoints
-5. ✅ Use conventional commit messages
-
-### Code Standards
-
-- **TypeScript**: Strict type checking, proper union type handling
-- **Vue**: Composition API, reactive state management
-- **Python**: Type hints, comprehensive error handling
-- **API**: Consistent response format, proper error handling
-
-### Pull Request Checklist
-
-- [ ] Code follows project patterns and conventions
-- [ ] TypeScript compiles without errors
-- [ ] All lint issues resolved
-- [ ] API changes include proper type definitions  
-- [ ] Documentation updated if needed
-- [ ] Conventional commit messages used
+- **Svelte DevTools**: Browser extension for Svelte debugging
+- **Network Tab**: Monitor API calls and proxy behavior
+- **Docker Logs**: `docker-compose logs radio-backend`
+- **Console**: Frontend errors appear in browser console
 
 ## 📚 Resources
 
-- [Project Overview](./README.md)
-- [Troubleshooting Guide](./TROUBLESHOOTING.md)
-- [Development Scripts](./scripts/)
-- [Docker Development](./scripts/docker-dev.sh)
-- [Conventional Commits](https://www.conventionalcommits.org/)
+### Documentation
+- [SvelteKit Docs](https://kit.svelte.dev/docs)
+- [Svelte Tutorial](https://svelte.dev/tutorial)
+- [Tailwind CSS](https://tailwindcss.com/docs)
+- [Vite Configuration](https://vitejs.dev/config/)
 
-## ⚠️ Critical Notes
+### Migration Guides
+- [SVELTEKIT-MIGRATION.md](./SVELTEKIT-MIGRATION.md) - Detailed migration guide
+- [Vue to Svelte comparison](https://svelte.dev/docs#vue-js)
 
-1. **Container Dependencies**: All packages install in Docker - local IDE may show import errors but builds work
-2. **Type Safety**: Always use type guards for union types to prevent runtime errors  
-3. **Platform Optimization**: Docker automatically optimizes for your development platform
-4. **WiFi Mocking**: Backend provides realistic mock data in development mode
-5. **Hot Reload**: Code changes reflect immediately without rebuilding containers
+## 🎯 Best Practices
 
-This guide provides everything needed for productive development on the Radio WiFi Configuration project.
+### Development
+1. **Keep backend in Docker** - Ensures consistency
+2. **Use local frontend** - Faster development cycle
+3. **Leverage hot reload** - Instant feedback on changes
+4. **Test early on Pi** - Catch platform-specific issues
+
+### Code Organization
+1. **Stores for global state** - WiFi status, networks, etc.
+2. **Components for reusability** - SignalStrength, NetworkList
+3. **Types for safety** - Shared TypeScript definitions
+4. **API layer separation** - Centralized API calls
+
+### Performance
+1. **Static generation** - Pre-build pages where possible
+2. **Lazy loading** - Load components as needed
+3. **Minimal bundles** - Tree-shake unused code
+4. **Caching** - Leverage browser and CDN caching
+
+---
+
+This hybrid approach solves the ARM64 compatibility issues while providing a modern, fast development experience. The combination of local SvelteKit development with containerized FastAPI backend gives us the best of both worlds.

@@ -51,8 +51,7 @@ services:
       dockerfile: docker/Dockerfile.dev
       platforms:
         - linux/amd64
-      args:
-        NODE_VERSION: 20-alpine
+
     platform: linux/amd64
     container_name: radio-app-ci
     hostname: radio-app

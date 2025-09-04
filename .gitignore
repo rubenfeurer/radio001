@@ -86,10 +86,14 @@ node_modules/
 .next
 out
 
-# Nuxt.js build / generate output
-.nuxt
-dist
+# SvelteKit build output
+.svelte-kit
+build/
 .output
+
+# Legacy Nuxt.js build / generate output (removed)
+# .nuxt
+# dist
 
 # Gatsby files
 .cache/
@@ -249,6 +253,14 @@ cython_debug/
 /tmp/
 *.sqlite
 *.db
+
+# SvelteKit specific
+frontend/.svelte-kit/
+frontend/build/
+frontend/package-lock.json
+
+# Legacy app directory (removed)
+# app/
 
 # WiFi configuration files (sensitive)
 wpa_supplicant.conf

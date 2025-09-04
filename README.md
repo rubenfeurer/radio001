@@ -1,137 +1,265 @@
 # Radio WiFi Configuration
 
-A modern WiFi provisioning solution for Raspberry Pi, built with Nuxt 3 and FastAPI. Provides an easy web interface for configuring WiFi networks on headless Raspberry Pi devices.
+A modern WiFi provisioning solution for Raspberry Pi Zero 2 W, built with **SvelteKit frontend** and **FastAPI backend**. Provides an easy web interface for configuring WiFi networks on headless Raspberry Pi devices.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Docker](https://img.shields.io/badge/docker-required-blue.svg)
-![Platform](https://img.shields.io/badge/platform-linux%2Farm64%7Cx86__64-lightgrey.svg)
+![Architecture](https://img.shields.io/badge/architecture-ARM64%20Compatible-green.svg)
+![Frontend](https://img.shields.io/badge/frontend-SvelteKit-ff3e00.svg)
+![Backend](https://img.shields.io/badge/backend-FastAPI-009688.svg)
 
 ## ✨ Features
 
-- 🚀 **Modern Web Interface**: Built with Nuxt 3, TypeScript, and Tailwind CSS
-- 📱 **Mobile-Friendly**: Responsive design for smartphone configuration
-- 🐳 **Containerized**: Docker-based deployment with automatic platform detection
-- 🔄 **Mode Switching**: Automatic hotspot ↔ client mode switching
-- 🔗 **Easy Access**: Available via `radio.local` or hotspot connection
-- ⚡ **Raspberry Pi Optimized**: Efficient performance on Pi Zero 2 W
+- 🌐 **Easy WiFi Setup** - Simple web interface for network configuration
+- 📱 **Mobile Optimized** - Responsive design works on phones and tablets  
+- 🔒 **Secure by Default** - WPA2/WPA3 support with secure credential handling
+- 🚀 **Fast Performance** - SvelteKit frontend compiles to vanilla JavaScript
+- 🐳 **Docker Ready** - Containerized backend for easy deployment
+- 🔧 **ARM64 Compatible** - No oxc-parser issues on Raspberry Pi
+- ⚡ **Hot Reload** - Live development with instant updates
+- 🎨 **Dark Mode** - Automatic dark/light theme switching
+- 📶 **Signal Strength** - Real-time WiFi signal monitoring
+- 🔄 **Auto-reconnect** - Automatic connection recovery
 
-## 🏗️ How It Works
+## 🏗️ Architecture
 
-1. **Hotspot Mode**: Pi creates "Radio-Setup" WiFi network
-2. **Web Interface**: Connect and navigate to setup page
-3. **Network Selection**: Scan and select your WiFi network
-4. **Credentials**: Enter WiFi password securely
-5. **Auto-Switch**: Pi automatically switches to client mode
-6. **Management**: Access via `radio.local` for ongoing management
+**Hybrid Development Approach** (solves ARM64 oxc-parser issues):
+
+```
+┌─────────────────┐    ┌──────────────────┐
+│   SvelteKit     │────│   FastAPI        │
+│   Frontend      │ API│   Backend        │
+│   (Local Dev)   │────│   (Docker)       │
+└─────────────────┘    └──────────────────┘
+      :3000                    :8000
+```
+
+- **Frontend**: SvelteKit runs locally (no ARM64 issues)
+- **Backend**: FastAPI runs in Docker (proven stable)
+- **API**: Frontend proxies requests to backend
+- **Production**: Static frontend + Docker backend
 
 ## 🚀 Quick Start
 
-### For Developers
+### Prerequisites
+
+- **Node.js** 20+ (for local development)
+- **Docker** & Docker Compose (for backend)
+- **Raspberry Pi Zero 2 W** or compatible ARM64 device
+
+### Development Setup
+
+1. **Clone and setup:**
+   ```bash
+   git clone <repository-url> radio-wifi
+   cd radio-wifi
+   ```
+
+2. **Start backend (Docker):**
+   ```bash
+   docker-compose up radio-backend -d
+   ```
+
+3. **Setup frontend (Local):**
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+4. **Access the app:**
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:8000/docs
+
+### Production Deployment
+
+Deploy to Raspberry Pi:
+```bash
+# Build and deploy
+./scripts/deploy-pi.sh
+
+# Or manually:
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+## 📁 Project Structure
+
+```
+radio-wifi/
+├── frontend/              # SvelteKit frontend (new)
+│   ├── src/
+│   │   ├── routes/        # Page components
+│   │   ├── lib/
+│   │   │   ├── components/# Reusable components  
+│   │   │   ├── stores/    # Svelte stores (state)
+│   │   │   └── types.ts   # TypeScript types
+│   │   └── app.html       # HTML template
+│   ├── static/            # Static assets
+│   └── package.json
+├── backend/               # FastAPI backend (unchanged)
+│   ├── main.py            # FastAPI application
+│   └── requirements.txt
+├── app/                   # Legacy Nuxt (deprecated)
+├── docker/                # Docker configurations
+└── docs/                  # Documentation
+```
+
+## 🔧 Development
+
+### Frontend Development (SvelteKit)
 
 ```bash
-# Setup and start development
-git clone <repository-url>
-cd radio001
-./scripts/setup-dev.sh
-./scripts/docker-dev.sh start
-
-# Access application
-open http://localhost:3000    # Frontend
-open http://localhost:8000    # Backend API
+cd frontend
+npm run dev          # Start dev server
+npm run build        # Build for production  
+npm run preview      # Preview production build
+npm run check        # Type checking
+npm run lint         # Lint code
 ```
 
-### For Production (Raspberry Pi)
+### Backend Development (FastAPI)
 
 ```bash
-# Install Docker
-curl -sSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
-
-# Deploy application
-git clone <repository-url>
-cd radio001
-docker compose -f docker-compose.prod.yml up -d
-
-# Access via browser
-# http://radio.local or http://[pi-ip-address]
+docker-compose up radio-backend    # Start backend
+docker-compose logs radio-backend  # View logs
+docker-compose exec radio-backend bash  # Shell access
 ```
 
-**See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed setup and development workflow.**
+### Full Stack Development
 
-## 🔧 Configuration
+```bash
+# Terminal 1: Backend
+docker-compose up radio-backend
 
-### Environment Variables
+# Terminal 2: Frontend  
+cd frontend && npm run dev
 
-Configure the application with environment variables in `.env`:
-
-```env
-# Network Configuration
-WIFI_INTERFACE=wlan0
-HOSTNAME=radio
-
-# Hotspot Configuration  
-HOTSPOT_SSID=Radio-Setup
-HOTSPOT_PASSWORD=radio123
-HOTSPOT_IP=192.168.4.1
-
-# Features
-ENABLE_CAPTIVE_PORTAL=true
-ENABLE_AUTO_CONNECT=true
+# Access: http://localhost:3000
 ```
 
-### WiFi Management
+## 🏠 Pages & Features
 
-The system uses a **RaspiWiFi-inspired approach** with modern FastAPI architecture:
+| Route | Component | Description |
+|-------|-----------|-------------|
+| `/` | `+page.svelte` | Main dashboard with WiFi status |
+| `/setup` | `setup/+page.svelte` | WiFi network setup wizard |
+| `/settings` | `settings/+page.svelte` | System settings |
+| `/status` | `status/+page.svelte` | Detailed system status |
 
-- **Network Scanning**: `iwlist scan` command parsing
-- **Configuration**: `wpa_supplicant.conf` management
-- **Mode Switching**: Automatic hotspot ↔ client mode switching
-- **Status Monitoring**: Real-time connection status
-- **Development**: Mock data for testing without Pi hardware
+## 🔄 Migration from Nuxt
 
-## 📱 Usage
+We migrated from Nuxt to SvelteKit to solve ARM64 compatibility issues:
 
-### First-Time Setup
+| **Issue** | **Nuxt Solution** | **SvelteKit Solution** |
+|-----------|-------------------|----------------------|
+| oxc-parser ARM64 | ❌ Complex workarounds | ✅ No oxc-parser dependency |
+| Development | ❌ Docker required | ✅ Local development |
+| Performance | ❌ Runtime overhead | ✅ Compiled JavaScript |
+| Bundle size | ❌ Larger bundles | ✅ Smaller bundles |
 
-1. **Connect** to "Radio-Setup" WiFi network
-2. **Navigate** to `http://radio.local` or `http://192.168.4.1`
-3. **Select** your WiFi network from the scan results
-4. **Enter** WiFi password
-5. **Connect** - Pi automatically switches to client mode
+See [SVELTEKIT-MIGRATION.md](./SVELTEKIT-MIGRATION.md) for detailed migration guide.
 
-### Web Interface
+## 📡 API Endpoints
 
-- **Dashboard**: System status and connection info
-- **WiFi Setup**: Network scanning and connection wizard
-- **System Status**: Detailed monitoring and controls
-- **Settings**: Device configuration and preferences
+The FastAPI backend provides these endpoints:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/wifi/status` | Current WiFi status |
+| POST | `/api/wifi/scan` | Scan for networks |
+| POST | `/api/wifi/connect` | Connect to network |
+| POST | `/api/system/reset` | Reset to hotspot mode |
+| GET | `/health` | Health check |
+
+## 🐳 Docker
+
+### Development
+```bash
+docker-compose up -d          # Start all services
+docker-compose up radio-backend -d  # Backend only
+```
+
+### Production  
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+### ARM64 Compatibility
+- ✅ Backend: Runs perfectly in Docker on ARM64
+- ✅ Frontend: SvelteKit has no ARM64 issues
+- ✅ Development: Local frontend + Docker backend
+
+## 🎯 Raspberry Pi Setup
+
+1. **Install Docker:**
+   ```bash
+   curl -sSL https://get.docker.com | sh
+   sudo usermod -aG docker pi
+   ```
+
+2. **Deploy application:**
+   ```bash
+   git clone <repo-url> radio-wifi
+   cd radio-wifi
+   docker-compose -f docker-compose.prod.yml up -d
+   ```
+
+3. **Configure as access point:**
+   ```bash
+   sudo ./scripts/setup-pi.sh
+   ```
+
+## 🔍 Troubleshooting
+
+### ARM64 Issues (Solved!)
+- ❌ **Problem**: `oxc-parser` no ARM64 binaries
+- ✅ **Solution**: Use SvelteKit (no oxc-parser dependency)
+
+### Development Issues
+```bash
+# Reset everything
+docker-compose down -v
+cd frontend && rm -rf node_modules && npm install
+docker-compose up --build
+```
+
+### Backend Issues  
+```bash
+# Check backend logs
+docker-compose logs radio-backend
+
+# Restart backend
+docker-compose restart radio-backend
+```
 
 ## 📚 Documentation
 
-- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Complete development setup and workflow
-- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Issue resolution guide
+- [Development Guide](./DEVELOPMENT.md)
+- [SvelteKit Migration](./SVELTEKIT-MIGRATION.md)
+- [Deployment Guide](./DEPLOYMENT.md)  
+- [API Documentation](./API.md)
+- [Troubleshooting](./TROUBLESHOOTING.md)
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Follow conventional commits: `git commit -m 'feat: add amazing feature'`
-4. Push and create a Pull Request
-
-See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development guidelines.
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open Pull Request
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](./LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- **[RaspiWiFi](https://github.com/jasbur/RaspiWiFi)** for inspiring the WiFi management patterns
-- **Raspberry Pi Foundation** for amazing hardware
-- **Nuxt.js** and **FastAPI** teams for excellent frameworks
+- [SvelteKit](https://kit.svelte.dev) - Amazing frontend framework
+- [FastAPI](https://fastapi.tiangolo.com) - Fast and reliable backend
+- [Tailwind CSS](https://tailwindcss.com) - Utility-first CSS framework
+- [RaspiWiFi](https://github.com/jasbur/RaspiWifi) - Inspiration for Pi WiFi setup
 
 ---
 
-**Built with ❤️ for the Raspberry Pi community**
-test change
-# Test
+**Made with ❤️ for Raspberry Pi developers**
+
+*No more ARM64 oxc-parser headaches! 🎉*

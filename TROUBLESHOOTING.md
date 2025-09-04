@@ -1,381 +1,613 @@
 # Troubleshooting Guide
 
-Common issues and solutions for the Radio WiFi Configuration project.
+Common issues and solutions for the Radio WiFi Configuration project using the **SvelteKit + FastAPI hybrid architecture**.
 
-## 🐳 Docker Issues
+## 🚨 ARM64 Issues (SOLVED!)
 
-### Docker Not Running
-```bash
-# Check Docker status
-docker info
+### The oxc-parser Problem
+**❌ Old Problem**: `Cannot find module '@oxc-parser/binding-linux-arm64-gnu'`
 
-# Start Docker Desktop (macOS/Windows)
-open -a Docker
+**✅ Solution**: Migrated to SvelteKit (no oxc-parser dependency)
 
-# Start Docker service (Linux)
-sudo systemctl start docker
-```
+**Why This Happened**:
+- Nuxt 3.17.1+ introduced oxc-parser
+- oxc-parser lacks ARM64 binaries
+- Affected Raspberry Pi Zero 2 W and M1/M2 Macs
 
-### Build Failures on Apple Silicon
-**Error**: `Failed to build installable wheels for pydantic-core`
-
-**Solution**: Use the setup script (handles platform detection automatically)
-```bash
-./scripts/setup-dev.sh
-./scripts/docker-dev.sh start
-```
-
-### Platform Mismatch Errors
-**Error**: `exec format error` or `exec /bin/sh: exec format error`
-
-**Cause**: Trying to run ARM64 containers on AMD64 system (or vice versa)
-
-**Solutions**:
-```bash
-# Force correct platform for your system
-export DOCKER_DEFAULT_PLATFORM=linux/amd64  # For Intel/AMD
-export DOCKER_DEFAULT_PLATFORM=linux/arm64  # For Apple Silicon
-
-# Use CI configuration (AMD64) for testing
-./scripts/test-ci.sh
-
-# Clean rebuild with correct platform
-./scripts/docker-dev.sh cleanup
-./scripts/docker-dev.sh start
-```
-
-### Port Conflicts
-**Error**: `Port 3000 is already in use`
-
-**Solution**:
-```bash
-# Find and kill process using the port
-lsof -ti:3000 | xargs kill -9
-lsof -ti:8000 | xargs kill -9
-
-# Or use different ports
-FRONTEND_PORT=3001 BACKEND_PORT=8001 ./scripts/docker-dev.sh start
-```
-
-### Memory Issues
-**Error**: Container exits with out of memory errors
-
-**Solution**: Increase Docker Desktop memory to 4GB+ in Settings → Resources
-
-### Container Won't Start
-```bash
-# Clean restart
-./scripts/docker-dev.sh stop
-./scripts/docker-dev.sh cleanup
-./scripts/docker-dev.sh start
-
-# Check logs
-./scripts/docker-dev.sh logs
-```
+**Migration Benefits**:
+- ✅ No more ARM64 compatibility issues
+- ✅ Faster local development
+- ✅ Smaller bundle sizes
+- ✅ Better performance
 
 ## 🛠️ Development Issues
 
-### TypeScript Import Errors in IDE
-**Issue**: IDE shows import errors for packages
+### Backend Won't Start (Docker)
 
-**Solution**: This is expected behavior - packages are installed in Docker containers
+**Error**: `docker-compose up radio-backend` fails
+
+**Diagnosis**:
 ```bash
-# For accurate type checking, use Docker
-./scripts/docker-dev.sh shell radio-app
-npm run type-check
+# Check Docker status
+docker --version
+docker-compose --version
+
+# View detailed error logs
+docker-compose logs radio-backend
+
+# Check if port is in use
+lsof -i :8000
 ```
-
-### Pre-commit Hooks Not Working
-```bash
-# Reinstall hooks
-cd app && npm run prepare
-chmod +x .husky/pre-commit .husky/commit-msg
-
-# Test hooks manually
-npm run lint:fix
-npm run type-check
-```
-
-### Hot Reload Not Working
-```bash
-# For macOS users - enable polling
-export CHOKIDAR_USEPOLLING=true
-export WATCHPACK_POLLING=true
-./scripts/docker-dev.sh restart
-```
-
-### TypeScript Union Type Errors
-**Error**: `Property 'data' does not exist on type...`
-
-**Solution**: Use proper type guards
-```typescript
-// ✅ Correct
-if (response.success && 'data' in response) {
-  data.value = response.data
-} else if (!response.success && 'error' in response) {
-  throw new Error(response.error)
-}
-
-// ❌ Wrong
-if (response.success) {
-  data.value = response.data
-}
-```
-
-## 🌐 Network Issues
-
-### Cannot Access radio.local
-**Issue**: mDNS resolution not working
 
 **Solutions**:
 ```bash
-# Check if containers are running
-docker ps
+# Clean restart
+docker-compose down -v
+docker-compose up radio-backend -d
 
-# Use direct IP instead
-curl http://localhost:3000/api/health
-curl http://localhost:8000/health
+# Rebuild backend container
+docker-compose build --no-cache radio-backend
 
-# Check mDNS service (Linux)
-systemctl status avahi-daemon
-```
-
-### API Connection Timeouts
-```bash
 # Check backend health
 curl http://localhost:8000/health
-
-# Check backend logs
-./scripts/docker-dev.sh logs radio-backend
-
-# Restart backend service
-./scripts/docker-dev.sh restart
 ```
 
-### Frontend Blank Page
-```bash
-# Check frontend logs
-./scripts/docker-dev.sh logs radio-app
+### Frontend Won't Start (Local)
 
-# Rebuild frontend
-./scripts/docker-dev.sh shell radio-app
-npm run build
+**Error**: `npm run dev` fails in frontend directory
 
-# Check for JavaScript errors in browser console
-```
+**Common Causes & Solutions**:
 
-## 📱 Application Issues
-
-### WiFi Scan Fails on Raspberry Pi
-**Issue**: No networks found or scan errors
-
-**Solutions**:
-```bash
-# Check WiFi interface
-sudo ip addr show wlan0
-sudo iwconfig wlan0
-
-# Check permissions
-sudo usermod -aG netdev $USER
-
-# Manual scan test
-sudo iwlist wlan0 scan
-
-# Check system logs
-journalctl -u wpa_supplicant
-sudo dmesg | grep wlan
-```
-
-### Connection Fails After Entering Password
-**Possible causes**:
-1. **Incorrect password** - Double-check WiFi credentials
-2. **Weak signal** - Move closer to router
-3. **Network issues** - Check if network accepts new devices
-4. **Interface busy** - Restart networking service
-
-**Debug steps**:
-```bash
-# Check wpa_supplicant logs
-journalctl -u wpa_supplicant -f
-
-# Check network manager logs
-journalctl -u NetworkManager -f
-
-# Restart networking
-sudo systemctl restart networking
-```
-
-### Hotspot Mode Not Working
-```bash
-# Check hostapd service
-sudo systemctl status hostapd
-journalctl -u hostapd
-
-# Check hostapd configuration
-sudo hostapd -dd /etc/hostapd/hostapd.conf
-
-# Check IP forwarding
-cat /proc/sys/net/ipv4/ip_forward
-
-# Restart hostapd
-sudo systemctl restart hostapd
-```
-
-## 🔧 System Issues
-
-### High CPU Usage
-```bash
-# Check container resource usage
-docker stats
-
-# Check system processes
-./scripts/docker-dev.sh shell radio-backend
-top
-
-# Restart services
-./scripts/docker-dev.sh restart
-```
-
-### Low Memory on Raspberry Pi
-**Solutions**:
-1. **Increase swap space**:
+1. **Node.js Version Issue**:
    ```bash
+   # Check Node version (requires 18+)
+   node --version
+   
+   # Install correct version
+   nvm install 18
+   nvm use 18
+   ```
+
+2. **Dependencies Not Installed**:
+   ```bash
+   cd frontend
+   rm -rf node_modules package-lock.json
+   npm install
+   ```
+
+3. **Port Conflict**:
+   ```bash
+   # Check what's using port 3000
+   lsof -i :3000
+   
+   # Kill conflicting process
+   kill -9 $(lsof -ti:3000)
+   
+   # Or use different port
+   npm run dev -- --port 3001
+   ```
+
+4. **TypeScript Errors**:
+   ```bash
+   # Check for type errors
+   npm run check
+   
+   # Fix common issues
+   npm run lint:fix
+   ```
+
+### API Proxy Not Working
+
+**Error**: Frontend can't reach backend API
+
+**Symptoms**:
+- API calls return 404 or timeout
+- Network tab shows failed requests to `/api/*`
+
+**Diagnosis**:
+```bash
+# Test backend directly
+curl http://localhost:8000/health
+
+# Test frontend proxy
+curl http://localhost:3000/api/health
+
+# Check Vite proxy config
+cat frontend/vite.config.js
+```
+
+**Solutions**:
+
+1. **Backend Not Running**:
+   ```bash
+   docker-compose up radio-backend -d
+   ```
+
+2. **Proxy Misconfiguration**:
+   ```javascript
+   // frontend/vite.config.js
+   export default defineConfig({
+     server: {
+       proxy: {
+         '/api': {
+           target: 'http://localhost:8000',
+           changeOrigin: true
+         }
+       }
+     }
+   });
+   ```
+
+3. **Network Issues**:
+   ```bash
+   # Check Docker network
+   docker network ls
+   docker inspect radio001_radio-network
+   ```
+
+## 🖥️ Frontend-Specific Issues
+
+### SvelteKit Build Errors
+
+**Error**: `npm run build` fails
+
+**Common Issues**:
+
+1. **TypeScript Errors**:
+   ```bash
+   # Check types
+   npm run check
+   
+   # Fix in src/lib/types.ts
+   ```
+
+2. **Import Resolution**:
+   ```bash
+   # Check for invalid imports
+   grep -r "from.*app/" src/
+   
+   # Use correct Svelte imports
+   # ❌ import { page } from '$app/page'
+   # ✅ import { page } from '$app/stores'
+   ```
+
+3. **Adapter Issues**:
+   ```javascript
+   // svelte.config.js
+   import adapter from '@sveltejs/adapter-static';
+   
+   export default {
+     kit: {
+       adapter: adapter({
+         fallback: 'index.html'  // For SPA routing
+       })
+     }
+   };
+   ```
+
+### Store Reactivity Issues
+
+**Problem**: Store values not updating in components
+
+**Solution**:
+```svelte
+<script lang="ts">
+  import { networks } from '$lib/stores/wifi';
+  
+  // ✅ Correct - reactive statement
+  $: networkList = $networks;
+  
+  // ✅ Correct - direct store access
+  {#each $networks as network}
+    <div>{network.ssid}</div>
+  {/each}
+</script>
+```
+
+### Routing Issues
+
+**Problem**: Page routes not working
+
+**Diagnosis**:
+```bash
+# Check route structure
+ls -la frontend/src/routes/
+```
+
+**Solutions**:
+
+1. **File Naming**:
+   ```
+   ✅ Correct structure:
+   routes/
+   ├── +page.svelte          # Home (/)
+   ├── setup/
+   │   └── +page.svelte      # Setup (/setup)
+   └── status/
+       └── +page.svelte      # Status (/status)
+   
+   ❌ Wrong:
+   routes/
+   ├── index.svelte
+   ├── setup.svelte
+   └── status.svelte
+   ```
+
+2. **Navigation**:
+   ```svelte
+   <script>
+     import { goto } from '$app/navigation';
+   </script>
+   
+   <!-- ✅ Correct -->
+   <button on:click={() => goto('/setup')}>Setup</button>
+   
+   <!-- ❌ Wrong -->
+   <button on:click={() => navigateTo('/setup')}>Setup</button>
+   ```
+
+## 🐳 Production Issues
+
+### Nginx Not Serving Files
+
+**Error**: 404 errors in production
+
+**Diagnosis**:
+```bash
+# Check if files exist in container
+docker exec radio-frontend-prod ls -la /usr/share/nginx/html
+
+# Check nginx configuration
+docker exec radio-frontend-prod cat /etc/nginx/conf.d/default.conf
+
+# View nginx logs
+docker exec radio-frontend-prod tail -f /var/log/nginx/error.log
+```
+
+**Solutions**:
+
+1. **Frontend Not Built**:
+   ```bash
+   cd frontend
+   npm run build
+   
+   # Verify build output
+   ls -la build/
+   ```
+
+2. **Volume Mount Issues**:
+   ```yaml
+   # docker-compose.prod.yml
+   services:
+     radio-frontend:
+       volumes:
+         - ./frontend/build:/usr/share/nginx/html:ro  # Ensure path is correct
+   ```
+
+3. **File Permissions**:
+   ```bash
+   # Fix permissions
+   chmod -R 755 frontend/build/
+   ```
+
+### Backend Container Issues
+
+**Error**: Backend container exits or restarts
+
+**Diagnosis**:
+```bash
+# Check container status
+docker-compose -f docker-compose.prod.yml ps
+
+# View container logs
+docker-compose -f docker-compose.prod.yml logs radio-backend
+
+# Check resource usage
+docker stats radio-backend-prod
+```
+
+**Solutions**:
+
+1. **Memory Issues** (common on Pi Zero):
+   ```bash
+   # Check available memory
+   free -h
+   
+   # Increase swap
    sudo dphys-swapfile swapoff
-   sudo nano /etc/dphys-swapfile  # Set CONF_SWAPSIZE=1024
+   sudo sed -i 's/CONF_SWAPSIZE=100/CONF_SWAPSIZE=1024/' /etc/dphys-swapfile
    sudo dphys-swapfile setup
    sudo dphys-swapfile swapon
    ```
 
-2. **Optimize Docker memory limits** (already configured in docker-compose.prod.yml)
+2. **Permission Issues**:
+   ```bash
+   # Check if backend has WiFi access
+   docker exec radio-backend-prod ls -la /etc/wpa_supplicant/
+   
+   # Ensure proper capabilities
+   # In docker-compose.prod.yml:
+   privileged: true
+   cap_add:
+     - NET_ADMIN
+     - NET_RAW
+   ```
 
-### Service Won't Start on Boot
+## 🔧 System Integration Issues
+
+### WiFi Management Not Working
+
+**Problem**: Can't scan or connect to networks
+
+**Diagnosis**:
 ```bash
-# Enable Docker service
-sudo systemctl enable docker
+# Check WiFi interface
+iwconfig
 
-# Create systemd service for the application
-sudo nano /etc/systemd/system/radio-wifi.service
+# Test manual scanning
+sudo iwlist wlan0 scan | head -20
+
+# Check system services
+sudo systemctl status hostapd
+sudo systemctl status dnsmasq
+sudo systemctl status wpa_supplicant
 ```
 
-Example systemd service:
-```ini
-[Unit]
-Description=Radio WiFi Configuration
-Requires=docker.service
-After=docker.service
+**Solutions**:
 
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/local/bin/docker-compose -f /home/pi/radio001/docker-compose.prod.yml up -d
-ExecStop=/usr/local/bin/docker-compose -f /home/pi/radio001/docker-compose.prod.yml down
-WorkingDirectory=/home/pi/radio001
+1. **Interface Issues**:
+   ```bash
+   # Ensure correct interface name
+   ip link show
+   
+   # Update environment variable
+   export WIFI_INTERFACE=wlan0  # or wlan1, etc.
+   ```
 
-[Install]
-WantedBy=multi-user.target
-```
+2. **Permission Issues**:
+   ```bash
+   # Check if container can access WiFi
+   docker exec radio-backend-prod iwconfig
+   
+   # If fails, check container configuration
+   ```
 
-Then enable it:
+3. **Service Conflicts**:
+   ```bash
+   # Stop conflicting services
+   sudo systemctl stop NetworkManager
+   sudo systemctl disable NetworkManager
+   
+   # Use systemd-networkd instead
+   sudo systemctl enable systemd-networkd
+   ```
+
+### Captive Portal Not Working
+
+**Problem**: Mobile devices don't auto-open browser
+
+**Diagnosis**:
 ```bash
-sudo systemctl enable radio-wifi
-sudo systemctl start radio-wifi
+# Test captive portal endpoints
+curl http://radio.local/generate_204
+curl http://radio.local/connecttest.txt
+curl http://radio.local/hotspot-detect.html
 ```
+
+**Solutions**:
+
+1. **DNS Issues**:
+   ```bash
+   # Check DNS resolution
+   nslookup radio.local
+   
+   # Restart avahi
+   docker-compose -f docker-compose.prod.yml restart avahi
+   ```
+
+2. **Firewall Issues**:
+   ```bash
+   # Check firewall rules
+   sudo ufw status
+   
+   # Allow HTTP traffic
+   sudo ufw allow 80/tcp
+   ```
+
+### mDNS Resolution Issues
+
+**Problem**: `radio.local` doesn't resolve
+
+**Diagnosis**:
+```bash
+# Test mDNS resolution
+ping radio.local
+avahi-resolve -n radio.local
+
+# Check avahi service
+docker-compose -f docker-compose.prod.yml logs avahi
+```
+
+**Solutions**:
+
+1. **Avahi Not Running**:
+   ```bash
+   # Start avahi with mdns profile
+   docker-compose -f docker-compose.prod.yml --profile mdns up -d
+   ```
+
+2. **Network Configuration**:
+   ```bash
+   # Check network mode
+   docker inspect radio-avahi | grep NetworkMode
+   
+   # Should be "host" for mDNS
+   ```
 
 ## 🔍 Debugging Commands
 
-### Container Diagnostics
+### Development Debugging
 ```bash
-# View all containers
-docker ps -a
+# Backend debugging
+docker-compose logs radio-backend
+docker-compose exec radio-backend bash
 
-# Check container logs
-./scripts/docker-dev.sh logs radio-app
-./scripts/docker-dev.sh logs radio-backend
+# Frontend debugging  
+cd frontend
+npm run check        # Type checking
+npm run lint         # Code linting
+npm run build        # Test build
 
-# Execute commands in containers
-./scripts/docker-dev.sh shell radio-app
-./scripts/docker-dev.sh shell radio-backend
-
-# Check container resources
-docker stats
+# Network debugging
+curl -v http://localhost:8000/health
+curl -v http://localhost:3000/api/health
 ```
 
-### Health Checks
+### Production Debugging
 ```bash
-# Manual health checks
-curl http://localhost:3000/api/health
-curl http://localhost:8000/health
+# Service status
+docker-compose -f docker-compose.prod.yml ps
+docker-compose -f docker-compose.prod.yml logs
 
-# Check service status
-./scripts/docker-dev.sh status
+# System status
+sudo systemctl status docker
+free -h
+df -h
 
-# Test WiFi APIs
-curl http://localhost:3000/api/wifi/status
-curl -X POST http://localhost:3000/api/wifi/scan
+# Network status
+iwconfig
+ip addr show
+sudo systemctl status avahi-daemon
+```
+
+### Performance Debugging
+```bash
+# Resource usage
+docker stats
+htop
+
+# Network performance
+iperf3 -s  # On server
+iperf3 -c radio.local  # On client
+
+# Disk I/O
+sudo iotop
+```
+
+## 📊 Monitoring & Health Checks
+
+### Automated Health Checks
+```bash
+#!/bin/bash
+# health-check.sh
+echo "🔍 Radio WiFi Health Check"
+
+# Backend health
+if curl -sf http://localhost:8000/health; then
+  echo "✅ Backend healthy"
+else
+  echo "❌ Backend unhealthy"
+fi
+
+# Frontend health
+if curl -sf http://localhost:3000; then
+  echo "✅ Frontend healthy"
+else
+  echo "❌ Frontend unhealthy"
+fi
+
+# WiFi interface
+if iwconfig wlan0 | grep -q "IEEE 802.11"; then
+  echo "✅ WiFi interface active"
+else
+  echo "❌ WiFi interface issues"
+fi
 ```
 
 ### Log Analysis
 ```bash
-# Follow all logs
-./scripts/docker-dev.sh logs -f
+# Analyze nginx logs
+tail -f /var/log/nginx/radio_access.log | grep -E "4[0-9]{2}|5[0-9]{2}"
 
-# Frontend logs only
-./scripts/docker-dev.sh logs radio-app
+# Analyze backend logs
+docker-compose logs radio-backend | grep -i error
 
-# Backend logs only
-./scripts/docker-dev.sh logs radio-backend
-
-# CI configuration logs
-docker compose -f docker-compose.ci.yml logs
-
-# System logs (Raspberry Pi)
-journalctl -f
+# System logs
+journalctl -u docker -f
 ```
 
-### Platform Testing
+## 🚨 Emergency Recovery
+
+### Complete System Reset
 ```bash
-# Test CI configuration locally
-./scripts/test-ci.sh
+#!/bin/bash
+# emergency-reset.sh
+echo "⚠️  Performing emergency reset..."
 
-# Check current platform
-docker version --format '{{.Server.Arch}}'
-uname -m
+# Stop all services
+docker-compose down -v
+docker-compose -f docker-compose.prod.yml down -v
 
-# Force platform and rebuild
-export DOCKER_DEFAULT_PLATFORM=linux/amd64
-docker compose -f docker-compose.ci.yml build --no-cache
+# Clean Docker
+docker system prune -af
+docker volume prune -f
+
+# Reset WiFi configuration
+sudo systemctl stop wpa_supplicant hostapd dnsmasq
+sudo cp /etc/wpa_supplicant/wpa_supplicant.conf.backup /etc/wpa_supplicant/wpa_supplicant.conf
+
+# Restart services
+sudo systemctl restart networking
+docker-compose -f docker-compose.prod.yml up -d
+
+echo "✅ Reset complete"
 ```
 
-## 🚀 Performance Optimization
-
-### Raspberry Pi Zero 2 W Optimization
-
-**Already implemented**:
-- Memory limits for containers
-- Resource-efficient Docker images
-- Optimized Nuxt configuration
-- Minimal dependencies
-
-**Additional optimizations**:
+### Backup & Restore
 ```bash
-# Disable unnecessary services
-sudo systemctl disable bluetooth
-sudo systemctl disable cups
+# Create backup
+./scripts/backup-config.sh
 
-# Optimize GPU memory split
-echo "gpu_mem=16" | sudo tee -a /boot/config.txt
-
-# Enable I2C/SPI only if needed
-sudo raspi-config
+# Restore from backup
+./scripts/restore-config.sh backup_20241201.tar.gz
 ```
 
-## 🆘 Getting Help
+## 📞 Getting Help
 
-If issues persist:
+### Diagnostic Information
+When seeking help, provide:
 
-1. **Check logs**: Run `./scripts/docker-dev.sh logs` for detailed error information
-2. **Platform issues**: Verify you're using the correct Docker Compose configuration for your platform
-3. **Network connectivity**: Test basic network connectivity before WiFi configuration
-4. **System resources**: Ensure adequate memory and storage space
+```bash
+# System information
+uname -a
+docker --version
+docker-compose --version
+node --version
 
-For development issues, see [DEVELOPMENT.md](DEVELOPMENT.md) for detailed setup and workflow guidance.
+# Service status
+docker-compose ps
+curl -I http://localhost:8000/health
+curl -I http://localhost:3000
+
+# Log excerpts (last 50 lines)
+docker-compose logs --tail=50 radio-backend
+docker-compose logs --tail=50 radio-frontend
+```
+
+### Common Error Patterns
+
+1. **"Address already in use"** → Port conflict (kill process or change port)
+2. **"Cannot find module"** → Missing dependencies (npm install)
+3. **"exec format error"** → Platform mismatch (check Docker platform)
+4. **"Permission denied"** → File/device permissions (check volumes/devices)
+5. **"Connection refused"** → Service not running (check container status)
+
+### Resources
+- [SvelteKit Docs](https://kit.svelte.dev/docs)
+- [Docker Troubleshooting](https://docs.docker.com/config/daemon/troubleshoot/)
+- [Nginx Configuration](https://nginx.org/en/docs/troubleshooting_faq.html)
+- [Raspberry Pi Forum](https://www.raspberrypi.org/forums/)
+
+---
+
+This troubleshooting guide covers the most common issues with the new SvelteKit + FastAPI architecture. The migration has eliminated the major ARM64 compatibility issues while introducing a more reliable and performant solution.

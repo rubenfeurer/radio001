@@ -47,8 +47,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.dev
-      args:
-        NODE_VERSION: 20-alpine
     container_name: radio-wifi-dev
     hostname: radio
     ports:
@@ -86,6 +84,8 @@ services:
       # Development flags
       - DEBUG=radio:*
       - CHOKIDAR_USEPOLLING=true
+      - SKIP_NUXT_PREPARE=true
+      - NITRO_PRESET=node-server
     networks:
       - radio-network
     restart: unless-stopped

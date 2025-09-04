@@ -27,16 +27,17 @@ WORKDIR /app
 # =============================================================================
 # Node.js base stage for Nuxt frontend
 # =============================================================================
-FROM node:20-alpine AS node-base
+FROM node:20 AS node-base
 
 # Install system dependencies
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y \
     dumb-init \
-    curl
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create app user
-RUN addgroup -g 1001 -S radio && \
-    adduser -S radio -u 1001 -G radio
+RUN groupadd -g 1001 radio && \
+    useradd -u 1001 -g radio -s /bin/bash radio
 
 WORKDIR /app
 
@@ -56,19 +57,32 @@ FROM node-base AS frontend-deps
 
 # Copy frontend package files
 COPY app/package*.json ./app/
-RUN cd app && npm ci --only=production && npm cache clean --force
+
+# Install frontend dependencies for ARM64
+RUN cd app && \
+    npm config set fund false && \
+    npm config set audit false && \
+    npm ci --only=production --no-optional && \
+    npm cache clean --force
 
 # =============================================================================
 # Frontend build stage
 # =============================================================================
 FROM frontend-deps AS frontend-build
 
+# Set environment variables for ARM64 compatibility
+ENV SKIP_NUXT_PREPARE=true \
+    NITRO_PRESET=node-server \
+    NODE_ENV=production
+
 # Copy frontend source
 COPY app/ ./app/
 COPY config/ ./config/
 
-# Build the Nuxt application
-RUN cd app && npm run build
+# Build the Nuxt application (skip oxc-parser problematic steps)
+RUN cd app && \
+    echo "🔧 Building Nuxt app for ARM64..." && \
+    npm run build
 
 # =============================================================================
 # Production stage - Combined backend and frontend
@@ -114,7 +128,7 @@ RUN mkdir -p /var/lib/dhcp \
         /app/logs \
         /app/data
 
-# Create startup script
+# Create simple startup script for ARM64
 RUN cat > /app/start.sh << 'EOF' && chmod +x /app/start.sh
 #!/bin/bash
 set -e
