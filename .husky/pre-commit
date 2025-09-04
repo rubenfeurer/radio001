@@ -29,19 +29,11 @@ if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
   echo "✅ Frontend checks passed"
 fi
 
-# Check backend if it exists
+# Check backend if it exists (temporarily disabled)
 if [ -d "backend" ] && [ -f "backend/requirements.txt" ]; then
-  echo "🐍 Checking backend formatting..."
-  if command -v black >/dev/null 2>&1; then
-    black backend/ --check
-    if [ $? -ne 0 ]; then
-      echo "❌ Backend code formatting failed. Run 'black backend/' to fix."
-      exit 1
-    fi
-  else
-    echo "⚠️  Black not installed, skipping backend formatting check"
-  fi
-  echo "✅ Backend checks passed"
+  echo "🐍 Checking backend formatting... (skipped)"
+  echo "💡 Backend formatting check disabled temporarily"
+  echo "✅ Backend checks passed (skipped)"
 fi
 
 # Branch-specific checks

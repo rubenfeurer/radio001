@@ -100,10 +100,11 @@
     ]
   },
   "directories": {
-    "app": "./app",
+    "frontend": "./frontend",
+    "backend": "./backend",
     "config": "./config",
     "scripts": "./scripts",
     "docker": "./docker",
-    "docs": "./docs"
+    "nginx": "./nginx"
   }
 }
