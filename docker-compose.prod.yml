@@ -1,7 +1,7 @@
 # Production Docker Compose configuration
 # Optimized for Raspberry Pi Zero 2 W deployment
 
-version: '3.8'
+version: "3.8"
 
 services:
   # Main application service
@@ -12,14 +12,14 @@ services:
       platforms:
         - linux/arm64
       args:
-        NODE_VERSION: 18-alpine
+        NODE_VERSION: 20-alpine
     image: radio-wifi:latest
     container_name: radio-wifi-prod
     hostname: radio
     ports:
-      - "80:3000"      # HTTP (standard web port)
-      - "53:53/udp"    # DNS
-      - "67:67/udp"    # DHCP
+      - "80:3000" # HTTP (standard web port)
+      - "53:53/udp" # DNS
+      - "67:67/udp" # DHCP
       - "5353:5353/udp" # mDNS
     volumes:
       # Persistent data
@@ -64,8 +64,8 @@ services:
       - ENABLE_CAPTIVE_PORTAL=true
       - ENABLE_AUTO_CONNECT=true
       - ENABLE_MONITORING=false
-    privileged: true  # Required for network management
-    network_mode: host  # Required for WiFi interface access
+    privileged: true # Required for network management
+    network_mode: host # Required for WiFi interface access
     restart: unless-stopped
     cap_add:
       - NET_ADMIN
@@ -128,7 +128,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_POLL_INTERVAL=86400  # Check daily
+      - WATCHTOWER_POLL_INTERVAL=86400 # Check daily
       - WATCHTOWER_INCLUDE_STOPPED=true
       - WATCHTOWER_REVIVE_STOPPED=true
     restart: unless-stopped
@@ -183,7 +183,6 @@ volumes:
 
   avahi_data:
     driver: local
-
 # Production deployment notes:
 # 1. Ensure directories exist: sudo mkdir -p /opt/radio/{data,logs,config}
 # 2. Set proper permissions: sudo chown -R 1001:1001 /opt/radio

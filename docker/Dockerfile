@@ -27,7 +27,7 @@ WORKDIR /app
 # =============================================================================
 # Node.js base stage for Nuxt frontend
 # =============================================================================
-FROM node:18-alpine AS node-base
+FROM node:20-alpine AS node-base
 
 # Install system dependencies
 RUN apk add --no-cache \
