@@ -1,0 +1,152 @@
+name: Develop CI - Quick Validation
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+env:
+  NODE_VERSION: "18"
+
+jobs:
+  # =============================================================================
+  # Quick Linting & Type Checking
+  # =============================================================================
+  lint-and-type-check:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            app/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install app dependencies
+        run: cd app && npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript type checking
+        run: npm run type-check
+
+  # =============================================================================
+  # Quick Build Validation
+  # =============================================================================
+  build-validation:
+    name: Build Validation
+    runs-on: ubuntu-latest
+    needs: lint-and-type-check
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            app/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd app && npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Validate build output
+        run: |
+          if [ ! -d "app/.output" ]; then
+            echo "❌ Build output directory not found"
+            exit 1
+          fi
+          echo "✅ Build completed successfully"
+
+  # =============================================================================
+  # Basic Docker Build Test (AMD64 only for speed)
+  # =============================================================================
+  docker-build-test:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    needs: lint-and-type-check
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image (test only)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.dev
+          platforms: linux/amd64
+          push: false
+          tags: radio-wifi:develop-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Validate Docker image
+        run: |
+          docker run --rm -d --name radio-test radio-wifi:develop-test || exit 1
+          sleep 5
+          docker stop radio-test || true
+          echo "✅ Docker image builds and starts successfully"
+
+  # =============================================================================
+  # Summary & Next Steps
+  # =============================================================================
+  summary:
+    name: Development Summary
+    runs-on: ubuntu-latest
+    needs: [lint-and-type-check, build-validation, docker-build-test]
+    if: always()
+
+    steps:
+      - name: Report Results
+        run: |
+          echo "📊 Develop Branch CI Summary"
+          echo "=========================="
+          echo "Lint & Type Check: ${{ needs.lint-and-type-check.result }}"
+          echo "Build Validation: ${{ needs.build-validation.result }}"
+          echo "Docker Build Test: ${{ needs.docker-build-test.result }}"
+          echo ""
+
+          if [ "${{ needs.lint-and-type-check.result }}" = "success" ] && \
+             [ "${{ needs.build-validation.result }}" = "success" ] && \
+             [ "${{ needs.docker-build-test.result }}" = "success" ]; then
+            echo "✅ All checks passed! Ready for further development."
+            echo "💡 When ready, create a PR to main for full validation."
+          else
+            echo "❌ Some checks failed. Please review and fix issues."
+            echo "🔧 Failed jobs should be addressed before merging to main."
+          fi
+
+      - name: Development Tips
+        if: success()
+        run: |
+          echo ""
+          echo "🚀 Development Workflow Tips:"
+          echo "• Continue developing on this branch"
+          echo "• Quick feedback loop with these lightweight checks"
+          echo "• Create PR to main when feature is ready"
+          echo "• Full integration tests will run on PR to main"

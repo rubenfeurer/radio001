@@ -1,9 +1,9 @@
-name: CI/CD Pipeline
+name: Main CI/CD - Full Validation & Deployment
 
 on:
-  push:
-    branches: [main, develop]
   pull_request:
+    branches: [main]
+  push:
     branches: [main]
   release:
     types: [published]
@@ -14,11 +14,48 @@ env:
 
 jobs:
   # =============================================================================
-  # Integration Tests & Docker Build
+  # Pre-flight Checks (for PRs)
+  # =============================================================================
+  pre-flight:
+    name: Pre-flight Validation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            app/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd app && npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Run type checking
+        run: npm run type-check
+
+      - name: Build application
+        run: npm run build
+
+  # =============================================================================
+  # Full Integration Tests (for PRs and main pushes)
   # =============================================================================
   integration:
     name: Integration Tests
     runs-on: ubuntu-latest
+    needs: pre-flight
+    if: always() && (needs.pre-flight.result == 'success' || github.event_name != 'pull_request')
 
     steps:
       - name: Checkout code
@@ -118,7 +155,7 @@ jobs:
     name: Build Docker Images
     runs-on: ubuntu-latest
     needs: [integration, security]
-    if: github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' || github.event_name == 'release'
 
     strategy:
       matrix:
@@ -175,7 +212,7 @@ jobs:
     name: Create Multi-Arch Manifest
     runs-on: ubuntu-latest
     needs: docker-build
-    if: github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' || github.event_name == 'release'
 
     steps:
       - name: Login to Container Registry
@@ -283,20 +320,42 @@ jobs:
   notify:
     name: Notify Results
     runs-on: ubuntu-latest
-    needs: [integration, security, docker-build]
+    needs: [pre-flight, integration, security, docker-build]
     if: always()
 
     steps:
-      - name: Notify on success
-        if: ${{ needs.integration.result == 'success' && needs.security.result == 'success' && needs.docker-build.result == 'success' }}
+      - name: PR Validation Summary
+        if: github.event_name == 'pull_request'
         run: |
-          echo "✅ CI/CD Pipeline completed successfully!"
-          echo "All tests passed, security checks passed, Docker images built"
+          echo "🔍 Pull Request Validation Summary"
+          echo "================================="
+          echo "Pre-flight: ${{ needs.pre-flight.result }}"
+          echo "Integration: ${{ needs.integration.result }}"
+          echo "Security: ${{ needs.security.result }}"
+          echo ""
 
-      - name: Notify on failure
-        if: ${{ needs.integration.result == 'failure' || needs.security.result == 'failure' || needs.docker-build.result == 'failure' }}
+          if [ "${{ needs.pre-flight.result }}" = "success" ] && \
+             [ "${{ needs.integration.result }}" = "success" ] && \
+             [ "${{ needs.security.result }}" = "success" ]; then
+            echo "✅ PR validation passed! Safe to merge to main."
+          else
+            echo "❌ PR validation failed. Please fix issues before merging."
+          fi
+
+      - name: Main Branch Summary
+        if: github.ref == 'refs/heads/main'
         run: |
-          echo "❌ CI/CD Pipeline failed!"
-          echo "Integration result: ${{ needs.integration.result }}"
-          echo "Security result: ${{ needs.security.result }}"
-          echo "Docker build result: ${{ needs.docker-build.result }}"
+          echo "🚀 Main Branch Deployment Summary"
+          echo "================================="
+          echo "Integration: ${{ needs.integration.result }}"
+          echo "Security: ${{ needs.security.result }}"
+          echo "Docker Build: ${{ needs.docker-build.result }}"
+          echo ""
+
+          if [ "${{ needs.integration.result }}" = "success" ] && \
+             [ "${{ needs.security.result }}" = "success" ] && \
+             [ "${{ needs.docker-build.result }}" = "success" ]; then
+            echo "✅ Main branch validation completed! Ready for deployment."
+          else
+            echo "❌ Main branch validation failed!"
+          fi

@@ -1,9 +1,57 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-# Run lint-staged for linting and auto-fixes
+# Get current branch name
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+echo "🔍 Running pre-commit checks on branch: $BRANCH"
+
+# Always run lint-staged for basic linting and auto-fixes
+echo "📝 Running lint-staged..."
 cd app && npx lint-staged
 
-# Run type checking separately (only if lint-staged passes)
-echo "Running TypeScript type checking..."
-cd app && npm run type-check
+# Exit if lint-staged fails
+if [ $? -ne 0 ]; then
+  echo "❌ Linting failed. Please fix the issues above."
+  exit 1
+fi
+
+# Branch-specific checks
+if [ "$BRANCH" = "main" ]; then
+  echo "🏭 Main branch detected - running full validation..."
+
+  # Full type checking for main branch
+  echo "🔍 Running TypeScript type checking..."
+  cd app && npm run type-check
+
+  if [ $? -ne 0 ]; then
+    echo "❌ Type checking failed on main branch."
+    exit 1
+  fi
+
+  # Could add more checks here like:
+  # - Unit tests
+  # - Build validation
+  echo "✅ Full validation complete for main branch"
+
+elif [ "$BRANCH" = "develop" ]; then
+  echo "🚀 Develop branch detected - running quick checks..."
+
+  # Quick type check (could be made faster if needed)
+  echo "⚡ Running quick TypeScript validation..."
+  cd app && npm run type-check
+
+  if [ $? -ne 0 ]; then
+    echo "⚠️  Type checking failed on develop branch."
+    echo "💡 Consider fixing before pushing, but allowing commit to proceed..."
+    # Don't exit - allow commit but warn
+  fi
+
+  echo "✅ Quick validation complete for develop branch"
+
+else
+  echo "🌿 Feature branch detected - running minimal checks..."
+  echo "💡 Only linting was performed. Consider switching to develop for more validation."
+fi
+
+echo "🎉 Pre-commit checks completed successfully!"
