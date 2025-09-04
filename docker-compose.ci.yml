@@ -1,12 +1,12 @@
 # CI-specific Docker Compose configuration
-# Optimized for GitHub Actions AMD64 runners with proper platform settings
+# Optimized for GitHub Actions AMD64 runners with SvelteKit frontend
 
 services:
   # Backend API service for CI
   radio-backend:
     build:
-      context: .
-      dockerfile: docker/Dockerfile.backend
+      context: ./backend
+      dockerfile: Dockerfile
       platforms:
         - linux/amd64
     platform: linux/amd64
@@ -44,54 +44,37 @@ services:
           memory: 256M
           cpus: "0.5"
 
-  # Frontend application service for CI
-  radio-app:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.dev
-      platforms:
-        - linux/amd64
-
-    platform: linux/amd64
-    container_name: radio-app-ci
-    hostname: radio-app
+  # Frontend CI test service (nginx + static build)
+  radio-frontend:
+    image: nginx:alpine
+    container_name: radio-frontend-ci
+    hostname: radio-frontend
     ports:
-      - "3000:3000"
+      - "3000:80"
+    volumes:
+      - ./frontend/build:/usr/share/nginx/html:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     environment:
-      # Application settings
-      - NODE_ENV=development
-      - NUXT_HOST=0.0.0.0
-      - NUXT_PORT=3000
-      - NUXT_DEVTOOLS=false
-
-      # Backend API configuration
-      - API_HOST=radio-backend
-      - API_PORT=8000
-
-      # Network settings
-      - HOSTNAME=radio
-      - WIFI_INTERFACE=wlan0
-
-      # CI optimizations
-      - NODE_OPTIONS=--max-old-space-size=1024
-      - DEBUG=0
-      - CHOKIDAR_USEPOLLING=false
+      - NGINX_HOST=localhost
+      - NGINX_PORT=80
+      - BACKEND_HOST=radio-backend
+      - BACKEND_PORT=8000
     networks:
       - radio-network
     depends_on:
       radio-backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 60s
+      start_period: 10s
     deploy:
       resources:
         limits:
-          memory: 512M
-          cpus: "1.0"
+          memory: 128M
+          cpus: "0.5"
 
 # Custom network for CI
 networks:
