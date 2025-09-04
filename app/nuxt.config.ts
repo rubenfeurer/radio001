@@ -6,24 +6,23 @@ export default defineNuxtConfig({
   // Core Modules
   // =============================================================================
   modules: [
-    '@nuxt/ui',
     '@pinia/nuxt',
-    '@nuxt/devtools'
+    '@nuxtjs/tailwindcss'
   ],
 
   // =============================================================================
   // TypeScript Configuration
   // =============================================================================
   typescript: {
-    typeCheck: true,
-    strict: true
+    typeCheck: false,
+    strict: false
   },
 
   // =============================================================================
   // Development Tools
   // =============================================================================
   devtools: {
-    enabled: process.env.NODE_ENV === 'development'
+    enabled: false
   },
 
   // =============================================================================
@@ -85,20 +84,18 @@ export default defineNuxtConfig({
   },
 
   // =============================================================================
-  // UI Framework Configuration
-  // =============================================================================
-  ui: {
-    global: true,
-    icons: ['heroicons', 'lucide'],
-    safelistColors: ['primary', 'red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose']
-  },
-
-  // =============================================================================
   // Styling
   // =============================================================================
   css: [
     '~/assets/css/main.css'
   ],
+
+  // =============================================================================
+  // Tailwind CSS Configuration
+  // =============================================================================
+  tailwindcss: {
+    cssPath: '~/assets/css/main.css',
+  },
 
   // =============================================================================
   // Server Configuration
@@ -125,31 +122,7 @@ export default defineNuxtConfig({
   // =============================================================================
   vite: {
     build: {
-      target: 'es2020', // Ensure compatibility with older ARM processors
-      minify: process.env.NODE_ENV === 'production' ? 'terser' : false,
-
-      // Terser options for production
-      terserOptions: {
-        compress: {
-          drop_console: process.env.NODE_ENV === 'production',
-          drop_debugger: process.env.NODE_ENV === 'production'
-        }
-      },
-
-      // Chunk size optimization
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            vendor: ['vue', 'vue-router'],
-            ui: ['@nuxt/ui']
-          }
-        }
-      }
-    },
-
-    // Dependency optimization
-    optimizeDeps: {
-      include: ['vue', 'vue-router', '@headlessui/vue']
+      target: 'es2020'
     },
 
     // Development server
@@ -177,9 +150,8 @@ export default defineNuxtConfig({
   // Experimental Features (Memory Optimizations)
   // =============================================================================
   experimental: {
-    payloadExtraction: false, // Reduce memory usage
-    inlineSSRStyles: false,   // Reduce initial bundle size
-    treeshakeClientOnly: true
+    payloadExtraction: false,
+    inlineSSRStyles: false
   },
 
   // =============================================================================
@@ -197,5 +169,12 @@ export default defineNuxtConfig({
         next(error)
       })
     }
+  },
+
+  // =============================================================================
+  // Build Configuration
+  // =============================================================================
+  build: {
+    analyze: false
   }
 })

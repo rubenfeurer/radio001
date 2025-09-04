@@ -110,7 +110,7 @@
               <div class="space-y-1">
                 <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Interface</p>
                 <p class="text-sm text-gray-900 dark:text-white font-mono">
-                  {{ systemStatus?.network.wifi.interface || 'wlan0' }}
+                  {{ systemStatus?.network.wifi.wifiInterface || 'wlan0' }}
                 </p>
               </div>
               <div class="space-y-1">
@@ -237,25 +237,25 @@
 
         <div class="space-y-3">
           <div
-            v-for="interface in networkInterfaces"
-            :key="interface.name"
+            v-for="netInterface in networkInterfaces"
+            :key="netInterface.name"
             class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
           >
             <div class="flex items-center justify-between mb-2">
               <span class="text-sm font-medium text-gray-900 dark:text-white font-mono">
-                {{ interface.name }}
+                {{ netInterface.name }}
               </span>
               <UBadge
-                :color="interface.status === 'up' ? 'green' : 'gray'"
-                :label="interface.status"
+                :color="netInterface.status === 'up' ? 'green' : 'gray'"
+                :label="netInterface.status"
                 size="xs"
               />
             </div>
             <div class="grid grid-cols-2 gap-2 text-xs text-gray-500">
-              <div>Type: {{ interface.type }}</div>
-              <div>IP: {{ interface.ip || 'N/A' }}</div>
-              <div v-if="interface.mac">MAC: {{ interface.mac }}</div>
-              <div v-if="interface.mtu">MTU: {{ interface.mtu }}</div>
+              <div>Type: {{ netInterface.type }}</div>
+              <div>IP: {{ netInterface.ip || 'N/A' }}</div>
+              <div v-if="netInterface.mac">MAC: {{ netInterface.mac }}</div>
+              <div v-if="netInterface.mtu">MTU: {{ netInterface.mtu }}</div>
             </div>
           </div>
         </div>

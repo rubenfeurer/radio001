@@ -50,7 +50,7 @@ async function getSystemStatus(config: any): Promise<SystemStatus> {
       },
       network: {
         wifi: {
-          interface: 'wlan0',
+          wifiInterface: 'wlan0',
           status: 'disconnected',
           mode: 'hotspot',
           ip: '192.168.4.1'
@@ -83,7 +83,7 @@ async function getSystemStatus(config: any): Promise<SystemStatus> {
     cpu: cpu.status === 'fulfilled' ? cpu.value : { load: 0, temperature: 0 },
     network: {
       wifi: wifi.status === 'fulfilled' ? wifi.value : {
-        interface: config.wifiInterface,
+        wifiInterface: config.wifiInterface,
         status: 'disconnected',
         mode: 'offline'
       }
@@ -147,14 +147,14 @@ async function getCpuInfo(): Promise<{ load: number; temperature?: number }> {
   }
 }
 
-async function getWiFiStatus(interface: string): Promise<any> {
+async function getWiFiStatus(wifiInterface: string): Promise<any> {
   try {
     // Check if interface exists and is up
-    const { stdout: ifconfig } = await execAsync(`ip addr show ${interface} 2>/dev/null || echo "interface not found"`)
+    const { stdout: ifconfig } = await execAsync(`ip addr show ${wifiInterface} 2>/dev/null || echo "interface not found"`)
 
     if (ifconfig.includes('interface not found')) {
       return {
-        interface,
+        wifiInterface,
         status: 'disconnected',
         mode: 'offline'
       }
@@ -164,7 +164,7 @@ async function getWiFiStatus(interface: string): Promise<any> {
     const isUp = ifconfig.includes('state UP')
     if (!isUp) {
       return {
-        interface,
+        wifiInterface,
         status: 'disconnected',
         mode: 'offline'
       }
@@ -179,7 +179,7 @@ async function getWiFiStatus(interface: string): Promise<any> {
       const { stdout: hostapd } = await execAsync('systemctl is-active hostapd 2>/dev/null || echo "inactive"')
       if (hostapd.trim() === 'active') {
         return {
-          interface,
+          wifiInterface,
           status: 'connected',
           mode: 'hotspot',
           ip: ip || '192.168.4.1'
@@ -191,11 +191,11 @@ async function getWiFiStatus(interface: string): Promise<any> {
 
     // Check client mode connection
     try {
-      const { stdout: iwconfig } = await execAsync(`iwconfig ${interface} 2>/dev/null`)
+      const { stdout: iwconfig } = await execAsync(`iwconfig ${wifiInterface} 2>/dev/null`)
 
       if (iwconfig.includes('Access Point: Not-Associated')) {
         return {
-          interface,
+          wifiInterface,
           status: 'disconnected',
           mode: 'client'
         }
@@ -215,7 +215,7 @@ async function getWiFiStatus(interface: string): Promise<any> {
       }
 
       return {
-        interface,
+        wifiInterface,
         status: ssid ? 'connected' : 'disconnected',
         mode: 'client',
         ssid,
@@ -224,14 +224,14 @@ async function getWiFiStatus(interface: string): Promise<any> {
       }
     } catch {
       return {
-        interface,
+        wifiInterface,
         status: 'disconnected',
         mode: 'client'
       }
     }
   } catch {
     return {
-      interface,
+      wifiInterface,
       status: 'disconnected',
       mode: 'offline'
     }

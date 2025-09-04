@@ -82,7 +82,7 @@ async function scanWiFiNetworks(config: any): Promise<ScanResult> {
     return {
       networks: mockNetworks,
       timestamp: Date.now(),
-      interface: wifiInterface
+      wifiInterface: wifiInterface
     }
   }
 
@@ -112,7 +112,7 @@ async function scanWiFiNetworks(config: any): Promise<ScanResult> {
     return {
       networks: enhancedNetworks,
       timestamp: Date.now(),
-      interface: wifiInterface
+      wifiInterface: wifiInterface
     }
   } catch (error) {
     console.error('WiFi scan failed:', error)
@@ -228,9 +228,9 @@ async function getSavedNetworks(): Promise<string[]> {
   }
 }
 
-async function getCurrentConnection(interface: string): Promise<string | null> {
+async function getCurrentConnection(wifiInterface: string): Promise<string | null> {
   try {
-    const { stdout } = await execAsync(`iwconfig ${interface} 2>/dev/null`)
+    const { stdout } = await execAsync(`iwconfig ${wifiInterface} 2>/dev/null`)
     const ssidMatch = stdout.match(/ESSID:"([^"]+)"/)
     return ssidMatch ? ssidMatch[1] : null
   } catch {

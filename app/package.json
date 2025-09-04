@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "nuxt": "^3.8.4",
-    "@nuxt/ui": "^2.11.1",
+    "@nuxtjs/tailwindcss": "^6.8.4",
     "@pinia/nuxt": "^0.5.1",
     "pinia": "^2.1.7",
     "vue": "^3.3.8",
@@ -26,7 +26,9 @@
   "devDependencies": {
     "@nuxt/devtools": "^1.0.6",
     "@types/node": "^20.10.4",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "tailwindcss": "^3.3.6",
+    "autoprefixer": "^10.4.16"
   },
   "engines": {
     "node": ">=18.0.0",

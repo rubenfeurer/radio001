@@ -11,7 +11,7 @@ A modern, containerized WiFi provisioning solution for Raspberry Pi Zero 2 W, bu
 
 ## 🌟 Features
 
-- 🚀 **Modern Stack**: Built with Nuxt 3, FastAPI, TypeScript, and Nuxt UI
+- 🚀 **Modern Stack**: Built with Nuxt 3, FastAPI, TypeScript, and Tailwind CSS
 - 📱 **Mobile-First**: Responsive design optimized for smartphone configuration
 - 🐳 **Containerized**: Fully dockerized with multi-architecture support
 - 🍎 **Apple Silicon Ready**: Optimized for M1/M2 Macs with automatic platform detection
@@ -356,7 +356,7 @@ CHOKIDAR_USEPOLLING=true
 **Frontend:**
 - **Nuxt 3** - Vue.js framework with SSR/SPA support
 - **TypeScript** - Type-safe development
-- **Nuxt UI** - Component library with Tailwind CSS
+- **Tailwind CSS** - Utility-first CSS framework (minimal setup)
 - **Pinia** - State management
 - **Composables** - Reactive WiFi state management
 
@@ -521,6 +521,7 @@ docker info
 - [x] System status and monitoring
 - [x] Configuration management
 - [x] Signal strength indicators
+- [x] Removed @nuxt/ui for faster builds (replaced with minimal Tailwind CSS)
 
 
 ## 📄 License

@@ -48,7 +48,7 @@ export default defineEventHandler(async (event) => {
         },
         network: {
           status: networkStatus,
-          interface: config.wifiInterface
+          wifiInterface: config.wifiInterface
         },
         system: {
           hostname: config.hostname,

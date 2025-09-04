@@ -53,15 +53,15 @@ services:
     hostname: radio
     ports:
       - "3000:3000" # Main application port
-      - "24678:24678" # Nuxt DevTools (if enabled)
+      - "24678:24678" # Nuxt HMR port
     volumes:
-      # Source code mounting for hot reload (disabled for stable environment)
-      # - ./app:/app/app:cached
+      # Source code mounting for hot reload
+      - ./app:/app/app:cached
       - ./config:/app/config:ro
       - ./scripts:/app/scripts:ro
-      # Node modules volume to avoid overwriting (disabled for stable environment)
-      # - radio_node_modules:/app/node_modules
-      # - radio_app_node_modules:/app/app/node_modules
+      # Node modules volume to avoid overwriting
+      - radio_node_modules:/app/node_modules
+      - radio_app_node_modules:/app/app/node_modules
       # Development cache
       - radio_nuxt_cache:/app/.nuxt
     environment:
@@ -85,7 +85,7 @@ services:
 
       # Development flags
       - DEBUG=radio:*
-      - CHOKIDAR_USEPOLLING=true # For file watching in containers
+      - CHOKIDAR_USEPOLLING=true
     networks:
       - radio-network
     restart: unless-stopped
@@ -93,10 +93,10 @@ services:
       - radio-backend
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      interval: 60s
+      timeout: 30s
+      retries: 5
+      start_period: 120s
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.radio.rule=Host(`radio.local`)"

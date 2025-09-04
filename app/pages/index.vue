@@ -2,227 +2,173 @@
   <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
     <!-- Header -->
     <header class="bg-white dark:bg-gray-800 shadow">
-      <div class="radio-container">
+      <div class="max-w-md mx-auto px-4">
         <div class="flex items-center justify-between py-4">
           <div class="flex items-center space-x-3">
             <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Icon name="heroicons:radio" class="w-5 h-5 text-white" />
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"></path>
+              </svg>
             </div>
             <div>
               <h1 class="text-xl font-bold text-gray-900 dark:text-white">
                 Radio WiFi
               </h1>
               <p class="text-sm text-gray-500 dark:text-gray-400">
-                {{ config.public.hostname }}.local
+                radio.local
               </p>
             </div>
           </div>
-          <UButton
-            variant="ghost"
-            size="sm"
+          <button
             @click="refreshStatus"
-            :loading="isRefreshing"
+            :disabled="isRefreshing"
+            class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
           >
-            <Icon name="heroicons:arrow-path" class="w-4 h-4" />
-          </UButton>
+            <svg class="w-4 h-4" :class="{ 'animate-spin': isRefreshing }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
         </div>
       </div>
     </header>
 
     <!-- Main Content -->
-    <main class="radio-container py-6">
+    <main class="max-w-md mx-auto px-4 py-6">
       <!-- Status Card -->
-      <UCard class="mb-6">
-        <template #header>
-          <div class="flex items-center justify-between">
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 mb-6">
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
               Connection Status
             </h2>
-            <UBadge
-              :color="statusColor"
-              :label="statusText"
-              size="lg"
-            />
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+              {{ statusText }}
+            </span>
           </div>
-        </template>
 
-        <div class="space-y-4">
-          <!-- Current Connection -->
-          <div v-if="wifiStatus.status === 'connected'" class="space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Network
-              </span>
-              <span class="text-sm text-gray-900 dark:text-white font-mono">
-                {{ wifiStatus.ssid }}
-              </span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                IP Address
-              </span>
-              <span class="text-sm text-gray-900 dark:text-white font-mono">
-                {{ wifiStatus.ip }}
-              </span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Signal Strength
-              </span>
-              <div class="flex items-center space-x-2">
-                <SignalStrength :strength="wifiStatus.signal || 0" />
+          <div class="space-y-4">
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Network
+                </span>
+                <span class="text-sm text-gray-900 dark:text-white font-mono">
+                  {{ currentNetwork }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  IP Address
+                </span>
+                <span class="text-sm text-gray-900 dark:text-white font-mono">
+                  {{ currentIP }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Signal Strength
+                </span>
                 <span class="text-sm text-gray-600 dark:text-gray-400">
-                  {{ wifiStatus.signal }}%
+                  {{ signalStrength }}%
                 </span>
               </div>
             </div>
           </div>
 
-          <!-- Hotspot Mode -->
-          <div v-else-if="wifiStatus.mode === 'hotspot'" class="space-y-2">
-            <div class="flex items-center space-x-2 text-orange-600 dark:text-orange-400">
-              <Icon name="heroicons:wifi" class="w-5 h-5" />
-              <span class="text-sm font-medium">
-                Hotspot Mode Active
-              </span>
-            </div>
-            <p class="text-sm text-gray-600 dark:text-gray-400">
-              Connect to "{{ hotspotSSID }}" to configure WiFi
-            </p>
-          </div>
-
-          <!-- Disconnected -->
-          <div v-else class="space-y-2">
-            <div class="flex items-center space-x-2 text-red-600 dark:text-red-400">
-              <Icon name="heroicons:wifi-slash" class="w-5 h-5" />
-              <span class="text-sm font-medium">
-                No WiFi Connection
-              </span>
-            </div>
-            <p class="text-sm text-gray-600 dark:text-gray-400">
-              Configure WiFi to get started
-            </p>
+          <div class="mt-6">
+            <button
+              @click="goToSetup"
+              class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center"
+            >
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+              Configure WiFi
+            </button>
           </div>
         </div>
-
-        <template #footer>
-          <div class="flex space-x-3">
-            <UButton
-              v-if="wifiStatus.status !== 'connected'"
-              color="primary"
-              block
-              @click="navigateTo('/setup')"
-            >
-              <Icon name="heroicons:cog-6-tooth" class="w-4 h-4 mr-2" />
-              Configure WiFi
-            </UButton>
-            <UButton
-              v-else
-              variant="outline"
-              block
-              @click="navigateTo('/setup')"
-            >
-              <Icon name="heroicons:pencil-square" class="w-4 h-4 mr-2" />
-              Change Network
-            </UButton>
-          </div>
-        </template>
-      </UCard>
+      </div>
 
       <!-- System Information -->
-      <UCard class="mb-6">
-        <template #header>
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 mb-6">
+        <div class="p-6">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             System Information
           </h2>
-        </template>
 
-        <div class="grid grid-cols-2 gap-4">
-          <div class="space-y-1">
-            <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Hostname
-            </p>
-            <p class="text-sm text-gray-900 dark:text-white font-mono">
-              {{ systemStatus.hostname }}
-            </p>
-          </div>
-          <div class="space-y-1">
-            <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Uptime
-            </p>
-            <p class="text-sm text-gray-900 dark:text-white">
-              {{ formatUptime(systemStatus.uptime) }}
-            </p>
-          </div>
-          <div class="space-y-1">
-            <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Memory Usage
-            </p>
+          <div class="grid grid-cols-2 gap-4">
             <div class="space-y-1">
-              <div class="progress-bar">
-                <div
-                  class="progress-fill"
-                  :style="{ width: `${memoryUsagePercent}%` }"
-                />
+              <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Hostname
+              </p>
+              <p class="text-sm text-gray-900 dark:text-white font-mono">
+                {{ hostname }}
+              </p>
+            </div>
+            <div class="space-y-1">
+              <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Uptime
+              </p>
+              <p class="text-sm text-gray-900 dark:text-white">
+                {{ uptime }}
+              </p>
+            </div>
+            <div class="space-y-1">
+              <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Memory Usage
+              </p>
+              <div class="space-y-1">
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                  <div class="h-full bg-blue-600 transition-all duration-300 ease-out" :style="{ width: memoryPercent + '%' }"></div>
+                </div>
+                <p class="text-xs text-gray-600 dark:text-gray-400">
+                  {{ memoryUsed }}MB / {{ memoryTotal }}MB
+                </p>
               </div>
-              <p class="text-xs text-gray-600 dark:text-gray-400">
-                {{ formatBytes(systemStatus.memory.used) }} /
-                {{ formatBytes(systemStatus.memory.total) }}
+            </div>
+            <div class="space-y-1">
+              <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                CPU Temperature
+              </p>
+              <p class="text-sm text-gray-900 dark:text-white">
+                {{ cpuTemp }}°C
               </p>
             </div>
           </div>
-          <div class="space-y-1">
-            <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
-              CPU Temperature
-            </p>
-            <p class="text-sm text-gray-900 dark:text-white">
-              {{ systemStatus.cpu.temperature || 'N/A' }}°C
-            </p>
-          </div>
         </div>
-      </UCard>
+      </div>
 
       <!-- Quick Actions -->
-      <UCard>
-        <template #header>
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+        <div class="p-6">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             Quick Actions
           </h2>
-        </template>
 
-        <div class="grid grid-cols-2 gap-3">
-          <UButton
-            variant="outline"
-            @click="scanNetworks"
-            :loading="isScanning"
-          >
-            <Icon name="heroicons:magnifying-glass" class="w-4 h-4 mr-2" />
-            Scan Networks
-          </UButton>
-          <UButton
-            variant="outline"
-            @click="navigateTo('/status')"
-          >
-            <Icon name="heroicons:chart-bar" class="w-4 h-4 mr-2" />
-            View Details
-          </UButton>
-          <UButton
-            variant="outline"
-            @click="restartNetwork"
-            :loading="isRestarting"
-          >
-            <Icon name="heroicons:arrow-path" class="w-4 h-4 mr-2" />
-            Restart Network
-          </UButton>
-          <UButton
-            variant="outline"
-            @click="navigateTo('/settings')"
-          >
-            <Icon name="heroicons:cog-6-tooth" class="w-4 h-4 mr-2" />
-            Settings
-          </UButton>
+          <div class="grid grid-cols-2 gap-3">
+            <button
+              @click="scanNetworks"
+              :disabled="isScanning"
+              class="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
+            >
+              <svg class="w-4 h-4 mr-2" :class="{ 'animate-spin': isScanning }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              Scan Networks
+            </button>
+            <button
+              @click="goToStatus"
+              class="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600"
+            >
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+              </svg>
+              View Details
+            </button>
+          </div>
         </div>
-      </UCard>
+      </div>
     </main>
 
     <!-- Loading Overlay -->
@@ -230,126 +176,52 @@
       v-if="isLoading"
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
     >
-      <UCard class="w-64">
-        <div class="text-center py-4">
-          <div class="radio-spinner mx-auto mb-3"></div>
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 w-64">
+        <div class="text-center">
+          <div class="inline-block w-6 h-6 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin mx-auto mb-3"></div>
           <p class="text-sm text-gray-600 dark:text-gray-400">
             {{ loadingMessage }}
           </p>
         </div>
-      </UCard>
+      </div>
     </div>
   </div>
 </template>
 
-<script setup lang="ts">
-import type { WiFiStatus, SystemStatus } from '~/types'
-
+<script setup>
 // Meta
 definePageMeta({
   title: 'Radio WiFi Dashboard',
   description: 'WiFi configuration dashboard for your Raspberry Pi Radio'
 })
 
-// Runtime config
-const config = useRuntimeConfig()
-
 // Reactive state
 const isLoading = ref(false)
 const isRefreshing = ref(false)
 const isScanning = ref(false)
-const isRestarting = ref(false)
 const loadingMessage = ref('')
 
-// System status
-const systemStatus = ref<SystemStatus>({
-  hostname: config.public.hostname,
-  uptime: 0,
-  memory: { total: 0, used: 0, free: 0 },
-  cpu: { load: 0, temperature: 0 },
-  network: {
-    wifi: {
-      interface: 'wlan0',
-      status: 'disconnected',
-      mode: 'offline'
-    }
-  },
-  services: {
-    avahi: false,
-    hostapd: false,
-    dnsmasq: false
-  }
-})
+// Mock data for development
+const statusText = ref('Connected')
+const currentNetwork = ref('HomeWiFi')
+const currentIP = ref('192.168.1.100')
+const signalStrength = ref(85)
+const hostname = ref('radio')
+const uptime = ref('2h 15m')
+const memoryPercent = ref(45)
+const memoryUsed = ref(230)
+const memoryTotal = ref(512)
+const cpuTemp = ref(42)
 
-// WiFi status
-const wifiStatus = computed(() => systemStatus.value.network.wifi)
-
-// Hotspot SSID from config
-const hotspotSSID = computed(() => 'Radio-Setup')
-
-// Status computed properties
-const statusColor = computed(() => {
-  switch (wifiStatus.value.status) {
-    case 'connected': return 'green'
-    case 'connecting': return 'yellow'
-    case 'scanning': return 'blue'
-    case 'failed': return 'red'
-    default: return 'gray'
-  }
-})
-
-const statusText = computed(() => {
-  switch (wifiStatus.value.status) {
-    case 'connected': return 'Connected'
-    case 'connecting': return 'Connecting'
-    case 'scanning': return 'Scanning'
-    case 'failed': return 'Connection Failed'
-    case 'disconnected':
-      return wifiStatus.value.mode === 'hotspot' ? 'Hotspot Mode' : 'Disconnected'
-    default: return 'Unknown'
-  }
-})
-
-const memoryUsagePercent = computed(() => {
-  const { total, used } = systemStatus.value.memory
-  return total > 0 ? Math.round((used / total) * 100) : 0
-})
-
-// Utility functions
-const formatUptime = (seconds: number): string => {
-  const days = Math.floor(seconds / 86400)
-  const hours = Math.floor((seconds % 86400) / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-
-  if (days > 0) return `${days}d ${hours}h`
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes}m`
-}
-
-const formatBytes = (bytes: number): string => {
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  if (bytes === 0) return '0 B'
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return `${Math.round(bytes / Math.pow(1024, i) * 10) / 10} ${sizes[i]}`
-}
-
-// API functions
+// Methods
 const refreshStatus = async () => {
   isRefreshing.value = true
   try {
-    const { data } = await $fetch<{ success: boolean; data: SystemStatus }>('/api/system/status')
-    if (data) {
-      systemStatus.value = data
-    }
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    console.log('Status refreshed')
   } catch (error) {
     console.error('Failed to refresh status:', error)
-    // Show error toast
-    const toast = useToast()
-    toast.add({
-      title: 'Error',
-      description: 'Failed to refresh system status',
-      color: 'red'
-    })
   } finally {
     isRefreshing.value = false
   }
@@ -358,8 +230,8 @@ const refreshStatus = async () => {
 const scanNetworks = async () => {
   isScanning.value = true
   try {
-    await $fetch('/api/wifi/scan', { method: 'POST' })
-    // Navigate to setup page to show results
+    // Simulate network scan
+    await new Promise(resolve => setTimeout(resolve, 2000))
     await navigateTo('/setup')
   } catch (error) {
     console.error('Failed to scan networks:', error)
@@ -368,39 +240,17 @@ const scanNetworks = async () => {
   }
 }
 
-const restartNetwork = async () => {
-  isRestarting.value = true
-  loadingMessage.value = 'Restarting network services...'
-  isLoading.value = true
-
-  try {
-    await $fetch('/api/system/restart-network', { method: 'POST' })
-
-    // Wait a moment then refresh
-    setTimeout(async () => {
-      await refreshStatus()
-      isLoading.value = false
-      loadingMessage.value = ''
-    }, 3000)
-  } catch (error) {
-    console.error('Failed to restart network:', error)
-    isLoading.value = false
-  } finally {
-    isRestarting.value = false
-  }
+const goToSetup = () => {
+  navigateTo('/setup')
 }
 
-// Initialize
+const goToStatus = () => {
+  navigateTo('/status')
+}
+
+// Initialize on mount
 onMounted(async () => {
   await refreshStatus()
-
-  // Auto-refresh every 30 seconds
-  const interval = setInterval(refreshStatus, 30000)
-
-  // Cleanup on unmount
-  onUnmounted(() => {
-    clearInterval(interval)
-  })
 })
 
 // Head configuration

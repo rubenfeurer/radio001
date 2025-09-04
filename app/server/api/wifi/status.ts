@@ -36,7 +36,7 @@ async function getWiFiStatus(config: any): Promise<WiFiStatus> {
   if (isDevelopment) {
     // Return mock data for development
     return {
-      interface: wifiInterface,
+      wifiInterface: wifiInterface,
       status: 'disconnected',
       mode: 'hotspot',
       ip: '192.168.4.1'
@@ -49,7 +49,7 @@ async function getWiFiStatus(config: any): Promise<WiFiStatus> {
 
     if (ifconfig.includes('interface not found')) {
       return {
-        interface: wifiInterface,
+        wifiInterface: wifiInterface,
         status: 'disconnected',
         mode: 'offline'
       }
@@ -59,7 +59,7 @@ async function getWiFiStatus(config: any): Promise<WiFiStatus> {
     const isUp = ifconfig.includes('state UP')
     if (!isUp) {
       return {
-        interface: wifiInterface,
+        wifiInterface: wifiInterface,
         status: 'disconnected',
         mode: 'offline'
       }
@@ -74,7 +74,7 @@ async function getWiFiStatus(config: any): Promise<WiFiStatus> {
       const { stdout: hostapd } = await execAsync('systemctl is-active hostapd 2>/dev/null || echo "inactive"')
       if (hostapd.trim() === 'active') {
         return {
-          interface: wifiInterface,
+          wifiInterface: wifiInterface,
           status: 'connected',
           mode: 'hotspot',
           ip: ip || '192.168.4.1',
@@ -91,7 +91,7 @@ async function getWiFiStatus(config: any): Promise<WiFiStatus> {
 
       if (iwconfig.includes('Access Point: Not-Associated')) {
         return {
-          interface: wifiInterface,
+          wifiInterface: wifiInterface,
           status: 'disconnected',
           mode: 'client'
         }
@@ -115,7 +115,7 @@ async function getWiFiStatus(config: any): Promise<WiFiStatus> {
       }
 
       return {
-        interface: wifiInterface,
+        wifiInterface: wifiInterface,
         status: ssid ? 'connected' : 'disconnected',
         mode: 'client',
         ssid,
@@ -125,7 +125,7 @@ async function getWiFiStatus(config: any): Promise<WiFiStatus> {
       }
     } catch {
       return {
-        interface: wifiInterface,
+        wifiInterface: wifiInterface,
         status: 'disconnected',
         mode: 'client'
       }
@@ -133,7 +133,7 @@ async function getWiFiStatus(config: any): Promise<WiFiStatus> {
   } catch (error) {
     console.error('Error getting WiFi status:', error)
     return {
-      interface: wifiInterface,
+      wifiInterface: wifiInterface,
       status: 'disconnected',
       mode: 'offline'
     }

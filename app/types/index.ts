@@ -20,13 +20,19 @@ export interface WiFiCredentials {
 }
 
 export interface WiFiStatus {
-  interface: string
+  wifiInterface: string
   status: 'connected' | 'disconnected' | 'connecting' | 'failed' | 'scanning'
   ssid?: string
   ip?: string
   signal?: number
   frequency?: string
   mode: 'client' | 'hotspot' | 'offline'
+}
+
+export interface ScanResult {
+  networks: WiFiNetwork[]
+  timestamp: number
+  wifiInterface: string
 }
 
 export interface SystemStatus {
@@ -88,7 +94,7 @@ export interface ConnectionResult {
 export interface ScanResult {
   networks: WiFiNetwork[]
   timestamp: number
-  interface: string
+  wifiInterface: string
 }
 
 export interface ApiResponse<T = any> {
@@ -109,7 +115,7 @@ export interface NetworkInterface {
 }
 
 export interface WifiScanOptions {
-  interface?: string
+  wifiInterface?: string
   timeout?: number
   cached?: boolean
 }
