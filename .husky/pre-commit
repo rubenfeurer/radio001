@@ -8,7 +8,7 @@ echo "🔍 Running pre-commit checks on branch: $BRANCH"
 
 # Always run lint-staged for basic linting and auto-fixes
 echo "📝 Running lint-staged..."
-cd app && npx lint-staged
+npx --prefix app lint-staged
 
 # Exit if lint-staged fails
 if [ $? -ne 0 ]; then
@@ -22,7 +22,7 @@ if [ "$BRANCH" = "main" ]; then
 
   # Full type checking for main branch
   echo "🔍 Running TypeScript type checking..."
-  cd app && npm run type-check
+  npm run type-check
 
   if [ $? -ne 0 ]; then
     echo "❌ Type checking failed on main branch."
@@ -39,7 +39,7 @@ elif [ "$BRANCH" = "develop" ]; then
 
   # Quick type check (could be made faster if needed)
   echo "⚡ Running quick TypeScript validation..."
-  cd app && npm run type-check
+  npm run type-check
 
   if [ $? -ne 0 ]; then
     echo "⚠️  Type checking failed on develop branch."
