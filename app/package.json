@@ -13,7 +13,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "type-check": "nuxt typecheck",
-    "prepare": "husky install"
+    "prepare": "echo 'Husky managed at project root'"
   },
   "dependencies": {
     "nuxt": "^3.8.4",
@@ -36,7 +36,6 @@
     "eslint": "^8.55.0",
     "eslint-plugin-vue": "^9.19.2",
     "vue-eslint-parser": "^9.3.2",
-    "husky": "^8.0.3",
     "lint-staged": "^15.2.0"
   },
   "engines": {
