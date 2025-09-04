@@ -9,6 +9,8 @@ const execAsync = promisify(exec)
 
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
+  // Test comment to trigger linting
+  const unusedVar = "this should trigger linting error"
 
   try {
     const scanResult = await scanWiFiNetworks(config)
