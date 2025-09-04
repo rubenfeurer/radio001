@@ -60,24 +60,22 @@ fi
 print_info "Python version: $(python --version)"
 print_info "FastAPI installation: $(python -c 'import fastapi; print(fastapi.__version__)' 2>/dev/null || echo 'Not found')"
 
-# Create necessary directories
-mkdir -p /tmp/radio
-mkdir -p /var/log/radio
+# Create necessary directories (use /tmp to avoid permission issues)
+mkdir -p /tmp/radio/logs
+mkdir -p /tmp/radio/mock
 
 # Set permissions for development
 if [ "$NODE_ENV" = "development" ]; then
     # In development, we might need some additional setup
     print_info "Setting up development environment..."
-
     # Create mock system files for development
-    mkdir -p /tmp/radio/mock
     echo "mock" > /tmp/radio/mock/interface_status
 fi
 
 # Health check function
 health_check() {
-    local max_attempts=30
-    local attempt=0
+local max_attempts=30
+local attempt=0
 
     print_info "Performing health check..."
 

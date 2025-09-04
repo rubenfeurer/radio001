@@ -87,7 +87,7 @@ The project is fully containerized with **automatic Apple Silicon (M1/M2) detect
    ```bash
    # macOS - ensure Docker Desktop is running
    open -a Docker
-   
+
    # Verify Docker is running
    docker info
    ```
@@ -96,7 +96,7 @@ The project is fully containerized with **automatic Apple Silicon (M1/M2) detect
    ```bash
    git clone <repository-url>
    cd radio001
-   
+
    # Start development environment (auto-detects platform)
    ./scripts/docker-dev.sh start
    ```
@@ -194,15 +194,15 @@ docker-compose up -d --build
    ```bash
    # Update system
    sudo apt update && sudo apt upgrade -y
-   
+
    # Install Docker
    curl -sSL https://get.docker.com | sh
    sudo usermod -aG docker $USER
    sudo systemctl enable docker
-   
+
    # Install Docker Compose
    sudo apt install docker-compose-plugin -y
-   
+
    # Reboot to apply changes
    sudo reboot
    ```
@@ -211,7 +211,7 @@ docker-compose up -d --build
    ```bash
    git clone <repository-url>
    cd radio001
-   
+
    # Configure for production
    cp .env.example .env
    nano .env  # Edit production settings
@@ -221,10 +221,10 @@ docker-compose up -d --build
    ```bash
    # Start production environment
    docker-compose -f docker-compose.prod.yml up -d
-   
+
    # Check status
    docker-compose -f docker-compose.prod.yml ps
-   
+
    # View logs
    docker-compose -f docker-compose.prod.yml logs -f
    ```
@@ -295,7 +295,7 @@ CHOKIDAR_USEPOLLING=true
 #### Frontend (Nuxt 3)
 - **Dashboard** (`/`) - System overview and status
 - **WiFi Setup** (`/setup`) - Network scanning and connection
-- **System Status** (`/status`) - Detailed system information  
+- **System Status** (`/status`) - Detailed system information
 - **Settings** (`/settings`) - Device configuration
 
 #### Backend (FastAPI)
@@ -522,18 +522,6 @@ docker info
 - [x] Configuration management
 - [x] Signal strength indicators
 
-### Phase 4: Enhanced Features 🚧
-- [ ] Captive portal implementation
-- [ ] Network profiles and priorities
-- [ ] Advanced security options
-- [ ] Performance analytics
-- [ ] Remote management capabilities
-
-### Phase 5: Production Features 📋
-- [ ] Backup and restore functionality
-- [ ] Multi-device coordination
-- [ ] Enterprise management
-- [ ] Custom branding options
 
 ## 📄 License
 
@@ -576,5 +564,5 @@ open http://localhost:8000  # Backend API
 
 ---
 
-**Built with ❤️ for the Raspberry Pi community**  
+**Built with ❤️ for the Raspberry Pi community**
 *Featuring automatic Apple Silicon optimization and cross-platform Docker development*

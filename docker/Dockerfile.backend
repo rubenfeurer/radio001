@@ -30,7 +30,9 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Create non-root user for development
-RUN groupadd -r radio && useradd -r -g radio radio
+RUN groupadd -r radio && useradd -r -g radio radio && \
+    mkdir -p /tmp/radio /var/log/radio && \
+    chown -R radio:radio /tmp/radio /var/log/radio
 
 # Copy requirements first for better caching
 COPY backend/requirements.txt .
@@ -50,7 +52,7 @@ COPY backend/ .
 RUN chmod +x /entrypoint.sh
 
 # Change ownership to radio user
-RUN chown -R radio:radio /app
+RUN chown -R radio:radio /app /tmp/radio /var/log/radio
 
 # Switch to non-root user
 USER radio
@@ -59,7 +61,7 @@ USER radio
 EXPOSE 8000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Set environment variables
