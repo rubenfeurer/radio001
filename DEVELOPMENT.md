@@ -64,6 +64,7 @@ git push
 The system automatically detects and optimizes for your platform:
 - **Apple Silicon (M1/M2)**: ARM64 optimized images with faster builds
 - **Intel/AMD64**: Standard multi-platform images
+- **CI/CD (GitHub Actions)**: Uses `docker-compose.ci.yml` for AMD64 compatibility
 
 ## 🔄 Development Workflow
 
@@ -314,6 +315,10 @@ docker info
 # View logs
 ./scripts/docker-dev.sh logs radio-app
 ./scripts/docker-dev.sh logs radio-backend
+
+# For CI debugging (GitHub Actions)
+docker compose -f docker-compose.ci.yml logs
+docker compose -f docker-compose.ci.yml ps
 ```
 
 ### TypeScript Issues

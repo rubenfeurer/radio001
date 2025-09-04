@@ -25,6 +25,25 @@ sudo systemctl start docker
 ./scripts/docker-dev.sh start
 ```
 
+### Platform Mismatch Errors
+**Error**: `exec format error` or `exec /bin/sh: exec format error`
+
+**Cause**: Trying to run ARM64 containers on AMD64 system (or vice versa)
+
+**Solutions**:
+```bash
+# Force correct platform for your system
+export DOCKER_DEFAULT_PLATFORM=linux/amd64  # For Intel/AMD
+export DOCKER_DEFAULT_PLATFORM=linux/arm64  # For Apple Silicon
+
+# Use CI configuration (AMD64) for testing
+./scripts/test-ci.sh
+
+# Clean rebuild with correct platform
+./scripts/docker-dev.sh cleanup
+./scripts/docker-dev.sh start
+```
+
 ### Port Conflicts
 **Error**: `Port 3000 is already in use`
 
@@ -306,8 +325,25 @@ curl -X POST http://localhost:3000/api/wifi/scan
 # Backend logs only
 ./scripts/docker-dev.sh logs radio-backend
 
+# CI configuration logs
+docker compose -f docker-compose.ci.yml logs
+
 # System logs (Raspberry Pi)
 journalctl -f
+```
+
+### Platform Testing
+```bash
+# Test CI configuration locally
+./scripts/test-ci.sh
+
+# Check current platform
+docker version --format '{{.Server.Arch}}'
+uname -m
+
+# Force platform and rebuild
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
+docker compose -f docker-compose.ci.yml build --no-cache
 ```
 
 ## 🚀 Performance Optimization

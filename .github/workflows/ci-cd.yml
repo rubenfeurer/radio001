@@ -26,47 +26,47 @@ jobs:
 
       - name: Build and test with Docker
         run: |
-          # Build containers
-          docker compose build --no-cache
+          # Build containers using CI-specific configuration
+          docker compose -f docker-compose.ci.yml build --no-cache
 
           # Start services
-          docker compose up -d
+          docker compose -f docker-compose.ci.yml up -d
 
           # Wait for services to be ready
           echo "Waiting for services to start..."
-          sleep 30
+          sleep 45
 
           # Show running containers for debugging
-          docker compose ps
+          docker compose -f docker-compose.ci.yml ps
 
-          # Test frontend health
-          echo "Testing frontend health..."
-          for i in {1..5}; do
-            if curl -f http://localhost:3000/api/health; then
-              echo "Frontend health check passed"
+          # Test backend health first (frontend depends on it)
+          echo "Testing backend health..."
+          for i in {1..10}; do
+            if curl -f http://localhost:8000/health; then
+              echo "Backend health check passed"
               break
             else
-              echo "Frontend health check failed (attempt $i/5)"
-              if [ $i -eq 5 ]; then
-                echo "Frontend logs:"
-                docker compose logs radio-app
+              echo "Backend health check failed (attempt $i/10)"
+              if [ $i -eq 10 ]; then
+                echo "Backend logs:"
+                docker compose -f docker-compose.ci.yml logs radio-backend
                 exit 1
               fi
               sleep 10
             fi
           done
 
-          # Test backend health
-          echo "Testing backend health..."
-          for i in {1..5}; do
-            if curl -f http://localhost:8000/health; then
-              echo "Backend health check passed"
+          # Test frontend health
+          echo "Testing frontend health..."
+          for i in {1..10}; do
+            if curl -f http://localhost:3000/api/health; then
+              echo "Frontend health check passed"
               break
             else
-              echo "Backend health check failed (attempt $i/5)"
-              if [ $i -eq 5 ]; then
-                echo "Backend logs:"
-                docker compose logs radio-backend
+              echo "Frontend health check failed (attempt $i/10)"
+              if [ $i -eq 10 ]; then
+                echo "Frontend logs:"
+                docker compose -f docker-compose.ci.yml logs radio-app
                 exit 1
               fi
               sleep 10
@@ -82,8 +82,8 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker compose logs
-          docker compose down -v
+          docker compose -f docker-compose.ci.yml logs
+          docker compose -f docker-compose.ci.yml down -v
 
   # =============================================================================
   # Security Scanning
