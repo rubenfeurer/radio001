@@ -101,7 +101,7 @@ jobs:
 
       - name: Start backend service
         run: |
-          docker-compose -f compose/docker-compose.ci.yml up radio-backend -d
+          docker-compose -f compose/docker-compose.ci.yml up -d radio-backend
           sleep 15
 
       - name: Test backend health
