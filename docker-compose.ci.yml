@@ -7,8 +7,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      platforms:
-        - linux/amd64
     platform: linux/amd64
     container_name: radio-backend-ci
     hostname: radio-backend

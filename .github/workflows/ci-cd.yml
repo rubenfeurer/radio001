@@ -34,7 +34,10 @@ jobs:
       - name: Install frontend dependencies
         run: |
           cd frontend
-          npm ci
+          rm -rf node_modules package-lock.json
+          npm config set target_arch x64
+          npm config set target_platform linux
+          npm install --no-optional
 
       - name: Run frontend linting
         run: |
@@ -44,19 +47,20 @@ jobs:
       - name: Run frontend type checking
         run: |
           cd frontend
-          npm run check
+          npm run check:ci
 
       - name: Build frontend application
         run: |
           cd frontend
-          npm run build
+          npm run build:ci
 
       - name: Test backend health
         run: |
-          docker-compose up radio-backend -d
-          sleep 10
+          rm -f docker-compose.override.yml
+          docker-compose -f docker-compose.ci.yml up radio-backend -d
+          sleep 15
           curl -f http://localhost:8000/health
-          docker-compose down
+          docker-compose -f docker-compose.ci.yml down
 
   # =============================================================================
   # Full Integration Tests (for PRs and main pushes)
@@ -78,18 +82,25 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Remove Docker Compose override file for CI
+        run: |
+          rm -f docker-compose.override.yml
+
       - name: Build and test backend
         run: |
-          docker-compose up radio-backend -d
+          docker-compose -f docker-compose.ci.yml up radio-backend -d
           sleep 15
           curl -f http://localhost:8000/health
-          docker-compose logs radio-backend
-          docker-compose down
+          docker-compose -f docker-compose.ci.yml logs radio-backend
+          docker-compose -f docker-compose.ci.yml down
 
       - name: Build and test frontend
         run: |
           cd frontend
-          npm ci
+          rm -rf node_modules package-lock.json
+          npm config set target_arch x64
+          npm config set target_platform linux
+          npm install --no-optional
           npm run build
           npm run preview &
           sleep 10
@@ -99,6 +110,8 @@ jobs:
       - name: Test production deployment
         run: |
           cd frontend && npm run build
+          # Remove override file that might cause platform issues
+          rm -f docker-compose.override.yml
           docker-compose -f docker-compose.prod.yml up -d
           sleep 20
           curl -f http://localhost || echo "Production test skipped - no nginx setup in CI"
@@ -125,13 +138,20 @@ jobs:
       - name: Build frontend for CI
         run: |
           cd frontend
-          npm ci
+          rm -rf node_modules package-lock.json
+          npm config set target_arch x64
+          npm config set target_platform linux
+          npm install --no-optional
           npm run build
 
       - name: Install Docker Compose
         run: |
           sudo apt-get update
           sudo apt-get install -y docker-compose
+
+      - name: Remove Docker Compose override file for CI
+        run: |
+          rm -f docker-compose.override.yml
 
       - name: Build and test with Docker
         run: |
