@@ -56,7 +56,7 @@ A modern WiFi provisioning solution for Raspberry Pi Zero 2 W, built with **Svel
 
 2. **Start backend (Docker):**
    ```bash
-   docker-compose up radio-backend -d
+   docker-compose -f compose/docker-compose.yml up radio-backend -d
    ```
 
 3. **Setup frontend (Local):**
@@ -78,14 +78,14 @@ Deploy to Raspberry Pi:
 ./scripts/deploy-pi.sh
 
 # Or manually:
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose -f compose/docker-compose.prod.yml up -d
 ```
 
 ## 📁 Project Structure
 
 ```
 radio-wifi/
-├── frontend/              # SvelteKit frontend (new)
+├── frontend/              # SvelteKit frontend
 │   ├── src/
 │   │   ├── routes/        # Page components
 │   │   ├── lib/
@@ -94,12 +94,18 @@ radio-wifi/
 │   │   │   └── types.ts   # TypeScript types
 │   │   └── app.html       # HTML template
 │   ├── static/            # Static assets
-│   └── package.json
-├── backend/               # FastAPI backend (unchanged)
+│   └── package.json       # Frontend dependencies
+├── backend/               # FastAPI backend
 │   ├── main.py            # FastAPI application
-│   └── requirements.txt
-├── app/                   # Legacy Nuxt (deprecated)
-├── docker/                # Docker configurations
+│   └── requirements.txt   # Python dependencies
+├── compose/               # Docker Compose files
+│   ├── docker-compose.yml      # Development
+│   ├── docker-compose.prod.yml # Production
+│   └── docker-compose.ci.yml   # CI/CD
+├── docker/                # Dockerfiles & scripts
+├── nginx/                 # Nginx configuration
+├── config/                # System configuration
+├── scripts/               # Deployment scripts
 └── docs/                  # Documentation
 ```
 
@@ -119,16 +125,16 @@ npm run lint         # Lint code
 ### Backend Development (FastAPI)
 
 ```bash
-docker-compose up radio-backend    # Start backend
-docker-compose logs radio-backend  # View logs
-docker-compose exec radio-backend bash  # Shell access
+docker-compose -f compose/docker-compose.yml up radio-backend    # Start backend
+docker-compose -f compose/docker-compose.yml logs radio-backend  # View logs
+docker-compose -f compose/docker-compose.yml exec radio-backend bash  # Shell access
 ```
 
 ### Full Stack Development
 
 ```bash
 # Terminal 1: Backend
-docker-compose up radio-backend
+docker-compose -f compose/docker-compose.yml up radio-backend
 
 # Terminal 2: Frontend  
 cd frontend && npm run dev
@@ -174,13 +180,13 @@ The FastAPI backend provides these endpoints:
 
 ### Development
 ```bash
-docker-compose up -d          # Start all services
-docker-compose up radio-backend -d  # Backend only
+docker-compose -f compose/docker-compose.yml up -d          # Start all services
+docker-compose -f compose/docker-compose.yml up radio-backend -d  # Backend only
 ```
 
 ### Production  
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose -f compose/docker-compose.prod.yml up -d
 ```
 
 ### ARM64 Compatibility
@@ -200,7 +206,7 @@ docker-compose -f docker-compose.prod.yml up -d
    ```bash
    git clone <repo-url> radio-wifi
    cd radio-wifi
-   docker-compose -f docker-compose.prod.yml up -d
+   docker-compose -f compose/docker-compose.prod.yml up -d
    ```
 
 3. **Configure as access point:**
@@ -217,27 +223,27 @@ docker-compose -f docker-compose.prod.yml up -d
 ### Development Issues
 ```bash
 # Reset everything
-docker-compose down -v
+docker-compose -f compose/docker-compose.yml down -v
 cd frontend && rm -rf node_modules && npm install
-docker-compose up --build
+docker-compose -f compose/docker-compose.yml up --build
 ```
 
 ### Backend Issues  
 ```bash
 # Check backend logs
-docker-compose logs radio-backend
+docker-compose -f compose/docker-compose.yml logs radio-backend
 
 # Restart backend
-docker-compose restart radio-backend
+docker-compose -f compose/docker-compose.yml restart radio-backend
 ```
 
 ## 📚 Documentation
 
-- [Development Guide](./DEVELOPMENT.md)
-- [SvelteKit Migration](./SVELTEKIT-MIGRATION.md)
-- [Deployment Guide](./DEPLOYMENT.md)  
-- [API Documentation](./API.md)
-- [Troubleshooting](./TROUBLESHOOTING.md)
+- [Development Guide](./docs/DEVELOPMENT.md)
+- [SvelteKit Migration](./docs/SVELTEKIT-MIGRATION.md)
+- [Deployment Guide](./docs/DEPLOYMENT.md)  
+- [Troubleshooting](./docs/TROUBLESHOOTING.md)
+- [Workflow Guide](./docs/WORKFLOW.md)
 
 ## 🤝 Contributing
 
