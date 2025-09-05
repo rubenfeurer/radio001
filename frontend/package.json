@@ -6,15 +6,16 @@
 	"scripts": {
 		"dev": "vite dev --host 0.0.0.0 --port 3000",
 		"build": "vite build",
-		"build:ci": "npm config set target_arch x64 && npm config set target_platform linux && npm run clean:modules && npm ci && vite build",
+		"build:ci": "npm run clean:modules && npm ci --omit=optional && npm install --optional && vite build",
 		"preview": "vite preview --host 0.0.0.0 --port 3000",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"check:ci": "npm config set target_arch x64 && npm config set target_platform linux && npm run clean:modules && npm ci && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:ci": "npm run clean:modules && npm ci --omit=optional && npm install --optional && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
-		"clean:modules": "rm -rf node_modules package-lock.json",
-		"install:force": "npm run clean:modules && npm install --no-optional",
+		"clean:modules": "rm -rf node_modules package-lock.json .svelte-kit",
+		"install:force": "npm run clean:modules && npm install --omit=optional && npm install --optional",
+		"install:native": "npm install --optional",
 		"postinstall": "svelte-kit sync"
 	},
 	"devDependencies": {
