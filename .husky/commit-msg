@@ -1,34 +1,7 @@
 #!/usr/bin/env sh
 
-# Conventional commit message validation
-# Enforces format: type(scope): description
-# Examples:
-#   feat: add WiFi scanning
-#   fix(api): handle connection timeout
-#   docs: update README
+# Commit message validation disabled - free-form messages allowed
+# You can now use any commit message format you prefer
 
-commit_regex='^(feat|fix|docs|style|refactor|perf|test|chore)(\(.+\))?: .{1,50}'
-
-if ! grep -qE "$commit_regex" "$1"; then
-    echo "❌ Invalid commit message format!"
-    echo ""
-    echo "✅ Commit message must follow conventional commits format:"
-    echo "   type(scope): description"
-    echo ""
-    echo "📋 Allowed types:"
-    echo "   • feat:     new feature"
-    echo "   • fix:      bug fix"
-    echo "   • docs:     documentation"
-    echo "   • style:    formatting, missing semicolons, etc"
-    echo "   • refactor: code change that neither fixes a bug nor adds a feature"
-    echo "   • perf:     performance improvement"
-    echo "   • test:     adding tests"
-    echo "   • chore:    maintenance, dependencies, etc"
-    echo ""
-    echo "💡 Examples:"
-    echo "   feat: add WiFi network scanning"
-    echo "   fix(api): handle connection timeout errors"
-    echo "   docs: update development guide"
-    echo ""
-    exit 1
-fi
+echo "💬 Commit message validation is disabled - using free-form messages"
+exit 0
