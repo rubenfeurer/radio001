@@ -17,6 +17,10 @@ python-multipart==0.0.6
 typing-extensions>=4.8.0
 annotated-types>=0.6.0
 
+# Radio system dependencies
+python-mpv==1.0.6           # Python MPV bindings for audio playback
+pigpio==1.78                # GPIO control for Raspberry Pi (Pi only)
+
 # Optional: Development dependencies (install with --dev flag)
 # pytest==7.4.3
 # black==23.11.0

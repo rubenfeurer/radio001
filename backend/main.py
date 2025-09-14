@@ -39,11 +39,41 @@ class Config:
     HOST = "0.0.0.0"
     PORT = int(os.getenv("API_PORT", "8000"))
 
+    # Radio Settings
+    DEFAULT_VOLUME: int = 50
+    MIN_VOLUME: int = 30
+    MAX_VOLUME: int = 100
+    NOTIFICATION_VOLUME: int = 40
+
+    # Hardware Settings (GPIO pins)
+    BUTTON_PIN_1: int = 17      # GPIO17 (Pin 11) - Station 1
+    BUTTON_PIN_2: int = 16      # GPIO16 (Pin 36) - Station 2
+    BUTTON_PIN_3: int = 26      # GPIO26 (Pin 37) - Station 3
+
+    # Rotary Encoder Settings
+    ROTARY_CLK: int = 11        # GPIO11 (Pin 23) - Clock
+    ROTARY_DT: int = 9          # GPIO9  (Pin 21) - Data
+    ROTARY_SW: int = 10         # GPIO10 (Pin 19) - Switch/Button
+    ROTARY_CLOCKWISE_INCREASES: bool = True  # Volume direction
+    ROTARY_VOLUME_STEP: int = 5  # Volume change per step
+
+    # Button Press Settings (in seconds)
+    LONG_PRESS_DURATION: float = 3.0
+    TRIPLE_PRESS_INTERVAL: float = 0.5
+
+    # Audio & Data Paths
+    DATA_DIR = Path("data")
+    SOUNDS_DIR = Path("assets/sounds")
+    STATIONS_FILE = DATA_DIR / "stations.json"
+    PREFERENCES_FILE = DATA_DIR / "preferences.json"
+
     # Ensure paths exist
     @classmethod
     def ensure_paths(cls):
         """Create necessary directories for the application"""
         cls.RASPIWIFI_DIR.mkdir(parents=True, exist_ok=True)
+        cls.DATA_DIR.mkdir(parents=True, exist_ok=True)
+        cls.SOUNDS_DIR.mkdir(parents=True, exist_ok=True)
         # Additional path creation for logs, etc.
 
 
