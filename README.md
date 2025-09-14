@@ -1,4 +1,4 @@
-# Radio WiFi Configuration System
+# Radio001
 
 A unified **Radio + WiFi Configuration** system for Raspberry Pi Zero 2 W, combining reliable WiFi management with full internet radio capabilities. Built with **SvelteKit frontend** and **FastAPI backend**.
 
@@ -11,7 +11,7 @@ A unified **Radio + WiFi Configuration** system for Raspberry Pi Zero 2 W, combi
 
 ### 📡 **WiFi Management**
 - 🌐 **Easy WiFi Setup** - Simple web interface for network configuration
-- 📱 **Mobile Optimized** - Responsive design works on phones and tablets  
+- 📱 **Mobile Optimized** - Responsive design works on phones and tablets
 - 🔒 **Secure by Default** - WPA2/WPA3 support with secure credential handling
 
 ### 📻 **Internet Radio**
@@ -92,7 +92,7 @@ docker-compose -f compose/docker-compose.prod.yml up -d
 radio001/
 ├── frontend/              # SvelteKit frontend
 │   ├── src/routes/        # WiFi + Radio pages
-│   ├── src/lib/stores/    # State management  
+│   ├── src/lib/stores/    # State management
 │   └── src/lib/components/# UI components
 ├── backend/               # FastAPI backend
 │   ├── core/              # Radio business logic
@@ -116,7 +116,7 @@ radio001/
 
 ### What You'll Find
 - **Architecture & Design** - Hybrid SvelteKit + FastAPI system
-- **API Documentation** - WiFi + Radio endpoints with examples  
+- **API Documentation** - WiFi + Radio endpoints with examples
 - **Development Guide** - Setup, testing, and contribution workflow
 - **Deployment Guide** - Raspberry Pi production deployment
 - **Phase Progress** - Current implementation status (Phase 1: 95% complete)
