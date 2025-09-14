@@ -1,0 +1,16 @@
+# This is a placeholder for error.wav sound file
+# In a real implementation, this would be a binary WAV audio file
+# For development purposes, this text file serves as a placeholder
+
+# To add actual sound files:
+# 1. Record or download appropriate WAV files (16-bit, 44.1kHz recommended)
+# 2. Replace this placeholder with actual audio files
+# 3. Sound should be a short, distinctive error tone (0.5-1 second)
+# 4. Use for error conditions like:
+#    - Station connection failed
+#    - Invalid volume setting
+#    - Network error
+#    - Hardware malfunction
+
+# Placeholder content for error sound
+PLACEHOLDER_ERROR_SOUND = True
