@@ -9,7 +9,7 @@ This module defines the Pydantic models used throughout the radio system:
 - PlaybackStatus: Current playback information
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Literal
 from pydantic import BaseModel, Field, validator, HttpUrl
 from enum import Enum
 
@@ -242,19 +242,19 @@ class WSMessage(BaseModel):
 
 class WSVolumeUpdate(WSMessage):
     """WebSocket volume update message"""
-    type: str = Field("volume_update", const=True)
+    type: Literal["volume_update"] = "volume_update"
 
 
 class WSStationChange(WSMessage):
     """WebSocket station change message"""
-    type: str = Field("station_change", const=True)
+    type: Literal["station_change"] = "station_change"
 
 
 class WSPlaybackStatus(WSMessage):
     """WebSocket playback status message"""
-    type: str = Field("playback_status", const=True)
+    type: Literal["playback_status"] = "playback_status"
 
 
 class WSSystemStatus(WSMessage):
     """WebSocket system status message"""
-    type: str = Field("system_status", const=True)
+    type: Literal["system_status"] = "system_status"

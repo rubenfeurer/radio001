@@ -16,8 +16,9 @@ from pydantic import BaseModel, Field
 import uvicorn
 
 # Radio system imports
-from api.routes import stations, radio, websocket
-from api.routes.websocket import setup_radio_manager_with_websocket
+from api.routes.stations import router as stations_router
+from api.routes.radio import router as radio_router
+from api.routes.websocket import router as websocket_router, setup_radio_manager_with_websocket
 
 
 # =============================================================================
@@ -420,9 +421,9 @@ app.add_middleware(
 )
 
 # Include radio API routes
-app.include_router(stations.router, prefix="/radio/stations", tags=["Radio Stations"])
-app.include_router(radio.router, prefix="/radio", tags=["Radio Control"])
-app.include_router(websocket.router, prefix="/ws", tags=["WebSocket"])
+app.include_router(stations_router, prefix="/radio/stations", tags=["Radio Stations"])
+app.include_router(radio_router, prefix="/radio", tags=["Radio Control"])
+app.include_router(websocket_router, prefix="/ws", tags=["WebSocket"])
 
 
 # =============================================================================

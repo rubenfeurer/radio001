@@ -17,8 +17,8 @@ from typing import Dict, Set, Any, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 from fastapi.websockets import WebSocketState
 
-from ...core.models import WSMessage, SystemStatus, PlaybackStatus
-from ...core.radio_manager import RadioManager
+from core.models import WSMessage, SystemStatus, PlaybackStatus
+from core.radio_manager import RadioManager
 
 logger = logging.getLogger(__name__)
 

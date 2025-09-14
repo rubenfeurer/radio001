@@ -110,8 +110,17 @@ async def client(temp_data_dir):
     # Set test environment
     os.environ["NODE_ENV"] = "development"
 
-    async with AsyncClient(app=app, base_url="http://test") as ac:
-        yield ac
+    # Initialize radio manager for integration tests
+    manager = await setup_radio_manager_with_websocket(
+        config=Config,
+        mock_mode=True
+    )
+
+    try:
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            yield ac
+    finally:
+        await manager.shutdown()
 
 
 @pytest.fixture

@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Dict, Optional, List
 from datetime import datetime
 
-from .models import RadioStation, StationRequest
+from core.models import RadioStation, StationRequest
 
 logger = logging.getLogger(__name__)
 

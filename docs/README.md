@@ -1,157 +1,271 @@
-# Documentation
+# Radio WiFi Configuration
 
-Welcome to the Radio WiFi Configuration project documentation! This guide will help you navigate through all available documentation.
+A modern WiFi provisioning solution for Raspberry Pi Zero 2 W, built with **SvelteKit frontend** and **FastAPI backend**. Provides an easy web interface for configuring WiFi networks on headless Raspberry Pi devices.
 
-## 📚 Documentation Index
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Architecture](https://img.shields.io/badge/architecture-ARM64%20Compatible-green.svg)
+![Frontend](https://img.shields.io/badge/frontend-SvelteKit-ff3e00.svg)
+![Backend](https://img.shields.io/badge/backend-FastAPI-009688.svg)
 
-### Getting Started
-- **[Project README](../README.md)** - Main project overview and quick start guide
+## ✨ Features
 
-### Development
-- **[Development Guide](./DEVELOPMENT.md)** - Complete development workflow and setup
-- **[SvelteKit Migration](./SVELTEKIT-MIGRATION.md)** - Migration from Nuxt to SvelteKit details
-- **[Workflow Guide](./WORKFLOW.md)** - Git workflow and contribution guidelines
+- 🌐 **Easy WiFi Setup** - Simple web interface for network configuration
+- 📱 **Mobile Optimized** - Responsive design works on phones and tablets  
+- 🔒 **Secure by Default** - WPA2/WPA3 support with secure credential handling
+- 🚀 **Fast Performance** - SvelteKit frontend compiles to vanilla JavaScript
+- 🐳 **Docker Ready** - Containerized backend for easy deployment
+- 🔧 **ARM64 Compatible** - No oxc-parser issues on Raspberry Pi
+- ⚡ **Hot Reload** - Live development with instant updates
+- 🎨 **Dark Mode** - Automatic dark/light theme switching
+- 📶 **Signal Strength** - Real-time WiFi signal monitoring
+- 🔄 **Auto-reconnect** - Automatic connection recovery
 
-### Deployment & Operations
-- **[Deployment Guide](./DEPLOYMENT.md)** - Production deployment on Raspberry Pi
-- **[Troubleshooting](./TROUBLESHOOTING.md)** - Common issues and solutions
+## 🏗️ Architecture
 
-## 🏗️ Architecture Overview
-
-This project uses a **hybrid architecture** that solves ARM64 compatibility issues:
+**Hybrid Development Approach** (solves ARM64 oxc-parser issues):
 
 ```
-Development:
 ┌─────────────────┐    ┌──────────────────┐
 │   SvelteKit     │────│   FastAPI        │
-│   (Local Dev)   │ API│   (Docker)       │
-│   :3000         │────│   :8000          │
+│   Frontend      │ API│   Backend        │
+│   (Local Dev)   │────│   (Docker)       │
 └─────────────────┘    └──────────────────┘
-
-Production:
-┌─────────────────┐    ┌──────────────────┐
-│     Nginx       │────│   FastAPI        │
-│ Static SvelteKit│ API│   (Docker)       │
-│     :80         │────│   :8000          │
-└─────────────────┘    └──────────────────┘
+      :3000                    :8000
 ```
 
-## 🚀 Quick Navigation
+- **Frontend**: SvelteKit runs locally (no ARM64 issues)
+- **Backend**: FastAPI runs in Docker (proven stable)
+- **API**: Frontend proxies requests to backend
+- **Production**: Static frontend + Docker backend
 
-### For Developers
-1. **New to the project?** → Start with [Development Guide](./DEVELOPMENT.md)
-2. **Understanding the migration?** → Read [SvelteKit Migration](./SVELTEKIT-MIGRATION.md)
-3. **Need to contribute?** → Follow [Workflow Guide](./WORKFLOW.md)
+## 🚀 Quick Start
 
-### For DevOps/Deployment
-1. **Deploying to production?** → Use [Deployment Guide](./DEPLOYMENT.md)
-2. **Having issues?** → Check [Troubleshooting](./TROUBLESHOOTING.md)
+### Prerequisites
 
-### For Project Management
-1. **Project overview** → [Main README](../README.md)
-2. **Feature status** → [Development Guide](./DEVELOPMENT.md#features)
+- **Node.js** 20+ (for local development)
+- **Docker** & Docker Compose (for backend)
+- **Raspberry Pi Zero 2 W** or compatible ARM64 device
 
-## 🔧 Key Commands Reference
+### Development Setup
 
-### Development
+1. **Clone and setup:**
+   ```bash
+   git clone <repository-url> radio-wifi
+   cd radio-wifi
+   ```
+
+2. **Start backend (Docker):**
+   ```bash
+   docker-compose -f compose/docker-compose.yml up radio-backend -d
+   ```
+
+3. **Setup frontend (Local):**
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+4. **Access the app:**
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:8000/docs
+
+### Production Deployment
+
+Deploy to Raspberry Pi:
 ```bash
-# Start development
-npm run dev:backend    # Backend only
-npm run dev:frontend   # Frontend only
-npm run dev:full       # Both services
+# Build and deploy
+./scripts/deploy-pi.sh
 
-# Testing & Quality
-npm run lint          # Lint frontend
-npm run type-check    # TypeScript checking
-npm run quick:check   # Both lint + type check
-```
-
-### Production
-```bash
-# Build & Deploy
-npm run build         # Build frontend
-npm run prod:up       # Start production stack
-npm run prod:down     # Stop production stack
-npm run prod:logs     # View production logs
-```
-
-### Docker Services
-```bash
-# Development
-docker-compose -f compose/docker-compose.yml up radio-backend -d
-
-# Production  
+# Or manually:
 docker-compose -f compose/docker-compose.prod.yml up -d
-
-# CI/CD
-docker-compose -f compose/docker-compose.ci.yml up
 ```
 
-## 📁 Project Structure Quick Reference
+## 📁 Project Structure
 
 ```
 radio-wifi/
-├── frontend/                    # SvelteKit frontend
-│   ├── src/routes/             # File-based routing
-│   ├── src/lib/components/     # Reusable components
-│   ├── src/lib/stores/         # State management
-│   └── src/lib/types.ts        # TypeScript definitions
-├── backend/                     # FastAPI backend
-│   ├── main.py                 # API application
-│   └── requirements.txt        # Python dependencies
-├── compose/                     # Docker Compose configurations
+├── frontend/              # SvelteKit frontend
+│   ├── src/
+│   │   ├── routes/        # Page components
+│   │   ├── lib/
+│   │   │   ├── components/# Reusable components  
+│   │   │   ├── stores/    # Svelte stores (state)
+│   │   │   └── types.ts   # TypeScript types
+│   │   └── app.html       # HTML template
+│   ├── static/            # Static assets
+│   └── package.json       # Frontend dependencies
+├── backend/               # FastAPI backend
+│   ├── main.py            # FastAPI application
+│   └── requirements.txt   # Python dependencies
+├── compose/               # Docker Compose files
 │   ├── docker-compose.yml      # Development
 │   ├── docker-compose.prod.yml # Production
 │   └── docker-compose.ci.yml   # CI/CD
-├── docker/                      # Dockerfiles
-├── nginx/                       # Production web server
-├── config/                      # System configurations
-├── scripts/                     # Deployment scripts
-└── docs/                       # This documentation
+├── docker/                # Dockerfiles & scripts
+├── nginx/                 # Nginx configuration
+├── config/                # System configuration
+├── scripts/               # Deployment scripts
+└── docs/                  # Documentation
 ```
 
-## 🎯 Common Tasks
+## 🔧 Development
 
-### I want to...
+### Frontend Development (SvelteKit)
 
-**Start developing locally**
-1. Read [Development Guide](./DEVELOPMENT.md#local-development)
-2. Run `npm run dev:backend` and `npm run dev:frontend`
+```bash
+cd frontend
+npm run dev          # Start dev server
+npm run build        # Build for production  
+npm run preview      # Preview production build
+npm run check        # Type checking
+npm run lint         # Lint code
+```
 
-**Deploy to Raspberry Pi** 
-1. Follow [Deployment Guide](./DEPLOYMENT.md#raspberry-pi-deployment)
-2. Use deployment scripts in `/scripts/`
+### Backend Development (FastAPI)
 
-**Understand the SvelteKit migration**
-1. Read [SvelteKit Migration](./SVELTEKIT-MIGRATION.md)
-2. Check the before/after comparisons
+```bash
+docker-compose -f compose/docker-compose.yml up radio-backend    # Start backend
+docker-compose -f compose/docker-compose.yml logs radio-backend  # View logs
+docker-compose -f compose/docker-compose.yml exec radio-backend bash  # Shell access
+```
 
-**Fix a bug or contribute**
-1. Follow [Workflow Guide](./WORKFLOW.md#development-workflow) 
-2. Create feature branch and PR
+### Full Stack Development
 
-**Troubleshoot issues**
-1. Check [Troubleshooting](./TROUBLESHOOTING.md)
-2. Look for your specific error message
+```bash
+# Terminal 1: Backend
+docker-compose -f compose/docker-compose.yml up radio-backend
 
-## 🔍 Documentation Standards
+# Terminal 2: Frontend  
+cd frontend && npm run dev
 
-All documentation follows these principles:
-- **Practical**: Step-by-step instructions with commands
-- **Complete**: Cover both development and production scenarios
-- **Current**: Updated with latest architecture (SvelteKit + FastAPI)
-- **Searchable**: Clear headings and structure
-- **Examples**: Real commands and code snippets
+# Access: http://localhost:3000
+```
 
-## 🆘 Need Help?
+## 🏠 Pages & Features
 
-1. **Check existing docs** - Search through the documentation above
-2. **Common issues** - Look in [Troubleshooting](./TROUBLESHOOTING.md)
-3. **Development setup** - Follow [Development Guide](./DEVELOPMENT.md)
-4. **Create an issue** - Open GitHub issue with detailed description
+| Route | Component | Description |
+|-------|-----------|-------------|
+| `/` | `+page.svelte` | Main dashboard with WiFi status |
+| `/setup` | `setup/+page.svelte` | WiFi network setup wizard |
+| `/settings` | `settings/+page.svelte` | System settings |
+| `/status` | `status/+page.svelte` | Detailed system status |
+
+## 🔄 Migration from Nuxt
+
+We migrated from Nuxt to SvelteKit to solve ARM64 compatibility issues:
+
+| **Issue** | **Nuxt Solution** | **SvelteKit Solution** |
+|-----------|-------------------|----------------------|
+| oxc-parser ARM64 | ❌ Complex workarounds | ✅ No oxc-parser dependency |
+| Development | ❌ Docker required | ✅ Local development |
+| Performance | ❌ Runtime overhead | ✅ Compiled JavaScript |
+| Bundle size | ❌ Larger bundles | ✅ Smaller bundles |
+
+See [SVELTEKIT-MIGRATION.md](./SVELTEKIT-MIGRATION.md) for detailed migration guide.
+
+## 📡 API Endpoints
+
+The FastAPI backend provides these endpoints:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/wifi/status` | Current WiFi status |
+| POST | `/api/wifi/scan` | Scan for networks |
+| POST | `/api/wifi/connect` | Connect to network |
+| POST | `/api/system/reset` | Reset to hotspot mode |
+| GET | `/health` | Health check |
+
+## 🐳 Docker
+
+### Development
+```bash
+docker-compose -f compose/docker-compose.yml up -d          # Start all services
+docker-compose -f compose/docker-compose.yml up radio-backend -d  # Backend only
+```
+
+### Production  
+```bash
+docker-compose -f compose/docker-compose.prod.yml up -d
+```
+
+### ARM64 Compatibility
+- ✅ Backend: Runs perfectly in Docker on ARM64
+- ✅ Frontend: SvelteKit has no ARM64 issues
+- ✅ Development: Local frontend + Docker backend
+
+## 🎯 Raspberry Pi Setup
+
+1. **Install Docker:**
+   ```bash
+   curl -sSL https://get.docker.com | sh
+   sudo usermod -aG docker pi
+   ```
+
+2. **Deploy application:**
+   ```bash
+   git clone <repo-url> radio-wifi
+   cd radio-wifi
+   docker-compose -f compose/docker-compose.prod.yml up -d
+   ```
+
+3. **Configure as access point:**
+   ```bash
+   sudo ./scripts/setup-pi.sh
+   ```
+
+## 🔍 Troubleshooting
+
+### ARM64 Issues (Solved!)
+- ❌ **Problem**: `oxc-parser` no ARM64 binaries
+- ✅ **Solution**: Use SvelteKit (no oxc-parser dependency)
+
+### Development Issues
+```bash
+# Reset everything
+docker-compose -f compose/docker-compose.yml down -v
+cd frontend && rm -rf node_modules && npm install
+docker-compose -f compose/docker-compose.yml up --build
+```
+
+### Backend Issues  
+```bash
+# Check backend logs
+docker-compose -f compose/docker-compose.yml logs radio-backend
+
+# Restart backend
+docker-compose -f compose/docker-compose.yml restart radio-backend
+```
+
+## 📚 Documentation
+
+- [Development Guide](./docs/DEVELOPMENT.md)
+- [SvelteKit Migration](./docs/SVELTEKIT-MIGRATION.md)
+- [Deployment Guide](./docs/DEPLOYMENT.md)  
+- [Troubleshooting](./docs/TROUBLESHOOTING.md)
+- [Workflow Guide](./docs/WORKFLOW.md)
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open Pull Request
+
+## 📄 License
+
+MIT License - see [LICENSE](./LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [SvelteKit](https://kit.svelte.dev) - Amazing frontend framework
+- [FastAPI](https://fastapi.tiangolo.com) - Fast and reliable backend
+- [Tailwind CSS](https://tailwindcss.com) - Utility-first CSS framework
+- [RaspiWiFi](https://github.com/jasbur/RaspiWifi) - Inspiration for Pi WiFi setup
 
 ---
 
-**Last Updated**: December 2024  
-**Architecture**: SvelteKit + FastAPI Hybrid  
-**Target Platform**: Raspberry Pi Zero 2 W (ARM64)
+**Made with ❤️ for Raspberry Pi developers**
+
+*No more ARM64 oxc-parser headaches! 🎉*

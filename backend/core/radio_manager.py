@@ -18,11 +18,11 @@ import time
 from typing import Optional, Callable, Dict, Any
 from pathlib import Path
 
-from .models import RadioStation, SystemStatus, PlaybackState, VolumeUpdate
-from .station_manager import StationManager
-from .sound_manager import SoundManager
-from ..hardware.audio_player import AudioPlayer
-from ..hardware.gpio_controller import GPIOController
+from core.models import RadioStation, SystemStatus, PlaybackState, VolumeUpdate
+from core.station_manager import StationManager
+from core.sound_manager import SoundManager
+from hardware.audio_player import AudioPlayer
+from hardware.gpio_controller import GPIOController
 
 logger = logging.getLogger(__name__)
 

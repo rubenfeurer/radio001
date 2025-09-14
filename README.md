@@ -1,6 +1,6 @@
-# Radio WiFi Configuration
+# Radio WiFi Configuration System
 
-A modern WiFi provisioning solution for Raspberry Pi Zero 2 W, built with **SvelteKit frontend** and **FastAPI backend**. Provides an easy web interface for configuring WiFi networks on headless Raspberry Pi devices.
+A unified **Radio + WiFi Configuration** system for Raspberry Pi Zero 2 W, combining reliable WiFi management with full internet radio capabilities. Built with **SvelteKit frontend** and **FastAPI backend**.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Architecture](https://img.shields.io/badge/architecture-ARM64%20Compatible-green.svg)
@@ -9,20 +9,26 @@ A modern WiFi provisioning solution for Raspberry Pi Zero 2 W, built with **Svel
 
 ## ✨ Features
 
+### 📡 **WiFi Management**
 - 🌐 **Easy WiFi Setup** - Simple web interface for network configuration
 - 📱 **Mobile Optimized** - Responsive design works on phones and tablets  
 - 🔒 **Secure by Default** - WPA2/WPA3 support with secure credential handling
-- 🚀 **Fast Performance** - SvelteKit frontend compiles to vanilla JavaScript
+
+### 📻 **Internet Radio**
+- 🎵 **3-Slot Station System** - Quick access to favorite radio stations
+- 🔊 **Volume Control** - Precise audio level management
+- 🎛️ **Hardware Controls** - Physical buttons and rotary encoder support
+- 📶 **Real-time Updates** - WebSocket communication for live status
+
+### 🚀 **System Features**
 - 🐳 **Docker Ready** - Containerized backend for easy deployment
-- 🔧 **ARM64 Compatible** - No oxc-parser issues on Raspberry Pi
+- 🔧 **ARM64 Compatible** - No build issues on Raspberry Pi
 - ⚡ **Hot Reload** - Live development with instant updates
 - 🎨 **Dark Mode** - Automatic dark/light theme switching
-- 📶 **Signal Strength** - Real-time WiFi signal monitoring
-- 🔄 **Auto-reconnect** - Automatic connection recovery
 
 ## 🏗️ Architecture
 
-**Hybrid Development Approach** (solves ARM64 oxc-parser issues):
+**Hybrid Development Approach**:
 
 ```
 ┌─────────────────┐    ┌──────────────────┐
@@ -33,25 +39,24 @@ A modern WiFi provisioning solution for Raspberry Pi Zero 2 W, built with **Svel
       :3000                    :8000
 ```
 
-- **Frontend**: SvelteKit runs locally (no ARM64 issues)
-- **Backend**: FastAPI runs in Docker (proven stable)
+- **Frontend**: SvelteKit runs locally (fast development)
+- **Backend**: FastAPI + Radio system runs in Docker
 - **API**: Frontend proxies requests to backend
 - **Production**: Static frontend + Docker backend
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-
 - **Node.js** 20+ (for local development)
 - **Docker** & Docker Compose (for backend)
-- **Raspberry Pi Zero 2 W** or compatible ARM64 device
+- **Raspberry Pi Zero 2 W** or compatible ARM64 device (for production)
 
 ### Development Setup
 
 1. **Clone and setup:**
    ```bash
-   git clone <repository-url> radio-wifi
-   cd radio-wifi
+   git clone <repository-url> radio001
+   cd radio001
    ```
 
 2. **Start backend (Docker):**
@@ -84,115 +89,75 @@ docker-compose -f compose/docker-compose.prod.yml up -d
 ## 📁 Project Structure
 
 ```
-radio-wifi/
+radio001/
 ├── frontend/              # SvelteKit frontend
-│   ├── src/
-│   │   ├── routes/        # Page components
-│   │   ├── lib/
-│   │   │   ├── components/# Reusable components  
-│   │   │   ├── stores/    # Svelte stores (state)
-│   │   │   └── types.ts   # TypeScript types
-│   │   └── app.html       # HTML template
-│   ├── static/            # Static assets
-│   └── package.json       # Frontend dependencies
+│   ├── src/routes/        # WiFi + Radio pages
+│   ├── src/lib/stores/    # State management  
+│   └── src/lib/components/# UI components
 ├── backend/               # FastAPI backend
-│   ├── main.py            # FastAPI application
-│   └── requirements.txt   # Python dependencies
-├── compose/               # Docker Compose files
-│   ├── docker-compose.yml      # Development
-│   ├── docker-compose.prod.yml # Production
-│   └── docker-compose.ci.yml   # CI/CD
-├── docker/                # Dockerfiles & scripts
-├── nginx/                 # Nginx configuration
-├── config/                # System configuration
-├── scripts/               # Deployment scripts
+│   ├── core/              # Radio business logic
+│   ├── hardware/          # GPIO & audio controls
+│   ├── api/routes/        # API endpoints
+│   └── main.py            # Unified WiFi + Radio API
+├── compose/               # Docker configurations
+├── data/                  # Station storage
+├── assets/sounds/         # Notification sounds
 └── docs/                  # Documentation
 ```
 
-## 🔧 Development
+## 📚 Documentation
 
-### Frontend Development (SvelteKit)
+> **[📖 View Complete Documentation →](./docs/index.md)**
 
-```bash
-cd frontend
-npm run dev          # Start dev server
-npm run build        # Build for production  
-npm run preview      # Preview production build
-npm run check        # Type checking
-npm run lint         # Lint code
-```
+### Quick Links
+- **[📋 System Overview](./docs/README.md)** - Detailed features, architecture, and API reference
+- **[🎯 Integration Plan](./docs/RADIO_INTEGRATION_PLAN.md)** - Technical roadmap and implementation status
+- **[🚀 Quick Start](#-quick-start)** - Get up and running in 5 minutes
 
-### Backend Development (FastAPI)
+### What You'll Find
+- **Architecture & Design** - Hybrid SvelteKit + FastAPI system
+- **API Documentation** - WiFi + Radio endpoints with examples  
+- **Development Guide** - Setup, testing, and contribution workflow
+- **Deployment Guide** - Raspberry Pi production deployment
+- **Phase Progress** - Current implementation status (Phase 1: 95% complete)
 
-```bash
-docker-compose -f compose/docker-compose.yml up radio-backend    # Start backend
-docker-compose -f compose/docker-compose.yml logs radio-backend  # View logs
-docker-compose -f compose/docker-compose.yml exec radio-backend bash  # Shell access
-```
+## 🎯 Current Status
 
-### Full Stack Development
+### ✅ **Phase 1 Complete: Backend Infrastructure (95%)**
+- ✅ **WiFi Management**: Full network configuration system
+- ✅ **Radio Backend**: 3-slot station management with volume control
+- ✅ **Hardware Integration**: GPIO controllers with mock mode
+- ✅ **API Integration**: Unified WiFi + Radio FastAPI backend
+- ✅ **Testing**: Comprehensive test suite (142 tests)
 
-```bash
-# Terminal 1: Backend
-docker-compose -f compose/docker-compose.yml up radio-backend
-
-# Terminal 2: Frontend  
-cd frontend && npm run dev
-
-# Access: http://localhost:3000
-```
+### 🔄 **Phase 4 In Progress: Frontend Integration**
+- 🔄 **Radio UI Components**: Station cards, volume controls
+- 🔄 **State Management**: Radio store integration
+- 🔄 **Navigation**: Unified WiFi + Radio interface
 
 ## 🏠 Pages & Features
 
-| Route | Component | Description |
-|-------|-----------|-------------|
-| `/` | `+page.svelte` | Main dashboard with WiFi status |
-| `/setup` | `setup/+page.svelte` | WiFi network setup wizard |
-| `/settings` | `settings/+page.svelte` | System settings |
-| `/status` | `status/+page.svelte` | Detailed system status |
-
-## 🔄 Migration from Nuxt
-
-We migrated from Nuxt to SvelteKit to solve ARM64 compatibility issues:
-
-| **Issue** | **Nuxt Solution** | **SvelteKit Solution** |
-|-----------|-------------------|----------------------|
-| oxc-parser ARM64 | ❌ Complex workarounds | ✅ No oxc-parser dependency |
-| Development | ❌ Docker required | ✅ Local development |
-| Performance | ❌ Runtime overhead | ✅ Compiled JavaScript |
-| Bundle size | ❌ Larger bundles | ✅ Smaller bundles |
-
-See [SVELTEKIT-MIGRATION.md](./SVELTEKIT-MIGRATION.md) for detailed migration guide.
+| Route | Description | Status |
+|-------|-------------|--------|
+| `/` | Main dashboard with WiFi + Radio status | ✅ WiFi Complete |
+| `/setup` | WiFi network setup wizard | ✅ Complete |
+| `/radio` | Radio station management | 🔄 In Progress |
+| `/settings` | System settings | ✅ Complete |
+| `/status` | Detailed system status | ✅ Complete |
 
 ## 📡 API Endpoints
 
-The FastAPI backend provides these endpoints:
+### WiFi Endpoints
+- `GET /api/wifi/status` - Current WiFi connection status
+- `POST /api/wifi/scan` - Scan for available networks
+- `POST /api/wifi/connect` - Connect to network
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/wifi/status` | Current WiFi status |
-| POST | `/api/wifi/scan` | Scan for networks |
-| POST | `/api/wifi/connect` | Connect to network |
-| POST | `/api/system/reset` | Reset to hotspot mode |
-| GET | `/health` | Health check |
-
-## 🐳 Docker
-
-### Development
-```bash
-docker-compose -f compose/docker-compose.yml up -d          # Start all services
-docker-compose -f compose/docker-compose.yml up radio-backend -d  # Backend only
-```
-
-### Production  
-```bash
-docker-compose -f compose/docker-compose.prod.yml up -d
-```
-
-### ARM64 Compatibility
-- ✅ Backend: Runs perfectly in Docker on ARM64
-- ✅ Frontend: SvelteKit has no ARM64 issues
-- ✅ Development: Local frontend + Docker backend
+### Radio Endpoints *(New)*
+- `GET /radio/status` - Current radio system status
+- `GET /radio/stations` - Get all configured stations
+- `POST /radio/stations/{slot}` - Save station to slot (1-3)
+- `POST /radio/volume` - Set volume level
+- `WS /ws/radio` - Real-time radio updates
 
 ## 🎯 Raspberry Pi Setup
 
@@ -204,46 +169,14 @@ docker-compose -f compose/docker-compose.prod.yml up -d
 
 2. **Deploy application:**
    ```bash
-   git clone <repo-url> radio-wifi
-   cd radio-wifi
+   git clone <repo-url> radio001
+   cd radio001
    docker-compose -f compose/docker-compose.prod.yml up -d
    ```
 
-3. **Configure as access point:**
-   ```bash
-   sudo ./scripts/setup-pi.sh
-   ```
-
-## 🔍 Troubleshooting
-
-### ARM64 Issues (Solved!)
-- ❌ **Problem**: `oxc-parser` no ARM64 binaries
-- ✅ **Solution**: Use SvelteKit (no oxc-parser dependency)
-
-### Development Issues
-```bash
-# Reset everything
-docker-compose -f compose/docker-compose.yml down -v
-cd frontend && rm -rf node_modules && npm install
-docker-compose -f compose/docker-compose.yml up --build
-```
-
-### Backend Issues  
-```bash
-# Check backend logs
-docker-compose -f compose/docker-compose.yml logs radio-backend
-
-# Restart backend
-docker-compose -f compose/docker-compose.yml restart radio-backend
-```
-
-## 📚 Documentation
-
-- [Development Guide](./docs/DEVELOPMENT.md)
-- [SvelteKit Migration](./docs/SVELTEKIT-MIGRATION.md)
-- [Deployment Guide](./docs/DEPLOYMENT.md)  
-- [Troubleshooting](./docs/TROUBLESHOOTING.md)
-- [Workflow Guide](./docs/WORKFLOW.md)
+3. **Access via:**
+   - **Web Interface**: http://radio.local or http://[pi-ip]
+   - **Hardware Controls**: 3 buttons + rotary encoder
 
 ## 🤝 Contributing
 
@@ -257,15 +190,8 @@ docker-compose -f compose/docker-compose.yml restart radio-backend
 
 MIT License - see [LICENSE](./LICENSE) file for details.
 
-## 🙏 Acknowledgments
-
-- [SvelteKit](https://kit.svelte.dev) - Amazing frontend framework
-- [FastAPI](https://fastapi.tiangolo.com) - Fast and reliable backend
-- [Tailwind CSS](https://tailwindcss.com) - Utility-first CSS framework
-- [RaspiWiFi](https://github.com/jasbur/RaspiWifi) - Inspiration for Pi WiFi setup
-
 ---
 
 **Made with ❤️ for Raspberry Pi developers**
 
-*No more ARM64 oxc-parser headaches! 🎉*
+*Unified WiFi + Radio system with no ARM64 compatibility issues! 🎉*

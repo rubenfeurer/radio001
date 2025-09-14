@@ -15,11 +15,11 @@ from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, status, BackgroundTasks
 from fastapi.responses import JSONResponse
 
-from ...core.models import (
+from core.models import (
     SystemStatus, VolumeUpdate, ApiResponse,
     PlaybackStatus, HardwareStatus
 )
-from ...core.radio_manager import RadioManager
+from core.radio_manager import RadioManager
 
 logger = logging.getLogger(__name__)
 

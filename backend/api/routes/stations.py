@@ -14,11 +14,11 @@ from typing import Dict, Optional
 from fastapi import APIRouter, HTTPException, status, BackgroundTasks
 from fastapi.responses import JSONResponse
 
-from ...core.models import (
+from core.models import (
     RadioStation, StationRequest, StationsResponse,
     ApiResponse, SystemStatus
 )
-from ...core.radio_manager import RadioManager
+from core.radio_manager import RadioManager
 
 logger = logging.getLogger(__name__)
 
