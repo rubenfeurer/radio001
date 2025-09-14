@@ -502,7 +502,7 @@ class TestWebSocketRoutes:
         )
 
         # Should be serializable to JSON
-        serialized = message.dict()
+        serialized = message.model_dump()
         assert serialized["type"] == "test_message"
         assert serialized["data"]["volume"] == 75
         assert serialized["timestamp"] == 1703123456.789

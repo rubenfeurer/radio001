@@ -23,34 +23,19 @@ from core.models import RadioStation, StationRequest
 class TestStationManager:
     """Test StationManager functionality in isolation."""
 
-    @pytest.fixture
-    async def station_manager(self, temp_data_dir):
-        """Create station manager for testing."""
+    async def test_initialization(self, temp_data_dir):
+        """Test station manager initialization."""
+        from core.station_manager import StationManager
+
         stations_file = temp_data_dir / "data" / "test_stations.json"
         manager = StationManager(stations_file)
         await manager.initialize()
-        return manager
 
-    @pytest.fixture
-    def sample_station_request(self):
-        """Sample station request for testing."""
-        return StationRequest(
-            name="Test Station",
-            url="https://test.example.com/stream",
-            country="Test Country",
-            location="Test City",
-            genre="Test Genre",
-            bitrate="128k",
-            language="English"
-        )
-
-    async def test_initialization(self, station_manager):
-        """Test station manager initialization."""
-        assert station_manager is not None
-        assert station_manager._stations is not None
+        assert manager is not None
+        assert manager._stations is not None
 
         # Should have 3 slots
-        stations = await station_manager.get_all_stations()
+        stations = await manager.get_all_stations()
         assert isinstance(stations, dict)
         assert len(stations) == 3
         assert all(slot in stations for slot in [1, 2, 3])

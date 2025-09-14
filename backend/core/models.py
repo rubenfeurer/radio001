@@ -10,7 +10,7 @@ This module defines the Pydantic models used throughout the radio system:
 """
 
 from typing import Optional, Dict, Any, Literal
-from pydantic import BaseModel, Field, validator, HttpUrl
+from pydantic import BaseModel, Field, field_validator, HttpUrl, ConfigDict
 from enum import Enum
 
 
@@ -35,15 +35,16 @@ class RadioStation(BaseModel):
     bitrate: Optional[str] = Field(None, max_length=20, description="Stream bitrate")
     language: Optional[str] = Field(None, max_length=30, description="Broadcast language")
 
-    @validator('url')
-    def validate_url(cls, v):
+    @field_validator('url')
+    @classmethod
+    def validate_url(cls, v: str) -> str:
         """Ensure URL is valid for streaming"""
         if not v.startswith(('http://', 'https://')):
             raise ValueError('URL must start with http:// or https://')
         return v
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra = {
             "example": {
                 "name": "Jazz FM",
                 "url": "https://jazz-icy.streamguys1.com/live",
@@ -55,6 +56,7 @@ class RadioStation(BaseModel):
                 "language": "English"
             }
         }
+    )
 
 
 class SystemStatus(BaseModel):
@@ -108,8 +110,9 @@ class StationRequest(BaseModel):
     bitrate: Optional[str] = Field(None, max_length=20, description="Stream bitrate")
     language: Optional[str] = Field(None, max_length=30, description="Broadcast language")
 
-    @validator('url')
-    def validate_url(cls, v):
+    @field_validator('url')
+    @classmethod
+    def validate_url(cls, v: str) -> str:
         """Ensure URL is valid for streaming"""
         if not v.startswith(('http://', 'https://')):
             raise ValueError('URL must start with http:// or https://')

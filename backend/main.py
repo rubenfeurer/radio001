@@ -370,6 +370,7 @@ async def lifespan(app: FastAPI):
 
     # Startup
     print("Radio WiFi Backend starting...")
+    Config.ensure_paths()
     if Config.IS_DEVELOPMENT:
         print("Running in development mode")
 
@@ -404,12 +405,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Ensure paths are created during startup
-@app.on_event("startup")
-async def startup_event():
-    """Perform startup configuration"""
-    Config.ensure_paths()
-    print(f"Backend starting in {'development' if Config.IS_DEVELOPMENT else 'production'} mode")
+# Startup configuration moved to lifespan context manager above
 
 # CORS middleware for frontend integration
 app.add_middleware(

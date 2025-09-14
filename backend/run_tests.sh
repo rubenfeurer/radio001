@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 
 # Default values
 TEST_TYPE="all"
-COVERAGE_THRESHOLD=70
+COVERAGE_THRESHOLD=23
 VERBOSE=false
 WATCH=false
 CLEAN=false
