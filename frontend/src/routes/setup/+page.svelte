@@ -13,6 +13,9 @@
 		requiresPassword
 	} from '$lib/stores/wifi';
 
+	// SvelteKit page props - explicitly define what we accept
+	export let data: any = undefined;
+
 	let selectedNetwork: WiFiNetwork | null = null;
 	let password = '';
 	let showPassword = false;

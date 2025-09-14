@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+
+	// SvelteKit page props - explicitly define what we accept
+	export let data: any = undefined;
 </script>
 
 <svelte:head>

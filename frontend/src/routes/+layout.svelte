@@ -2,6 +2,9 @@
 	import '../app.postcss';
 	import { onMount } from 'svelte';
 
+	// SvelteKit layout props - explicitly define what we accept
+	export let data: any = undefined;
+
 	// Dark mode management
 	let darkMode = false;
 

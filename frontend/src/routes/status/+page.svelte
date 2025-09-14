@@ -3,6 +3,9 @@
 	import { goto } from '$app/navigation';
 	import { status, getStatus, isLoading, error } from '$lib/stores/wifi';
 
+	// SvelteKit page props - explicitly define what we accept
+	export let data: any = undefined;
+
 	onMount(() => {
 		getStatus();
 		const interval = setInterval(getStatus, 10000);
@@ -116,40 +119,40 @@
 					<div class="flex justify-between items-center">
 						<span class="text-sm text-gray-600 dark:text-gray-400">WiFi Status:</span>
 						<span class="text-sm font-medium"
-							class:text-green-600={$status.network.wifi.status === 'connected'}
-							class:text-yellow-600={$status.network.wifi.status === 'connecting'}
-							class:text-red-600={$status.network.wifi.status === 'disconnected'}>
-							{$status.network.wifi.status}
+							class:text-green-600={$status?.network?.wifi?.status === 'connected'}
+							class:text-yellow-600={$status?.network?.wifi?.status === 'connecting'}
+							class:text-red-600={$status?.network?.wifi?.status === 'disconnected'}>
+							{$status?.network?.wifi?.status || 'Unknown'}
 						</span>
 					</div>
-					{#if $status.network.wifi.ssid}
+					{#if $status?.network?.wifi?.ssid}
 						<div class="flex justify-between items-center">
 							<span class="text-sm text-gray-600 dark:text-gray-400">Network:</span>
 							<span class="text-sm font-medium text-gray-900 dark:text-white">
-								{$status.network.wifi.ssid}
+								{$status?.network?.wifi?.ssid}
 							</span>
 						</div>
 					{/if}
-					{#if $status.network.wifi.ip}
+					{#if $status?.network?.wifi?.ip}
 						<div class="flex justify-between items-center">
 							<span class="text-sm text-gray-600 dark:text-gray-400">IP Address:</span>
 							<span class="text-sm font-mono text-gray-900 dark:text-white">
-								{$status.network.wifi.ip}
+								{$status?.network?.wifi?.ip}
 							</span>
 						</div>
 					{/if}
-					{#if $status.network.wifi.signal}
+					{#if $status?.network?.wifi?.signal}
 						<div class="flex justify-between items-center">
 							<span class="text-sm text-gray-600 dark:text-gray-400">Signal:</span>
 							<span class="text-sm font-medium text-gray-900 dark:text-white">
-								{$status.network.wifi.signal}%
+								{$status?.network?.wifi?.signal}%
 							</span>
 						</div>
 					{/if}
 					<div class="flex justify-between items-center">
 						<span class="text-sm text-gray-600 dark:text-gray-400">Mode:</span>
 						<span class="text-sm font-medium text-gray-900 dark:text-white">
-							{$status.network.wifi.mode}
+							{$status?.network?.wifi?.mode || 'Unknown'}
 						</span>
 					</div>
 				</div>

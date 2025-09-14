@@ -14,13 +14,10 @@ export const error = writable<string | null>(null);
 export const lastScanTime = writable<number | null>(null);
 
 // Derived stores (computed values)
-export const currentNetwork = derived(
-	[status, networks],
-	([$status, $networks]) => {
-		if (!$status?.network.wifi.ssid) return null;
-		return $networks.find(network => network.ssid === $status.network.wifi.ssid);
-	}
-);
+export const currentNetwork = derived([status, networks], ([$status, $networks]) => {
+	if (!$status?.network.wifi.ssid) return null;
+	return $networks.find((network) => network.ssid === $status.network.wifi.ssid);
+});
 
 export const isConnected = derived(
 	status,
@@ -32,13 +29,10 @@ export const isInHotspotMode = derived(
 	($status) => $status?.network.wifi.mode === 'hotspot'
 );
 
-export const isScanOutdated = derived(
-	lastScanTime,
-	($lastScanTime) => {
-		if (!$lastScanTime) return true;
-		return Date.now() - $lastScanTime > 60000; // 1 minute
-	}
-);
+export const isScanOutdated = derived(lastScanTime, ($lastScanTime) => {
+	if (!$lastScanTime) return true;
+	return Date.now() - $lastScanTime > 60000; // 1 minute
+});
 
 // Helper functions
 const setError = (message: string) => {
@@ -61,7 +55,16 @@ export const scanNetworks = async () => {
 		const result: ApiResponse = await response.json();
 
 		if (result.success && result.data) {
-			networks.set(result.data as WiFiNetwork[]);
+			// Transform backend network data to expected format
+			const backendData = result.data as any[];
+			const wifiNetworks: WiFiNetwork[] = backendData.map((network) => ({
+				ssid: network.ssid,
+				signal: network.signal,
+				security: network.encryption as WiFiNetwork['security'],
+				frequency: network.frequency,
+				connected: false
+			}));
+			networks.set(wifiNetworks);
 			lastScanTime.set(Date.now());
 		} else {
 			throw new Error(result.message || 'Failed to scan networks');
@@ -131,7 +134,26 @@ export const getStatus = async () => {
 		const result: ApiResponse = await response.json();
 
 		if (result.success && result.data) {
-			status.set(result.data as SystemStatus);
+			// Transform backend response to expected SystemStatus structure
+			const backendData = result.data as any;
+			const systemStatus: SystemStatus = {
+				hostname: 'radio', // Default value
+				uptime: 0,
+				memory: { total: 0, used: 0, free: 0 },
+				cpu: { load: 0 },
+				network: {
+					wifi: {
+						wifiInterface: 'wlan0',
+						status: backendData.connected ? 'connected' : 'disconnected',
+						ssid: backendData.ssid || undefined,
+						ip: backendData.ip_address || undefined,
+						signal: backendData.signal_strength || undefined,
+						mode: backendData.mode === 'host' ? 'hotspot' : 'client'
+					}
+				},
+				services: {}
+			};
+			status.set(systemStatus);
 		} else {
 			throw new Error(result.message || 'Failed to get status');
 		}
@@ -187,7 +209,7 @@ export const resetToHotspot = async (): Promise<boolean> => {
 
 // Utility functions
 export const getNetworkBySSID = (ssid: string): WiFiNetwork | undefined => {
-	return get(networks).find(network => network.ssid === ssid);
+	return get(networks).find((network) => network.ssid === ssid);
 };
 
 export const requiresPassword = (network: WiFiNetwork): boolean => {
