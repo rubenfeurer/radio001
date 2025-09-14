@@ -7,6 +7,8 @@ services:
     build:
       context: ../backend
       dockerfile: Dockerfile
+      args:
+        INSTALL_TEST_DEPS: "true"
     platform: linux/amd64
     container_name: radio-backend-ci
     hostname: radio-backend
@@ -28,6 +30,10 @@ services:
       - PYTHONDONTWRITEBYTECODE=1
       - PIP_NO_CACHE_DIR=1
       - DEBUG=0
+
+      # Test environment
+      - MOCK_HARDWARE=true
+      - PYTHONPATH=/app
     networks:
       - radio-network
     healthcheck:

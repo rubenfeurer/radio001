@@ -25,11 +25,20 @@ WORKDIR /app
 RUN groupadd -r radio && useradd -r -g radio radio
 
 # Copy requirements and install Python dependencies
-COPY requirements.txt .
+COPY requirements.txt requirements-test.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Install test dependencies for development/CI environments
+ARG INSTALL_TEST_DEPS=false
+RUN if [ "$INSTALL_TEST_DEPS" = "true" ]; then \
+        pip install --no-cache-dir -r requirements-test.txt; \
+    fi
 
 # Copy application code
 COPY . .
+
+# Create necessary directories for testing
+RUN mkdir -p /app/data /app/sounds /app/logs /app/htmlcov
 
 # Change ownership to radio user
 RUN chown -R radio:radio /app
@@ -45,7 +54,10 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Set environment variables
-ENV API_PORT=8000
+ENV API_PORT=8000 \
+    NODE_ENV=production \
+    MOCK_HARDWARE=false \
+    PYTHONPATH=/app
 
 # Start the FastAPI application
 CMD ["python", "main.py"]

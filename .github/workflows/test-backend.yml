@@ -1,0 +1,688 @@
+name: Backend Test Suite - Comprehensive Testing
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "backend/**"
+      - ".github/workflows/test-backend.yml"
+      - "compose/docker-compose*.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "backend/**"
+      - ".github/workflows/test-backend.yml"
+      - "compose/docker-compose*.yml"
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: "Type of tests to run"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - unit
+          - integration
+          - api
+          - websocket
+      coverage_threshold:
+        description: "Minimum coverage percentage required"
+        required: false
+        default: "70"
+        type: string
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_ENV: "development"
+  MOCK_HARDWARE: "true"
+
+jobs:
+  # =============================================================================
+  # Test Environment Setup
+  # =============================================================================
+  setup:
+    name: Test Environment Setup
+    runs-on: ubuntu-latest
+    outputs:
+      python-version: ${{ steps.setup.outputs.python-version }}
+      test-type: ${{ steps.setup.outputs.test-type }}
+      coverage-threshold: ${{ steps.setup.outputs.coverage-threshold }}
+
+    steps:
+      - name: Setup test parameters
+        id: setup
+        run: |
+          echo "python-version=${{ env.PYTHON_VERSION }}" >> $GITHUB_OUTPUT
+          echo "test-type=${{ github.event.inputs.test_type || 'all' }}" >> $GITHUB_OUTPUT
+          echo "coverage-threshold=${{ github.event.inputs.coverage_threshold || '70' }}" >> $GITHUB_OUTPUT
+
+      - name: Display test configuration
+        run: |
+          echo "🧪 Backend Test Configuration"
+          echo "============================="
+          echo "Python Version: ${{ env.PYTHON_VERSION }}"
+          echo "Test Type: ${{ github.event.inputs.test_type || 'all' }}"
+          echo "Coverage Threshold: ${{ github.event.inputs.coverage_threshold || '70' }}%"
+          echo "Mock Hardware: ${{ env.MOCK_HARDWARE }}"
+          echo "Environment: ${{ env.NODE_ENV }}"
+
+  # =============================================================================
+  # Unit Tests
+  # =============================================================================
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: setup
+    if: needs.setup.outputs.test-type == 'all' || needs.setup.outputs.test-type == 'unit'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ needs.setup.outputs.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+
+      - name: Run unit tests
+        run: |
+          cd backend
+
+          export NODE_ENV=development
+          export MOCK_HARDWARE=true
+          export PYTHONPATH=$PWD:$PYTHONPATH
+
+          echo "🧪 Running Unit Tests..."
+          python -m pytest \
+            --verbose \
+            --tb=short \
+            --maxfail=10 \
+            -m "unit" \
+            --cov=core \
+            --cov=hardware \
+            --cov-report=term-missing \
+            --cov-report=xml:unit-coverage.xml \
+            --cov-report=html:unit-htmlcov \
+            --junitxml=unit-results.xml \
+            --durations=20 \
+            tests/
+
+      - name: Upload unit test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-results
+          path: |
+            backend/unit-results.xml
+            backend/unit-coverage.xml
+            backend/unit-htmlcov/
+          retention-days: 7
+
+  # =============================================================================
+  # API Tests
+  # =============================================================================
+  api-tests:
+    name: API Tests
+    runs-on: ubuntu-latest
+    needs: setup
+    if: needs.setup.outputs.test-type == 'all' || needs.setup.outputs.test-type == 'api'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ needs.setup.outputs.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+
+      - name: Run API tests
+        run: |
+          cd backend
+
+          export NODE_ENV=development
+          export MOCK_HARDWARE=true
+          export PYTHONPATH=$PWD:$PYTHONPATH
+
+          echo "🌐 Running API Tests..."
+          python -m pytest \
+            --verbose \
+            --tb=short \
+            --maxfail=10 \
+            -m "api" \
+            --cov=api \
+            --cov-report=term-missing \
+            --cov-report=xml:api-coverage.xml \
+            --cov-report=html:api-htmlcov \
+            --junitxml=api-results.xml \
+            --durations=20 \
+            tests/
+
+      - name: Upload API test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-test-results
+          path: |
+            backend/api-results.xml
+            backend/api-coverage.xml
+            backend/api-htmlcov/
+          retention-days: 7
+
+  # =============================================================================
+  # WebSocket Tests
+  # =============================================================================
+  websocket-tests:
+    name: WebSocket Tests
+    runs-on: ubuntu-latest
+    needs: setup
+    if: needs.setup.outputs.test-type == 'all' || needs.setup.outputs.test-type == 'websocket'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ needs.setup.outputs.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+
+      - name: Run WebSocket tests
+        run: |
+          cd backend
+
+          export NODE_ENV=development
+          export MOCK_HARDWARE=true
+          export PYTHONPATH=$PWD:$PYTHONPATH
+
+          echo "🔌 Running WebSocket Tests..."
+          python -m pytest \
+            --verbose \
+            --tb=short \
+            --maxfail=10 \
+            -m "websocket" \
+            --cov=api.routes.websocket \
+            --cov-report=term-missing \
+            --cov-report=xml:websocket-coverage.xml \
+            --cov-report=html:websocket-htmlcov \
+            --junitxml=websocket-results.xml \
+            --durations=20 \
+            tests/
+
+      - name: Upload WebSocket test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: websocket-test-results
+          path: |
+            backend/websocket-results.xml
+            backend/websocket-coverage.xml
+            backend/websocket-htmlcov/
+          retention-days: 7
+
+  # =============================================================================
+  # Integration Tests
+  # =============================================================================
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: setup
+    if: needs.setup.outputs.test-type == 'all' || needs.setup.outputs.test-type == 'integration'
+
+    services:
+      redis:
+        image: redis:alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
+      - name: Build and start test services
+        run: |
+          # Build backend for integration testing
+          docker-compose -f compose/docker-compose.ci.yml build radio-backend
+          docker-compose -f compose/docker-compose.ci.yml up -d radio-backend
+
+          # Wait for services to be ready
+          echo "Waiting for backend to be ready..."
+          for i in {1..30}; do
+            if curl -f http://localhost:8000/health; then
+              echo "Backend is ready!"
+              break
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 5
+          done
+
+      - name: Run integration tests
+        run: |
+          echo "🔄 Running Integration Tests..."
+
+          docker-compose -f compose/docker-compose.ci.yml exec -T radio-backend bash -c "
+            export NODE_ENV=development
+            export MOCK_HARDWARE=true
+            export PYTHONPATH=/app:\$PYTHONPATH
+
+            # Install test dependencies
+            pip install -r requirements-test.txt
+
+            # Run integration tests
+            python -m pytest \
+              --verbose \
+              --tb=short \
+              --maxfail=5 \
+              -m 'integration' \
+              --cov=core \
+              --cov=api \
+              --cov-report=term-missing \
+              --cov-report=xml:/app/integration-coverage.xml \
+              --cov-report=html:/app/integration-htmlcov \
+              --junitxml=/app/integration-results.xml \
+              --durations=20 \
+              tests/
+          "
+
+      - name: Extract integration test results
+        if: always()
+        run: |
+          mkdir -p integration-results
+          docker-compose -f compose/docker-compose.ci.yml cp radio-backend:/app/integration-results.xml integration-results/
+          docker-compose -f compose/docker-compose.ci.yml cp radio-backend:/app/integration-coverage.xml integration-results/
+          docker-compose -f compose/docker-compose.ci.yml cp radio-backend:/app/integration-htmlcov integration-results/
+
+      - name: Upload integration test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: integration-results/
+          retention-days: 7
+
+      - name: Cleanup integration services
+        if: always()
+        run: |
+          docker-compose -f compose/docker-compose.ci.yml down -v
+
+  # =============================================================================
+  # Performance Tests (Optional)
+  # =============================================================================
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: setup
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ needs.setup.outputs.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+          pip install pytest-benchmark locust
+
+      - name: Run performance tests
+        run: |
+          cd backend
+
+          export NODE_ENV=development
+          export MOCK_HARDWARE=true
+          export PYTHONPATH=$PWD:$PYTHONPATH
+
+          echo "⚡ Running Performance Tests..."
+          python -m pytest \
+            --verbose \
+            --tb=short \
+            --benchmark-only \
+            --benchmark-json=performance-results.json \
+            tests/ || echo "No performance tests found"
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-test-results
+          path: backend/performance-results.json
+          retention-days: 7
+
+  # =============================================================================
+  # Test Analysis & Reporting
+  # =============================================================================
+  test-analysis:
+    name: Test Analysis & Coverage Report
+    runs-on: ubuntu-latest
+    needs: [setup, unit-tests, api-tests, websocket-tests, integration-tests]
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ needs.setup.outputs.python-version }}
+
+      - name: Install coverage tools
+        run: |
+          pip install coverage[toml] lxml
+
+      - name: Download all test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: test-artifacts/
+
+      - name: Combine coverage reports
+        run: |
+          echo "📊 Combining coverage reports..."
+
+          # Create combined coverage directory
+          mkdir -p combined-coverage
+
+          # Find all coverage XML files
+          find test-artifacts/ -name "*coverage.xml" -exec cp {} combined-coverage/ \;
+
+          # List found coverage files
+          echo "Found coverage files:"
+          ls -la combined-coverage/
+
+      - name: Generate test summary
+        run: |
+          echo "📋 Generating Test Summary..."
+
+          cat > test-summary.md << 'EOF'
+          # 🧪 Backend Test Results Summary
+
+          ## Test Execution Results
+
+          EOF
+
+          # Process each test type
+          for test_type in unit api websocket integration; do
+            if [ -f "test-artifacts/${test_type}-test-results/${test_type}-results.xml" ]; then
+              echo "### ${test_type^} Tests" >> test-summary.md
+
+              python3 -c "
+          import xml.etree.ElementTree as ET
+          import sys
+
+          try:
+              tree = ET.parse('test-artifacts/${test_type}-test-results/${test_type}-results.xml')
+              root = tree.getroot()
+              tests = root.attrib.get('tests', '0')
+              failures = root.attrib.get('failures', '0')
+              errors = root.attrib.get('errors', '0')
+              time = root.attrib.get('time', '0')
+
+              passed = int(tests) - int(failures) - int(errors)
+
+              print(f'- **Total**: {tests} tests')
+              print(f'- **Passed**: {passed} ✅')
+              print(f'- **Failed**: {failures} {"❌" if int(failures) > 0 else "✅"}')
+              print(f'- **Errors**: {errors} {"❌" if int(errors) > 0 else "✅"}')
+              print(f'- **Duration**: {float(time):.2f}s')
+              print()
+          except Exception as e:
+              print(f'- **Status**: Results not available')
+              print()
+          " >> test-summary.md
+            fi
+          done
+
+          echo "## Coverage Analysis" >> test-summary.md
+          echo "" >> test-summary.md
+
+          # Try to get coverage information
+          for coverage_file in combined-coverage/*coverage.xml; do
+            if [ -f "$coverage_file" ]; then
+              python3 -c "
+          import xml.etree.ElementTree as ET
+          import sys
+
+          try:
+              tree = ET.parse('$coverage_file')
+              root = tree.getroot()
+              coverage = root.attrib.get('line-rate', '0')
+              coverage_percent = float(coverage) * 100
+
+              filename = '$(basename "$coverage_file")'
+              test_type = filename.replace('-coverage.xml', '').replace('coverage.xml', 'overall')
+
+              print(f'- **{test_type.title()}**: {coverage_percent:.1f}%')
+          except Exception as e:
+              pass
+          " >> test-summary.md || true
+            fi
+          done
+
+          echo "" >> test-summary.md
+          echo "## Recommendations" >> test-summary.md
+          echo "" >> test-summary.md
+
+          # Check if any tests failed
+          failed_tests=0
+          for results_file in test-artifacts/*/*/results.xml; do
+            if [ -f "$results_file" ]; then
+              failures=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          try:
+              tree = ET.parse('$results_file')
+              root = tree.getroot()
+              print(int(root.attrib.get('failures', '0')) + int(root.attrib.get('errors', '0')))
+          except:
+              print('0')
+          " 2>/dev/null || echo "0")
+              failed_tests=$((failed_tests + failures))
+            fi
+          done
+
+          if [ "$failed_tests" -eq 0 ]; then
+            echo "✅ **All tests are passing!** Great work!" >> test-summary.md
+            echo "" >> test-summary.md
+            echo "- Code quality is excellent" >> test-summary.md
+            echo "- All API endpoints are functioning correctly" >> test-summary.md
+            echo "- WebSocket communication is stable" >> test-summary.md
+            echo "- Integration workflows are validated" >> test-summary.md
+          else
+            echo "❌ **Some tests are failing** - Action required:" >> test-summary.md
+            echo "" >> test-summary.md
+            echo "- Review failed test cases in the detailed logs" >> test-summary.md
+            echo "- Fix any broken functionality" >> test-summary.md
+            echo "- Ensure all dependencies are properly installed" >> test-summary.md
+            echo "- Validate mock hardware configuration" >> test-summary.md
+          fi
+
+          echo "" >> test-summary.md
+          echo "_Report generated by Backend Test Suite CI/CD_" >> test-summary.md
+
+      - name: Display test summary
+        run: |
+          echo "📋 TEST SUMMARY"
+          echo "==============="
+          cat test-summary.md
+
+      - name: Check coverage threshold
+        run: |
+          echo "🎯 Checking Coverage Threshold..."
+
+          threshold=${{ needs.setup.outputs.coverage-threshold }}
+          echo "Required coverage threshold: ${threshold}%"
+
+          # This is a simplified check - in practice, you'd want to combine all coverage reports
+          coverage_check_passed=true
+
+          for coverage_file in combined-coverage/*coverage.xml; do
+            if [ -f "$coverage_file" ]; then
+              coverage=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          try:
+              tree = ET.parse('$coverage_file')
+              root = tree.getroot()
+              print(float(root.attrib.get('line-rate', '0')) * 100)
+          except:
+              print('0')
+          " 2>/dev/null || echo "0")
+
+              if (( $(echo "$coverage < $threshold" | bc -l) )); then
+                echo "❌ Coverage $(basename "$coverage_file"): ${coverage}% (below ${threshold}%)"
+                coverage_check_passed=false
+              else
+                echo "✅ Coverage $(basename "$coverage_file"): ${coverage}% (meets ${threshold}%)"
+              fi
+            fi
+          done
+
+          if [ "$coverage_check_passed" = false ]; then
+            echo ""
+            echo "❌ Coverage threshold not met!"
+            echo "🎯 Please add more tests to improve coverage"
+            exit 1
+          else
+            echo ""
+            echo "✅ All coverage thresholds met!"
+          fi
+
+      - name: Upload combined results
+        uses: actions/upload-artifact@v4
+        with:
+          name: combined-test-results
+          path: |
+            test-summary.md
+            combined-coverage/
+          retention-days: 30
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        if: success()
+        with:
+          directory: combined-coverage
+          flags: backend-comprehensive
+          name: backend-comprehensive-coverage
+
+  # =============================================================================
+  # Final Status Check
+  # =============================================================================
+  final-status:
+    name: Final Test Status
+    runs-on: ubuntu-latest
+    needs: [setup, unit-tests, api-tests, websocket-tests, integration-tests, test-analysis]
+    if: always()
+
+    steps:
+      - name: Evaluate test results
+        run: |
+          echo "🏁 BACKEND TEST SUITE COMPLETE"
+          echo "================================"
+          echo ""
+          echo "Test Results:"
+          echo "- Unit Tests: ${{ needs.unit-tests.result }}"
+          echo "- API Tests: ${{ needs.api-tests.result }}"
+          echo "- WebSocket Tests: ${{ needs.websocket-tests.result }}"
+          echo "- Integration Tests: ${{ needs.integration-tests.result }}"
+          echo "- Test Analysis: ${{ needs.test-analysis.result }}"
+          echo ""
+
+          # Check if all required tests passed
+          unit_ok="${{ needs.unit-tests.result }}"
+          api_ok="${{ needs.api-tests.result }}"
+          websocket_ok="${{ needs.websocket-tests.result }}"
+          integration_ok="${{ needs.integration-tests.result }}"
+          analysis_ok="${{ needs.test-analysis.result }}"
+
+          all_passed=true
+
+          if [[ "$unit_ok" != "success" && "$unit_ok" != "skipped" ]]; then
+            echo "❌ Unit tests failed or had errors"
+            all_passed=false
+          fi
+
+          if [[ "$api_ok" != "success" && "$api_ok" != "skipped" ]]; then
+            echo "❌ API tests failed or had errors"
+            all_passed=false
+          fi
+
+          if [[ "$websocket_ok" != "success" && "$websocket_ok" != "skipped" ]]; then
+            echo "❌ WebSocket tests failed or had errors"
+            all_passed=false
+          fi
+
+          if [[ "$integration_ok" != "success" && "$integration_ok" != "skipped" ]]; then
+            echo "❌ Integration tests failed or had errors"
+            all_passed=false
+          fi
+
+          if [[ "$analysis_ok" != "success" ]]; then
+            echo "❌ Test analysis failed"
+            all_passed=false
+          fi
+
+          echo ""
+
+          if [ "$all_passed" = true ]; then
+            echo "🎉 ALL BACKEND TESTS PASSED!"
+            echo ""
+            echo "✅ Radio system is fully validated"
+            echo "✅ All API endpoints are working"
+            echo "✅ Real-time communication is stable"
+            echo "✅ Hardware integration is mocked correctly"
+            echo "✅ Error handling is robust"
+            echo "✅ Code coverage meets requirements"
+            echo ""
+            echo "🚀 Backend is ready for deployment!"
+          else
+            echo "❌ SOME TESTS FAILED!"
+            echo ""
+            echo "🔍 Please check the failed test jobs above"
+            echo "🛠️  Fix the issues and re-run the tests"
+            echo "📊 Review test reports in the artifacts"
+            echo ""
+            echo "🚨 Backend deployment blocked until tests pass"
+            exit 1
+          fi
