@@ -120,7 +120,7 @@ async def save_station(slot: int, station_request: StationRequest):
             message=f"Station '{saved_station.name}' saved to slot {slot}",
             data={
                 "slot": slot,
-                "station": saved_station.dict()
+                "station": saved_station.model_dump()
             }
         )
 

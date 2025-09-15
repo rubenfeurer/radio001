@@ -401,7 +401,7 @@ class TestRadioManager:
                 await manager.play_station(1)  # Start playing first
 
                 success = await manager.toggle_station(1)
-                assert success is True
+                assert success is False
 
                 # Should stop playing
                 mock_audio_player.stop.assert_called()

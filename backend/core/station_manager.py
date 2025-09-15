@@ -128,7 +128,7 @@ class StationManager:
                 data = {}
                 for slot, station in self._stations.items():
                     if station:
-                        data[str(slot)] = station.dict()
+                        data[str(slot)] = station.model_dump()
                     else:
                         data[str(slot)] = None
 
@@ -357,7 +357,7 @@ class StationManager:
         """Export all stations for backup purposes."""
         return {
             "export_timestamp": datetime.now().isoformat(),
-            "stations": {str(k): v.dict() if v else None for k, v in self._stations.items()}
+            "stations": {str(k): v.model_dump() if v else None for k, v in self._stations.items()}
         }
 
     async def import_stations(self, data: Dict[str, any]) -> bool:
@@ -371,23 +371,50 @@ class StationManager:
             True if import was successful
         """
         try:
-            async with self._lock:
-                stations_data = data.get("stations", {})
+            # Use asyncio wait_for to prevent hanging
+            async def _import_with_lock():
+                async with self._lock:
+                    stations_data = data.get("stations", {})
 
-                for slot_str, station_data in stations_data.items():
-                    slot = int(slot_str)
-                    if slot in [1, 2, 3]:
-                        if station_data:
-                            station = RadioStation(**station_data)
-                            station.slot = slot
-                            self._stations[slot] = station
-                        else:
-                            self._stations[slot] = None
+                    for slot_str, station_data in stations_data.items():
+                        try:
+                            slot = int(slot_str)
+                            if slot in [1, 2, 3]:
+                                if station_data:
+                                    # Validate required fields before creating station
+                                    if not isinstance(station_data, dict):
+                                        logger.warning(f"Invalid station data for slot {slot}: not a dict")
+                                        continue
 
-                await self._save_stations()
-                logger.info("Stations imported successfully")
-                return True
+                                    if 'name' not in station_data or 'url' not in station_data:
+                                        logger.warning(f"Missing required fields for slot {slot}")
+                                        continue
 
+                                    # Create a copy of the data and ensure slot is set correctly
+                                    station_dict = dict(station_data)
+                                    station_dict['slot'] = slot
+
+                                    station = RadioStation(**station_dict)
+                                    self._stations[slot] = station
+                                    logger.debug(f"Imported station for slot {slot}: {station.name}")
+                                else:
+                                    self._stations[slot] = None
+                                    logger.debug(f"Cleared slot {slot}")
+                        except (ValueError, TypeError) as e:
+                            logger.warning(f"Failed to process slot {slot_str}: {e}")
+                            continue
+
+                    await self._save_stations()
+                    logger.info("Stations imported successfully")
+                    return True
+
+            # Use wait_for with timeout to prevent hanging
+            await asyncio.wait_for(_import_with_lock(), timeout=10.0)
+            return True
+
+        except asyncio.TimeoutError:
+            logger.error("Import stations operation timed out")
+            return False
         except Exception as e:
             logger.error(f"Error importing stations: {e}", exc_info=True)
             return False

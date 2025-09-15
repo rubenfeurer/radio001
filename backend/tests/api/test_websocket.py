@@ -118,20 +118,21 @@ class TestWebSocketRoutes:
         assert "volume" in status_msg["data"]
         assert "is_playing" in status_msg["data"]
 
-    @patch('api.routes.websocket.ConnectionManager')
-    async def test_connection_manager_connect(self, mock_connection_manager):
+    async def test_connection_manager_connect(self):
         """Test WebSocket connection manager connect."""
-        mock_manager = AsyncMock()
-        mock_connection_manager.return_value = mock_manager
+        from api.routes.websocket import ConnectionManager
 
+        # Use real ConnectionManager but mock websocket
+        manager = ConnectionManager()
         mock_websocket = AsyncMock()
         mock_websocket.client.host = "test-host"
 
         # Test connection
-        await mock_manager.connect(mock_websocket, {"host": "test-host"})
+        await manager.connect(mock_websocket, {"host": "test-host"})
 
-        # Should accept connection
+        # Should accept connection and be added to active connections
         mock_websocket.accept.assert_called_once()
+        assert mock_websocket in manager.active_connections
 
     @patch('api.routes.websocket.ConnectionManager')
     async def test_connection_manager_disconnect(self, mock_connection_manager):
@@ -320,18 +321,25 @@ class TestWebSocketRoutes:
             sent_message = call_args[0][0]
             assert sent_message["type"] == "subscription_confirmed"
 
-    @patch('api.routes.websocket.ConnectionManager')
-    async def test_websocket_connection_cleanup(self, mock_connection_manager):
+    async def test_websocket_connection_cleanup(self):
         """Test WebSocket connection cleanup on disconnect."""
-        mock_manager = AsyncMock()
-        mock_connection_manager.return_value = mock_manager
+        from api.routes.websocket import ConnectionManager
 
-        # Mock failed connections
-        mock_manager.active_connections = {AsyncMock(), AsyncMock()}
-        mock_manager.broadcast.side_effect = Exception("Connection failed")
+        # Use real ConnectionManager
+        manager = ConnectionManager()
 
-        # Test that cleanup happens
-        await mock_manager.broadcast({"type": "test"})
+        # Add mock connections
+        mock_conn1 = AsyncMock()
+        mock_conn2 = AsyncMock()
+        manager.active_connections.add(mock_conn1)
+        manager.active_connections.add(mock_conn2)
+
+        # Test that broadcast works (should not raise exception)
+        await manager.broadcast({"type": "test"})
+
+        # Verify connections were called
+        mock_conn1.send_text.assert_called()
+        mock_conn2.send_text.assert_called()
 
     async def test_websocket_concurrent_connections(self):
         """Test handling of multiple concurrent WebSocket connections."""
@@ -456,7 +464,8 @@ class TestWebSocketRoutes:
 
         with patch('api.routes.websocket.RadioManager') as mock_radio_manager:
             mock_instance = AsyncMock()
-            mock_radio_manager.create_instance.return_value = mock_instance
+            # Fix: create_instance should return the mock instance directly, not as awaitable
+            mock_radio_manager.create_instance = AsyncMock(return_value=mock_instance)
 
             # Test setup function
             result = await setup_radio_manager_with_websocket(
@@ -464,7 +473,7 @@ class TestWebSocketRoutes:
                 mock_mode=True
             )
 
-            # Should create instance with WebSocket callback
+            assert result == mock_instance
             mock_radio_manager.create_instance.assert_called_once()
             call_args = mock_radio_manager.create_instance.call_args
             assert call_args.kwargs["config"] == Config

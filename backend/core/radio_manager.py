@@ -336,7 +336,7 @@ class RadioManager:
             try:
                 message = {
                     "type": update_type,
-                    "data": self._status.dict(),
+                    "data": self._status.model_dump(),
                     "timestamp": time.time()
                 }
                 await self._status_update_callback(message)

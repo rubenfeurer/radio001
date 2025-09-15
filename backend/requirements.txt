@@ -21,6 +21,9 @@ annotated-types>=0.6.0
 python-mpv==1.0.6           # Python MPV bindings for audio playback
 pigpio==1.78                # GPIO control for Raspberry Pi (Pi only)
 
+# HTTP client for URL validation
+aiohttp==3.9.1
+
 # Optional: Development dependencies (install with --dev flag)
 # pytest==7.4.3
 # black==23.11.0

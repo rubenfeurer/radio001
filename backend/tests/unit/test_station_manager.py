@@ -342,7 +342,7 @@ class TestStationManager:
         export_data = await station_manager.export_stations()
         assert isinstance(export_data, dict)
         assert "stations" in export_data
-        assert "metadata" in export_data or "timestamp" in export_data
+        assert "export_timestamp" in export_data
 
     async def test_import_stations(self, station_manager):
         """Test importing stations from backup."""
