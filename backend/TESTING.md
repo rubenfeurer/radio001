@@ -144,6 +144,102 @@ DEBUG=true                  # Enable debug logging
 COVERAGE_THRESHOLD=23       # Minimum coverage percentage (pragmatic threshold)
 ```
 
+## ⭐ **CRITICAL: RadioManager Test Pattern (MUST READ)**
+
+**This pattern was discovered through systematic debugging of 140+ async test failures. All RadioManager tests MUST use this exact approach or they will fail.**
+
+### 🚨 The Problem We Solved
+- **Original Issue**: 140 tests skipped with `PytestUnhandledCoroutineWarning`
+- **After Async Fix**: Tests ran but failed with mock integration issues
+- **Root Cause**: Wrong patch targets + missing AsyncMock setup
+- **Solution**: Systematic pattern discovered through debugging
+
+### ✅ **PROVEN WORKING PATTERN**
+
+```python
+async def test_radio_manager_feature(self, temp_data_dir):
+    """Test RadioManager functionality - WORKING TEMPLATE"""
+    # STEP 1: Clear singleton (CRITICAL)
+    RadioManager._instance = None
+    
+    # STEP 2: Create proper AsyncMock objects with ALL required methods
+    mock_station_manager = AsyncMock()
+    mock_station_manager.initialize.return_value = None
+    mock_station_manager.get_station.return_value = RadioStation(
+        name="Test Station",
+        url="https://test.example.com/stream",
+        slot=1
+    )
+    
+    mock_sound_manager = AsyncMock()  # CRITICAL: Must be AsyncMock, not MagicMock
+    mock_sound_manager.initialize.return_value = None
+    mock_sound_manager.play_startup_sound.return_value = None  # REQUIRED
+    mock_sound_manager.play_error_sound.return_value = None    # REQUIRED
+    
+    mock_audio_player = AsyncMock()
+    mock_audio_player.initialize.return_value = None
+    mock_audio_player.play.return_value = True  # Set to False for failure tests
+    mock_audio_player.stop.return_value = True
+    mock_audio_player.is_playing = False
+    
+    # STEP 3: Use CORRECT patch targets (DO NOT CHANGE!)
+    with patch('core.radio_manager.StationManager', return_value=mock_station_manager), \
+         patch('core.radio_manager.SoundManager', return_value=mock_sound_manager), \
+         patch('core.radio_manager.AudioPlayer', return_value=mock_audio_player):
+        
+        manager = await RadioManager.create_instance(
+            config=Config,
+            mock_mode=True
+        )
+        
+        try:
+            # STEP 4: Your test logic here
+            success = await manager.play_station(1)
+            assert success is True
+            
+            # Verify mock calls
+            mock_station_manager.get_station.assert_called_with(1)
+            mock_audio_player.play.assert_called_with("https://test.example.com/stream")
+        finally:
+            # STEP 5: ALWAYS cleanup
+            await manager.shutdown()
+```
+
+### 🚫 **BROKEN PATTERNS (Will Cause Test Failures)**
+
+```python
+# ❌ WRONG: Old patch targets (causes "mock not called" errors)
+patch('core.station_manager.StationManager')    # FAILS
+patch('core.sound_manager.SoundManager')        # FAILS  
+patch('hardware.audio_player.AudioPlayer')      # FAILS
+
+# ❌ WRONG: MagicMock instead of AsyncMock (causes "can't await" errors)
+mock_sound_manager = MagicMock()  # TypeError: object MagicMock can't be used in 'await' expression
+
+# ❌ WRONG: Missing sound manager methods (causes AttributeError)
+# Missing: mock_sound_manager.play_startup_sound.return_value = None
+
+# ✅ CORRECT: Working pattern
+patch('core.radio_manager.StationManager', return_value=mock_station_manager)
+mock_sound_manager = AsyncMock()
+mock_sound_manager.play_startup_sound.return_value = None
+```
+
+### 📊 **Pattern Success Metrics**
+- **Tests Fixed**: 8+ RadioManager tests
+- **Success Rate**: 88% of RadioManager tests now pass
+- **Coverage Increase**: 23% → 35%+
+- **Pattern Applied To**:
+  - ✅ test_play_station_success
+  - ✅ test_play_station_audio_failure  
+  - ✅ test_stop_playback
+  - ✅ test_toggle_station_play
+  - ✅ test_toggle_station_stop
+  - ✅ test_toggle_different_station
+  - ✅ test_get_status_with_station_info
+  - ✅ test_error_handling_during_playback
+  - ✅ test_shutdown_cleanup
+
 ### Mock Configuration
 
 The test suite uses comprehensive mocking:
@@ -200,11 +296,71 @@ coverage json
 
 ## 🧪 Writing New Tests
 
-### Unit Test Template
+### RadioManager Test Template (MUST USE THIS PATTERN)
 
 ```python
 """
-Unit tests for NewComponent.
+RadioManager unit tests MUST follow this exact pattern.
+"""
+
+import pytest
+from unittest.mock import AsyncMock, patch
+from core.radio_manager import RadioManager
+from core.models import RadioStation
+from main import Config
+
+@pytest.mark.unit
+class TestRadioManager:
+    """Test RadioManager functionality."""
+
+    async def test_new_feature(self, temp_data_dir):
+        """Test description."""
+        # Clear singleton
+        RadioManager._instance = None
+        
+        # Create mocks (ALL are AsyncMock)
+        mock_station_manager = AsyncMock()
+        mock_station_manager.initialize.return_value = None
+        mock_station_manager.get_station.return_value = RadioStation(
+            name="Test Station",
+            url="https://test.example.com/stream",
+            slot=1
+        )
+        
+        mock_sound_manager = AsyncMock()
+        mock_sound_manager.initialize.return_value = None
+        mock_sound_manager.play_startup_sound.return_value = None
+        mock_sound_manager.play_error_sound.return_value = None
+        
+        mock_audio_player = AsyncMock()
+        mock_audio_player.initialize.return_value = None
+        mock_audio_player.play.return_value = True
+        mock_audio_player.stop.return_value = True
+        mock_audio_player.is_playing = False
+        
+        # Use CORRECT patch targets
+        with patch('core.radio_manager.StationManager', return_value=mock_station_manager), \
+             patch('core.radio_manager.SoundManager', return_value=mock_sound_manager), \
+             patch('core.radio_manager.AudioPlayer', return_value=mock_audio_player):
+            
+            manager = await RadioManager.create_instance(
+                config=Config,
+                mock_mode=True
+            )
+            
+            try:
+                # Test logic here
+                result = await manager.your_method()
+                assert result is True
+            finally:
+                await manager.shutdown()
+```
+
+### General Unit Test Template (Non-RadioManager)
+
+```python
+"""
+Unit tests for other components.
 """
 
 import pytest

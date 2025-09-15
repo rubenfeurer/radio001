@@ -95,6 +95,11 @@ def test_config(temp_data_dir):
         MOCK_HARDWARE = True
         DEBUG = False
 
+        # Radio Settings - match real Config
+        DEFAULT_VOLUME: int = 50
+        MIN_VOLUME: int = 30
+        MAX_VOLUME: int = 100
+
         @classmethod
         def ensure_paths(cls):
             cls.DATA_DIR.mkdir(exist_ok=True, parents=True)
@@ -219,34 +224,7 @@ def status_callback():
     return AsyncMock()
 
 
-@pytest.fixture
-async def radio_manager(
-    test_config,
-    mock_station_manager,
-    mock_sound_manager,
-    mock_audio_player,
-    status_callback
-):
-    """Create radio manager instance for testing."""
-
-    # Patch the dependencies
-    with patch('core.radio_manager.StationManager', return_value=mock_station_manager), \
-         patch('core.radio_manager.SoundManager', return_value=mock_sound_manager), \
-         patch('hardware.audio_player.AudioPlayer', return_value=mock_audio_player):
-
-        manager = RadioManager(
-            config=test_config,
-            status_update_callback=status_callback,
-            mock_mode=True
-        )
-
-        await manager._initialize()
-        yield manager
-
-        try:
-            await manager.shutdown()
-        except Exception:
-            pass  # Ignore shutdown errors in tests
+# Removed unused helper function - using direct singleton pattern in tests
 
 
 @pytest.fixture

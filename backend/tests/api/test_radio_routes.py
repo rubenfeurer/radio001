@@ -88,26 +88,23 @@ class TestRadioControlRoutes:
             assert response.status_code == 422  # Validation error
 
     async def test_set_volume_boundary_clamping(self, client: AsyncClient):
-        """Test volume clamping at boundaries."""
-        # Test extreme values (should be clamped)
-        extreme_values = [
-            {"volume": -50, "expected_min": 0},
-            {"volume": 150, "expected_max": 100},
-            {"volume": 999, "expected_max": 100}
-        ]
+        """Test volume validation at boundaries."""
+        # Test extreme values (should be rejected by validation)
+        extreme_values = [-50, 150, 999, -1, 101]
 
-        for test_case in extreme_values:
-            response = await client.post("/radio/volume", json={"volume": test_case["volume"]})
+        for invalid_volume in extreme_values:
+            response = await client.post("/radio/volume", json={"volume": invalid_volume})
+            assert response.status_code == 422  # Should reject out-of-range values
+
+        # Test boundary values (should be accepted)
+        valid_boundary_values = [0, 100]
+
+        for valid_volume in valid_boundary_values:
+            response = await client.post("/radio/volume", json={"volume": valid_volume})
             assert response.status_code == 200
-
             result = response.json()
             assert result["success"] is True
-            actual_volume = result["data"]["volume"]
-
-            if "expected_min" in test_case:
-                assert actual_volume >= test_case["expected_min"]
-            if "expected_max" in test_case:
-                assert actual_volume <= test_case["expected_max"]
+            assert result["data"]["volume"] == valid_volume
 
     async def test_volume_up(self, client: AsyncClient):
         """Test POST /radio/volume/up endpoint."""

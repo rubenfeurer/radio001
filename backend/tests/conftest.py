@@ -6,6 +6,7 @@ used across all test modules in the radio backend test suite.
 """
 
 import pytest
+import pytest_asyncio
 import asyncio
 import json
 import tempfile
@@ -83,7 +84,7 @@ def temp_data_dir():
         Config.PREFERENCES_FILE = original_preferences_file
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def radio_manager(temp_data_dir):
     """Create a radio manager instance for testing."""
     # Ensure we're in development mode for testing
@@ -104,7 +105,7 @@ async def radio_manager(temp_data_dir):
             del os.environ["NODE_ENV"]
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client(temp_data_dir):
     """Create HTTP client for API testing."""
     # Set test environment
@@ -251,7 +252,7 @@ def sample_volume_levels():
     }
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def populated_station_manager(temp_data_dir):
     """Station manager with pre-populated test stations."""
     from core.station_manager import StationManager

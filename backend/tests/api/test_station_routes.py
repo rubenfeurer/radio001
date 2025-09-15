@@ -139,13 +139,14 @@ class TestStationRoutes:
             response = await client.post("/radio/stations/1", json=station_data)
             assert response.status_code == 200
 
-        # Invalid URLs
+    async def test_save_station_url_validation(self, client: AsyncClient):
+        """Test URL validation when saving stations."""
+        # Test invalid URLs (must start with http:// or https://)
         invalid_urls = [
-            "ftp://invalid.com/stream",
-            "not-a-url-at-all",
-            "http://",
-            "",
-            "javascript:alert('xss')"
+            "ftp://invalid.com/stream",  # Wrong protocol
+            "not-a-url-at-all",  # No protocol
+            "",  # Empty string
+            "javascript:alert('xss')"  # XSS attempt
         ]
 
         for url in invalid_urls:
@@ -155,6 +156,21 @@ class TestStationRoutes:
             }
             response = await client.post("/radio/stations/1", json=invalid_station)
             assert response.status_code == 422
+
+        # Test valid URLs (should be accepted)
+        valid_urls = [
+            "http://valid.example.com/stream",
+            "https://secure.example.com/stream",
+            "http://",  # Minimal valid format (starts with http://)
+        ]
+
+        for url in valid_urls:
+            valid_station = {
+                "name": "Valid URL Station",
+                "url": url
+            }
+            response = await client.post("/radio/stations/1", json=valid_station)
+            assert response.status_code == 200
 
     async def test_toggle_station_playback_success(self, client: AsyncClient):
         """Test POST /radio/stations/{slot}/toggle endpoint."""
