@@ -384,16 +384,16 @@ jobs:
                 print(f'Duration: {float(time):.2f}s')
 
                 if int(failures) > 0 or int(errors) > 0:
-                    print('❌ TESTS FAILED')
+                    print('TESTS FAILED')
                     sys.exit(1)
                 else:
-                    print('✅ ALL TESTS PASSED')
+                    print('ALL TESTS PASSED')
             except Exception as e:
                 print(f'Error parsing test results: {e}')
                 sys.exit(1)
             "
           else
-            echo "❌ No test results found"
+            echo "No test results found"
             exit 1
           fi
 
@@ -410,10 +410,10 @@ jobs:
                 print(f'Line Coverage: {coverage_percent:.1f}%')
 
                 if coverage_percent < 23:
-                    print('⚠️  Coverage below 23% threshold')
-                    print('🎯 Target: Increase test coverage')
+                    print('Coverage below 23% threshold')
+                    print('Target: Increase test coverage')
                 else:
-                    print('✅ Good coverage!')
+                    print('Good coverage!')
             except Exception as e:
                 print(f'Error parsing coverage: {e}')
             "
@@ -443,15 +443,15 @@ jobs:
 
                     comment += `### Test Summary\n`;
                     comment += `- **Total Tests**: ${total}\n`;
-                    comment += `- **Passed**: ${passed} ✅\n`;
-                    comment += `- **Failed**: ${failures} ${failures > 0 ? '❌' : '✅'}\n`;
-                    comment += `- **Errors**: ${errors} ${errors > 0 ? '❌' : '✅'}\n`;
+                    comment += `- **Passed**: ${passed} PASS\n`;
+                    comment += `- **Failed**: ${failures} ${failures > 0 ? 'FAIL' : 'PASS'}\n`;
+                    comment += `- **Errors**: ${errors} ${errors > 0 ? 'ERROR' : 'PASS'}\n`;
                     comment += `- **Duration**: ${parseFloat(attrs.time || '0').toFixed(2)}s\n\n`;
 
                     if (parseInt(failures) === 0 && parseInt(errors) === 0) {
-                      comment += '🎉 **All tests passed!**\n\n';
+                      comment += '**All tests passed!**\n\n';
                     } else {
-                      comment += '❌ **Some tests failed** - Please check the logs\n\n';
+                      comment += '**Some tests failed** - Please check the logs\n\n';
                     }
                   }
                 });

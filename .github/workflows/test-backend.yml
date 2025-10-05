@@ -464,9 +464,9 @@ jobs:
               passed = int(tests) - int(failures) - int(errors)
 
               print(f'- **Total**: {tests} tests')
-              print(f'- **Passed**: {passed} ✅')
-              print(f'- **Failed**: {failures} {"❌" if int(failures) > 0 else "✅"}')
-              print(f'- **Errors**: {errors} {"❌" if int(errors) > 0 else "✅"}')
+              print(f'- **Passed**: {passed} PASS')
+              print(f'- **Failed**: {failures} {"FAIL" if int(failures) > 0 else "PASS"}')
+              print(f'- **Errors**: {errors} {"ERROR" if int(errors) > 0 else "PASS"}')
               print(f'- **Duration**: {float(time):.2f}s')
               print()
           except Exception as e:
