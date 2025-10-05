@@ -324,9 +324,9 @@ jobs:
         if: always()
         run: |
           mkdir -p integration-results
-          docker-compose -f compose/docker-compose.ci.yml cp radio-backend:/app/integration-results.xml integration-results/
-          docker-compose -f compose/docker-compose.ci.yml cp radio-backend:/app/integration-coverage.xml integration-results/
-          docker-compose -f compose/docker-compose.ci.yml cp radio-backend:/app/integration-htmlcov integration-results/
+          docker cp radio-backend-ci:/app/integration-results.xml integration-results/ || echo "No integration-results.xml found"
+          docker cp radio-backend-ci:/app/integration-coverage.xml integration-results/ || echo "No integration-coverage.xml found"
+          docker cp radio-backend-ci:/app/integration-htmlcov integration-results/ || echo "No integration-htmlcov found"
 
       - name: Upload integration test results
         uses: actions/upload-artifact@v4
