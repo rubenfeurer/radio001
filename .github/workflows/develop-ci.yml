@@ -1,0 +1,266 @@
+name: Develop CI - Quick Validation
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # =============================================================================
+  # Quick Linting & Type Checking
+  # =============================================================================
+  lint-and-type-check:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install workspace dependencies
+        run: npm install
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm run install:force
+
+      - name: Run ESLint
+        run: |
+          cd frontend
+          npm run lint
+
+      - name: Run TypeScript type checking
+        run: |
+          cd frontend
+          npm run check:ci
+
+  # =============================================================================
+  # Quick Build Validation
+  # =============================================================================
+  build-validation:
+    name: Build Validation
+    runs-on: ubuntu-latest
+    needs: lint-and-type-check
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install workspace dependencies
+        run: npm install
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm run install:force
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build:ci
+
+      - name: Verify build output
+        run: |
+          cd frontend
+          ls -la build/
+          test -f build/index.html
+
+  # =============================================================================
+  # Quick Docker Backend Test
+  # =============================================================================
+  backend-smoke-test:
+    name: Backend Smoke Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
+      - name: Start backend service
+        run: |
+          docker-compose -f compose/docker-compose.ci.yml up -d radio-backend
+          sleep 15
+
+      - name: Test backend health
+        run: |
+          for i in {1..10}; do
+            if curl -f http://localhost:8000/health; then
+              echo "Backend health check passed!"
+              break
+            else
+              echo "Health check attempt $i/10 failed, retrying..."
+              if [ $i -eq 10 ]; then
+                echo "Backend health check failed after 10 attempts"
+                exit 1
+              fi
+              sleep 5
+            fi
+          done
+
+      - name: View backend logs
+        if: failure()
+        run: |
+          docker-compose -f compose/docker-compose.ci.yml logs radio-backend
+
+      - name: Run quick backend tests
+        run: |
+          echo "Running quick backend test suite..."
+
+          # Run tests inside the backend container
+          docker-compose -f compose/docker-compose.ci.yml exec -T radio-backend bash -c "
+            # Set test environment
+            export NODE_ENV=development
+            export MOCK_HARDWARE=true
+            export PYTHONPATH=/app:\$PYTHONPATH
+
+            # Install test dependencies
+            pip install -r requirements-test.txt
+
+            # Run quick test suite (unit tests only for speed)
+            python -m pytest \
+              --verbose \
+              --tb=short \
+              --maxfail=3 \
+              -m 'unit or api' \
+              --disable-warnings \
+              tests/
+
+            echo '✅ Quick tests passed!'
+          "
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker-compose -f compose/docker-compose.ci.yml down -v
+
+  # =============================================================================
+  # Quick Test Summary
+  # =============================================================================
+  quick-test-validation:
+    name: Quick Test Validation
+    runs-on: ubuntu-latest
+    needs: [backend-smoke-test]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Run local backend tests
+        run: |
+          cd backend
+
+          # Install dependencies
+          pip install -r requirements.txt -r requirements-test.txt
+
+          # Set test environment
+          export NODE_ENV=development
+          export MOCK_HARDWARE=true
+          export PYTHONPATH=$PWD:$PYTHONPATH
+
+          # Run focused test suite (unit + API tests for speed)
+          echo "🧪 Running backend unit and API tests..."
+          python -m pytest \
+            --verbose \
+            --tb=short \
+            --maxfail=5 \
+            -m 'unit or api' \
+            --disable-warnings \
+            --durations=10 \
+            tests/
+
+          echo "✅ Quick test validation completed!"
+
+  # =============================================================================
+  # Notify Success
+  # =============================================================================
+  success-notification:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs:
+      [
+        lint-and-type-check,
+        build-validation,
+        backend-smoke-test,
+        quick-test-validation,
+      ]
+    if: success()
+
+    steps:
+      - name: Success message
+        run: |
+          echo "🎉 Develop CI pipeline completed successfully!"
+          echo "✅ Linting passed"
+          echo "✅ Type checking passed"
+          echo "✅ Build validation passed"
+          echo "✅ Backend smoke test passed"
+          echo "✅ Quick test validation passed"
+          echo ""
+          echo "📊 Test Summary:"
+          echo "- Unit tests: ✅ Core functionality validated"
+          echo "- API tests: ✅ Endpoints working correctly"
+          echo "- Integration: ✅ Docker container healthy"
+          echo ""
+          echo "Ready for development! 🚀"
+
+  # =============================================================================
+  # Development Test Failure Notification
+  # =============================================================================
+  failure-notification:
+    name: CI Failure Analysis
+    runs-on: ubuntu-latest
+    needs:
+      [
+        lint-and-type-check,
+        build-validation,
+        backend-smoke-test,
+        quick-test-validation,
+      ]
+    if: failure()
+
+    steps:
+      - name: Failure analysis
+        run: |
+          echo "❌ Develop CI pipeline failed!"
+          echo ""
+          echo "🔍 Check the following jobs:"
+          echo "- Lint & Type Check: ${{ needs.lint-and-type-check.result }}"
+          echo "- Build Validation: ${{ needs.build-validation.result }}"
+          echo "- Backend Smoke Test: ${{ needs.backend-smoke-test.result }}"
+          echo "- Quick Test Validation: ${{ needs.quick-test-validation.result }}"
+          echo ""
+          echo "💡 Common issues:"
+          echo "- ESLint errors in frontend code"
+          echo "- TypeScript compilation errors"
+          echo "- Backend API health check failures"
+          echo "- Unit test failures in core modules"
+          echo "- Missing dependencies or configuration"
+          echo ""
+          echo "🚨 Please fix issues before continuing development"

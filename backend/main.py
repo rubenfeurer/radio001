@@ -15,6 +15,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import uvicorn
 
+# Radio system imports
+from api.routes.stations import router as stations_router
+from api.routes.radio import router as radio_router
+from api.routes.websocket import router as websocket_router, setup_radio_manager_with_websocket
+
 
 # =============================================================================
 # Configuration
@@ -39,11 +44,41 @@ class Config:
     HOST = "0.0.0.0"
     PORT = int(os.getenv("API_PORT", "8000"))
 
+    # Radio Settings
+    DEFAULT_VOLUME: int = 50
+    MIN_VOLUME: int = 30
+    MAX_VOLUME: int = 100
+    NOTIFICATION_VOLUME: int = 40
+
+    # Hardware Settings (GPIO pins)
+    BUTTON_PIN_1: int = 17      # GPIO17 (Pin 11) - Station 1
+    BUTTON_PIN_2: int = 16      # GPIO16 (Pin 36) - Station 2
+    BUTTON_PIN_3: int = 26      # GPIO26 (Pin 37) - Station 3
+
+    # Rotary Encoder Settings
+    ROTARY_CLK: int = 11        # GPIO11 (Pin 23) - Clock
+    ROTARY_DT: int = 9          # GPIO9  (Pin 21) - Data
+    ROTARY_SW: int = 10         # GPIO10 (Pin 19) - Switch/Button
+    ROTARY_CLOCKWISE_INCREASES: bool = True  # Volume direction
+    ROTARY_VOLUME_STEP: int = 5  # Volume change per step
+
+    # Button Press Settings (in seconds)
+    LONG_PRESS_DURATION: float = 3.0
+    TRIPLE_PRESS_INTERVAL: float = 0.5
+
+    # Audio & Data Paths
+    DATA_DIR = Path("data")
+    SOUNDS_DIR = Path("assets/sounds")
+    STATIONS_FILE = DATA_DIR / "stations.json"
+    PREFERENCES_FILE = DATA_DIR / "preferences.json"
+
     # Ensure paths exist
     @classmethod
     def ensure_paths(cls):
         """Create necessary directories for the application"""
         cls.RASPIWIFI_DIR.mkdir(parents=True, exist_ok=True)
+        cls.DATA_DIR.mkdir(parents=True, exist_ok=True)
+        cls.SOUNDS_DIR.mkdir(parents=True, exist_ok=True)
         # Additional path creation for logs, etc.
 
 
@@ -325,31 +360,52 @@ class WiFiManager:
 # FastAPI Application
 # =============================================================================
 
+# Global radio manager instance
+radio_manager = None
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan events"""
+    """Application lifespan events with radio system initialization"""
+    global radio_manager
+
     # Startup
-    print("🚀 Radio WiFi Backend starting...")
+    print("Radio WiFi Backend starting...")
+    Config.ensure_paths()
     if Config.IS_DEVELOPMENT:
-        print("🔧 Running in development mode")
+        print("Running in development mode")
+
+    # Initialize radio system
+    try:
+        print("Initializing radio system...")
+        radio_manager = await setup_radio_manager_with_websocket(
+            config=Config,
+            mock_mode=Config.IS_DEVELOPMENT
+        )
+        print("Radio system initialized successfully")
+    except Exception as e:
+        print(f"ERROR: Error initializing radio system: {e}")
+        print("WARNING: Continuing without radio functionality")
+
     yield
+
     # Shutdown
-    print("📡 Radio WiFi Backend shutting down...")
+    print("Radio WiFi Backend shutting down...")
+    if radio_manager:
+        try:
+            await radio_manager.shutdown()
+            print("Radio system shutdown complete")
+        except Exception as e:
+            print(f"Error shutting down radio system: {e}")
 
 
 app = FastAPI(
     title="Radio WiFi Configuration API",
-    description="FastAPI backend for WiFi configuration inspired by RaspiWiFi",
-    version="1.0.0",
+    description="Unified WiFi configuration and internet radio system with 3-slot station management",
+    version="2.0.0",
     lifespan=lifespan
 )
 
-# Ensure paths are created during startup
-@app.on_event("startup")
-async def startup_event():
-    """Perform startup configuration"""
-    Config.ensure_paths()
-    print(f"🚀 Backend starting in {'development' if Config.IS_DEVELOPMENT else 'production'} mode")
+# Startup configuration moved to lifespan context manager above
 
 # CORS middleware for frontend integration
 app.add_middleware(
@@ -359,6 +415,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include radio API routes
+app.include_router(stations_router, prefix="/radio/stations", tags=["Radio Stations"])
+app.include_router(radio_router, prefix="/radio", tags=["Radio Control"])
+app.include_router(websocket_router, prefix="/ws", tags=["WebSocket"])
 
 
 # =============================================================================
@@ -371,7 +432,11 @@ async def root():
     return ApiResponse(
         success=True,
         message="Radio WiFi Configuration API",
-        data={"version": "1.0.0", "status": "running"}
+        data={
+            "version": "2.0.0",
+            "status": "running",
+            "features": ["wifi_management", "radio_streaming", "3_slot_stations", "hardware_controls"]
+        }
     )
 
 
@@ -384,8 +449,29 @@ async def health_check():
             "mode": "development" if Config.IS_DEVELOPMENT else "production",
             "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
             "config_dir_exists": Config.RASPIWIFI_DIR.exists(),
-            "wifi_interface": Config.WIFI_INTERFACE
+            "wifi_interface": Config.WIFI_INTERFACE,
+            "data_dir_exists": Config.DATA_DIR.exists(),
+            "sounds_dir_exists": Config.SOUNDS_DIR.exists()
         }
+
+        # Add radio system status if available
+        if radio_manager:
+            try:
+                radio_status = await radio_manager.get_status()
+                system_info["radio_system"] = {
+                    "initialized": True,
+                    "volume": radio_status.volume,
+                    "is_playing": radio_status.is_playing,
+                    "current_station": radio_status.current_station
+                }
+            except Exception as e:
+                system_info["radio_system"] = {
+                    "initialized": False,
+                    "error": str(e)
+                }
+        else:
+            system_info["radio_system"] = {"initialized": False}
+
         return ApiResponse(
             success=True,
             message="Service healthy",
@@ -494,9 +580,10 @@ if __name__ == "__main__":
 
     reload = "--reload" in sys.argv or Config.IS_DEVELOPMENT
 
-    print(f"🎯 Starting Radio WiFi Backend on {Config.HOST}:{Config.PORT}")
-    print(f"📡 WiFi Interface: {Config.WIFI_INTERFACE}")
-    print(f"🔧 Development Mode: {Config.IS_DEVELOPMENT}")
+    print(f"Starting Radio WiFi Backend on {Config.HOST}:{Config.PORT}")
+    print(f"WiFi Interface: {Config.WIFI_INTERFACE}")
+    print(f"Development Mode: {Config.IS_DEVELOPMENT}")
+    print(f"Radio Features: Volume Control, 3-Slot Stations, Hardware Integration")
 
     uvicorn.run(
         "main:app",

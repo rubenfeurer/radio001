@@ -46,7 +46,6 @@ node_modules/
 
 # npm
 .npm
-package-lock.json
 
 # Optional npm cache directory
 .npm
@@ -87,10 +86,14 @@ package-lock.json
 .next
 out
 
-# Nuxt.js build / generate output
-.nuxt
-dist
+# SvelteKit build output
+.svelte-kit
+build/
 .output
+
+# Legacy Nuxt.js build / generate output (removed)
+# .nuxt
+# dist
 
 # Gatsby files
 .cache/
@@ -176,7 +179,9 @@ tramp
 # Build artifacts
 build/
 dist/
-lib/
+/lib/
+build/lib/
+dist/lib/
 es/
 
 # Testing
@@ -187,6 +192,31 @@ htmlcov/
 .nox/
 .pytest_cache/
 .cache
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.hypothesis/
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -250,6 +280,13 @@ cython_debug/
 /tmp/
 *.sqlite
 *.db
+
+# SvelteKit specific
+frontend/.svelte-kit/
+frontend/build/
+
+# Legacy app directory (removed)
+# app/
 
 # WiFi configuration files (sensitive)
 wpa_supplicant.conf

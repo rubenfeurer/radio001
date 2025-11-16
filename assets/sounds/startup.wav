@@ -1,0 +1,15 @@
+# This is a placeholder for startup.wav sound file
+# In a real implementation, this would be a binary WAV audio file
+# For development purposes, this text file serves as a placeholder
+
+# To add actual sound files:
+# 1. Record or download appropriate WAV files (16-bit, 44.1kHz recommended)
+# 2. Replace this placeholder with actual audio files
+# 3. Ensure files are named:
+#    - startup.wav (system startup sound)
+#    - success.wav (successful operation sound)
+#    - error.wav (error notification sound)
+#    - button_press.wav (button feedback sound)
+
+# Placeholder content for startup sound
+PLACEHOLDER_STARTUP_SOUND = True

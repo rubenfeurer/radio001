@@ -26,50 +26,67 @@
     "captive-portal"
   ],
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=20.19.0",
     "npm": ">=8.0.0"
   },
   "scripts": {
-    "dev": "cd app && npm run dev",
-    "dev:docker": "docker-compose up --build",
-    "dev:logs": "docker-compose logs -f radio-app",
-    "dev:restart": "docker-compose restart radio-app",
-    "dev:down": "docker-compose down",
-    "dev:clean": "docker-compose down -v --remove-orphans",
-    "build": "cd app && npm run build",
+    "dev": "echo 'Start backend: docker-compose -f compose/docker-compose.yml up -d radio-backend' && echo 'Start frontend: cd frontend && npm run dev'",
+    "dev:backend": "docker-compose -f compose/docker-compose.yml up -d radio-backend",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:full": "docker-compose -f compose/docker-compose.yml up -d radio-backend && cd frontend && npm run dev",
+    "dev:stop": "docker-compose -f compose/docker-compose.yml down",
+    "dev:logs": "docker-compose -f compose/docker-compose.yml logs radio-backend",
+    "dev:shell": "docker-compose -f compose/docker-compose.yml exec radio-backend bash",
+    "build": "cd frontend && npm run build",
     "build:docker": "docker build -f docker/Dockerfile -t radio-wifi:latest .",
     "build:multi-arch": "docker buildx build --platform linux/amd64,linux/arm64 -f docker/Dockerfile -t radio-wifi:latest .",
-    "preview": "cd app && npm run preview",
-    "prod:up": "docker-compose -f docker-compose.prod.yml up -d",
-    "prod:down": "docker-compose -f docker-compose.prod.yml down",
-    "prod:logs": "docker-compose -f docker-compose.prod.yml logs -f",
-    "prod:restart": "docker-compose -f docker-compose.prod.yml restart",
-    "prod:build": "docker-compose -f docker-compose.prod.yml build --no-cache",
-    "install:app": "cd app && npm install",
-    "install:all": "npm run install:app",
-    "lint": "cd app && npm run lint",
-    "lint:fix": "cd app && npm run lint:fix",
-    "type-check": "cd app && npm run type-check",
+    "preview": "cd frontend && npm run preview",
+    "prod:up": "docker-compose -f compose/docker-compose.prod.yml up -d",
+    "prod:down": "docker-compose -f compose/docker-compose.prod.yml down",
+    "prod:logs": "docker-compose -f compose/docker-compose.prod.yml logs -f",
+    "prod:restart": "docker-compose -f compose/docker-compose.prod.yml restart",
+    "prod:build": "docker-compose -f compose/docker-compose.prod.yml build --no-cache",
+    "install:frontend": "cd frontend && npm install",
+    "install:all": "npm run install:frontend",
+    "lint": "cd frontend && npm run lint",
+    "lint:fix": "cd frontend && npm run lint:fix",
+    "type-check": "cd frontend && npm run check",
     "test": "echo \"No tests specified yet\"",
     "health": "curl -f http://localhost:3000/api/health || curl -f http://radio.local:3000/api/health",
+    "workflow:init": "git checkout develop 2>/dev/null || git checkout -b develop",
+    "workflow:feature": "echo 'Usage: npm run workflow:feature -- feature-name' && exit 1",
+    "workflow:pr": "echo 'Create PR: develop -> main' && echo 'Visit: https://github.com/$(git remote get-url origin | sed \"s/.*github.com[:\\/]//\" | sed \"s/.git$//\")/compare/main...develop'",
+    "workflow:status": "echo 'Current branch:' && git branch --show-current && echo 'Status:' && git status --porcelain",
+    "quick:check": "npm run lint && npm run type-check",
+    "quick:fix": "npm run lint:fix",
     "setup:pi": "./scripts/setup-pi.sh",
     "deploy:pi": "./scripts/deploy-pi.sh",
     "backup:config": "./scripts/backup-config.sh",
     "restore:config": "./scripts/restore-config.sh",
-    "clean": "rm -rf app/.nuxt app/.output app/dist app/node_modules node_modules",
+    "clean": "rm -rf frontend/.svelte-kit frontend/build frontend/node_modules node_modules",
     "clean:docker": "docker system prune -f && docker volume prune -f",
     "docs:dev": "echo \"Documentation development not set up yet\"",
     "docs:build": "echo \"Documentation build not set up yet\"",
     "release": "echo \"Release process not set up yet\"",
-    "prepare": "echo 'Skipping script permissions - handled by Docker'"
+    "prepare": "husky || echo 'Husky install skipped in CI'",
+    "postinstall": "./scripts/setup-hooks.sh || echo 'Hook setup skipped'"
   },
   "devDependencies": {
     "@types/node": "^20.10.4",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "husky": "^8.0.3"
   },
   "optionalDependencies": {},
+  "lint-staged": {
+    "frontend/**/*.{js,ts,svelte}": [
+      "cd frontend && npm run lint:fix"
+    ],
+    "frontend/**/*.{js,ts,svelte,css,md}": [
+      "cd frontend && npm run check"
+    ]
+  },
   "workspaces": [
-    "app"
+    "frontend"
   ],
   "config": {
     "app_name": "Radio WiFi Configuration",
@@ -81,10 +98,11 @@
     ]
   },
   "directories": {
-    "app": "./app",
+    "frontend": "./frontend",
+    "backend": "./backend",
     "config": "./config",
     "scripts": "./scripts",
     "docker": "./docker",
-    "docs": "./docs"
+    "nginx": "./nginx"
   }
 }

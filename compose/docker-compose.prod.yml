@@ -1,0 +1,185 @@
+# Production Docker Compose configuration for Radio WiFi Configuration
+# New SvelteKit + FastAPI hybrid architecture for ARM64 compatibility
+
+version: "3.8"
+
+services:
+  # FastAPI Backend Service
+  radio-backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: radio-wifi-backend:latest
+    container_name: radio-backend-prod
+    hostname: radio-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persistent data
+      - radio_data:/app/data
+      - radio_logs:/app/logs
+      - radio_config:/app/config
+
+      # System integration for WiFi management
+      - /etc/wpa_supplicant:/etc/wpa_supplicant:rw
+      - /etc/hostapd:/etc/hostapd:rw
+      - /etc/dnsmasq.conf:/etc/dnsmasq.conf:rw
+
+      # Device access for WiFi management
+      - /dev:/dev:rw
+      - /sys/class/net:/sys/class/net:ro
+      - /proc/net:/proc/net:ro
+    environment:
+      # Production settings
+      - NODE_ENV=production
+      - API_PORT=8000
+
+      # Network configuration
+      - HOSTNAME=radio
+      - WIFI_INTERFACE=wlan0
+      - ETH_INTERFACE=eth0
+
+      # Hotspot configuration
+      - HOTSPOT_SSID=Radio-Setup
+      - HOTSPOT_PASSWORD=Configure123!
+      - HOTSPOT_IP=192.168.4.1
+      - HOTSPOT_RANGE=192.168.4.2,192.168.4.20
+
+      # Security settings
+      - SESSION_SECRET=${SESSION_SECRET:-prod-secret-key-change-me}
+      - JWT_SECRET=${JWT_SECRET:-prod-jwt-secret-change-me}
+
+      # Features
+      - ENABLE_CAPTIVE_PORTAL=true
+      - ENABLE_AUTO_CONNECT=true
+    networks:
+      - radio-network
+    restart: unless-stopped
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    devices:
+      - /dev/net/tun
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # SvelteKit Frontend Service (Static Files + Nginx)
+  radio-frontend:
+    image: nginx:alpine
+    container_name: radio-frontend-prod
+    hostname: radio-frontend
+    ports:
+      - "80:80" # HTTP
+      - "443:443" # HTTPS (if SSL configured)
+    volumes:
+      # Static SvelteKit build
+      - ./frontend/build:/usr/share/nginx/html:ro
+      # Nginx configuration
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      # SSL certificates (optional)
+      - radio_ssl:/etc/nginx/ssl:ro
+      # Logs
+      - radio_nginx_logs:/var/log/nginx
+    environment:
+      - NGINX_HOST=radio.local
+      - NGINX_PORT=80
+      - BACKEND_HOST=radio-backend
+      - BACKEND_PORT=8000
+    networks:
+      - radio-network
+    restart: unless-stopped
+    depends_on:
+      - radio-backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Avahi for mDNS (radio.local)
+  avahi:
+    image: solidnerd/avahi:latest
+    container_name: radio-avahi
+    hostname: radio
+    network_mode: host
+    environment:
+      - AVAHI_HOST_NAME=radio
+      - AVAHI_SERVICES=http:80:path=/,api:8000:path=/api
+    volumes:
+      - ./config/avahi:/etc/avahi/services:ro
+    restart: unless-stopped
+    profiles:
+      - mdns
+    depends_on:
+      - radio-frontend
+
+  # Optional: Watchtower for automatic updates
+  watchtower:
+    image: containrrr/watchtower
+    container_name: radio-watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=3600
+      - WATCHTOWER_INCLUDE_STOPPED=true
+    restart: unless-stopped
+    profiles:
+      - autoupdate
+
+# Named volumes for data persistence
+volumes:
+  radio_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/radio/data
+
+  radio_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/radio/logs
+
+  radio_config:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/radio/config
+
+  radio_nginx_logs:
+    driver: local
+
+  radio_ssl:
+    driver: local
+
+# Custom network for service communication
+networks:
+  radio-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+
+# Service configuration
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# Apply logging to all services
+x-common: &common
+  logging: *default-logging
+  restart: unless-stopped
