@@ -120,7 +120,7 @@ if command_exists npm; then
 else
     print_status "Setting up hooks via Docker..."
     cd ..
-    ./scripts/docker-dev.sh shell radio-app "npm run prepare"
+    ./scripts/dev-environment.sh shell radio-app "npm run prepare"
     cd app
 fi
 
@@ -135,7 +135,7 @@ print_status "Testing Docker environment..."
 
 # Build containers
 print_status "Building Docker containers (this may take a few minutes)..."
-if ./scripts/docker-dev.sh start; then
+if ./scripts/dev-environment.sh start; then
     sleep 5
 
     # Test if services are running
@@ -153,12 +153,12 @@ if ./scripts/docker-dev.sh start; then
 
     # Stop containers for now
     print_status "Stopping containers..."
-    ./scripts/docker-dev.sh stop
+    ./scripts/dev-environment.sh stop
 
 else
     print_error "Failed to start Docker environment"
     echo "Check Docker logs for details:"
-    echo "  ./scripts/docker-dev.sh logs"
+    echo "  ./scripts/dev-environment.sh logs"
     exit 1
 fi
 
@@ -231,7 +231,7 @@ echo ""
 echo "🚀 Next Steps:"
 echo ""
 echo "1. Start development environment:"
-echo "   ./scripts/docker-dev.sh start"
+echo "   ./scripts/dev-environment.sh start"
 echo ""
 echo "2. Open your browser:"
 echo "   Frontend: http://localhost:3000"
@@ -242,7 +242,7 @@ echo "   git add ."
 echo "   git commit -m 'feat: your new feature'"
 echo ""
 echo "4. View logs:"
-echo "   ./scripts/docker-dev.sh logs"
+echo "   ./scripts/dev-environment.sh logs"
 echo ""
 
 # Development workflow reminder
@@ -257,7 +257,7 @@ echo ""
 # Troubleshooting
 echo "🛠️  Troubleshooting:"
 echo ""
-echo "• Container issues: ./scripts/docker-dev.sh cleanup && ./scripts/docker-dev.sh start"
+echo "• Container issues: ./scripts/dev-environment.sh cleanup && ./scripts/dev-environment.sh start"
 echo "• Hook issues: cd app && npm run prepare"
 echo "• IDE type errors: Expected - packages are in Docker containers"
 echo "• Documentation: See DEVELOPMENT.md and .github/DEVELOPER_WORKFLOW.md"

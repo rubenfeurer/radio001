@@ -53,7 +53,31 @@ A unified **Radio + WiFi Configuration** system for Raspberry Pi Zero 2 W, combi
 
 ### Development Setup
 
-1. **Clone and setup:**
+#### Automated Setup (Recommended)
+
+The easiest way to get started is using the automated setup script:
+
+```bash
+# Clone repository
+git clone <repository-url> radio001
+cd radio001
+
+# Run automated setup (installs everything and tests the environment)
+./scripts/setup-dev.sh
+```
+
+This script will:
+- ✅ Check system requirements (Docker, Node.js, Git)
+- ✅ Install frontend dependencies
+- ✅ Setup Git hooks for code quality
+- ✅ Build and test Docker containers
+- ✅ Verify the development environment
+
+#### Manual Setup
+
+If you prefer manual setup:
+
+1. **Clone repository:**
    ```bash
    git clone <repository-url> radio001
    cd radio001
@@ -61,14 +85,14 @@ A unified **Radio + WiFi Configuration** system for Raspberry Pi Zero 2 W, combi
 
 2. **Start development environment:**
    ```bash
-   # Easy way - use the helper script
+   # Use the helper script
    ./scripts/dev-environment.sh start
    
    # Or manually start backend:
    docker compose -f compose/docker-compose.yml up radio-backend -d
    ```
 
-3. **Setup frontend (Local):**
+3. **Setup frontend:**
    ```bash
    cd frontend
    npm install
@@ -112,39 +136,51 @@ radio001/
 
 ## 🔧 Helper Scripts
 
-The `scripts/` directory contains various helper scripts for development and CI/CD:
+The `scripts/` directory contains helper scripts organized by purpose:
 
-| Script | Purpose | Usage |
-|--------|---------|-------|
-| **dev-environment.sh** | Manage Docker development environment | `./scripts/dev-environment.sh [start\|stop\|restart\|status\|logs]` |
-| **backend-test-status.sh** | Check backend testing infrastructure status | `./scripts/backend-test-status.sh` |
-| **ci-pipeline-fix.sh** | Fix CI/CD pipeline issues (ARM64/AMD64 compatibility) | `./scripts/ci-pipeline-fix.sh` |
-| **test-ci.sh** | Run local CI simulation | `./scripts/test-ci.sh` |
-| **setup-dev.sh** | Initial development environment setup | `./scripts/setup-dev.sh` |
-| **setup-hooks.sh** | Setup Git hooks | `./scripts/setup-hooks.sh` |
-| **setup-github-protection.sh** | Configure GitHub branch protection | `./scripts/setup-github-protection.sh` |
-| **wifi-init.sh** | Initialize WiFi configuration on Raspberry Pi | `./scripts/wifi-init.sh` |
+### 🚀 Setup & Development Scripts
 
-### Common Script Examples
+| Script | Purpose | When to Use |
+|--------|---------|-------------|
+| **setup-dev.sh** | **First-time setup** - Installs dependencies, configures hooks, tests environment | Run once when cloning the repo |
+| **dev-environment.sh** | **Daily development** - Start/stop/manage Docker services | Use daily for development work |
+| **setup-hooks.sh** | Setup Git pre-commit hooks for code quality | Run if hooks need reinstalling |
+
+### 🧪 Testing & CI Scripts
+
+| Script | Purpose | When to Use |
+|--------|---------|-------------|
+| **backend-test-status.sh** | Check backend testing infrastructure status | Verify test setup is correct |
+| **test-ci.sh** | Run local CI simulation | Test before pushing to CI/CD |
+| **ci-pipeline-fix.sh** | Fix CI/CD pipeline issues (ARM64/AMD64) | When CI pipeline has build issues |
+
+### ⚙️ Configuration Scripts
+
+| Script | Purpose | When to Use |
+|--------|---------|-------------|
+| **setup-github-protection.sh** | Configure GitHub branch protection rules | Initial repo setup (maintainers) |
+| **wifi-init.sh** | Initialize WiFi configuration on Raspberry Pi | Raspberry Pi first-time setup |
+
+### Common Usage Examples
 
 ```bash
-# Start development environment
-./scripts/dev-environment.sh start
+# FIRST TIME SETUP
+./scripts/setup-dev.sh
 
-# Check development status
-./scripts/dev-environment.sh status
+# DAILY DEVELOPMENT
+./scripts/dev-environment.sh start     # Start dev environment
+./scripts/dev-environment.sh status    # Check what's running
+./scripts/dev-environment.sh logs      # View all logs
+./scripts/dev-environment.sh logs radio-backend  # Backend logs only
+./scripts/dev-environment.sh stop      # Stop all services
 
-# View backend logs
-./scripts/dev-environment.sh logs radio-backend
+# TESTING & TROUBLESHOOTING
+./scripts/backend-test-status.sh       # Check test infrastructure
+./scripts/test-ci.sh                   # Simulate CI pipeline locally
+./scripts/ci-pipeline-fix.sh           # Fix CI/CD issues
 
-# Stop all services
-./scripts/dev-environment.sh stop
-
-# Check backend test infrastructure
-./scripts/backend-test-status.sh
-
-# Fix CI pipeline issues
-./scripts/ci-pipeline-fix.sh
+# PRODUCTION DEPLOYMENT
+./scripts/wifi-init.sh                 # Setup WiFi on Raspberry Pi
 ```
 
 ## 📚 Documentation
@@ -216,7 +252,7 @@ The `scripts/` directory contains various helper scripts for development and CI/
    ```bash
    git clone <repo-url> radio001
    cd radio001
-   docker-compose -f compose/docker-compose.prod.yml up -d
+   docker compose -f compose/docker-compose.prod.yml up -d
    ```
 
 3. **Access via:**
