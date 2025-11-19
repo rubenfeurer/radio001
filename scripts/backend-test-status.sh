@@ -102,7 +102,7 @@ check_docker_config() {
         echo -e "    ${GREEN}${CHECK} CI Docker Compose${NC} (compose/docker-compose.ci.yml)"
 
         # Check if it has test dependencies arg
-        if grep -q "INSTALL_TEST_DEPS" compose/docker-compose.ci.yml; then
+        if grep -q "INSTALL_TEST_DEPS" compose/docker-compose.ci.yml 2>/dev/null; then
             echo -e "    ${GREEN}${CHECK} Test dependencies configured in Docker${NC}"
         else
             echo -e "    ${YELLOW}${WARNING} Test dependencies not configured in Docker${NC}"
@@ -227,7 +227,7 @@ check_system_tools() {
     fi
 
     # Docker Compose
-    if command_exists docker-compose; then
+    if docker compose version >/dev/null 2>&1; then
         echo -e "${GREEN}${CHECK} Docker Compose installed${NC}"
     else
         echo -e "${YELLOW}${WARNING} Docker Compose not found (needed for integration tests)${NC}"

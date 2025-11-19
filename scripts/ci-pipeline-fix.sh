@@ -99,18 +99,18 @@ cd ..
 
 # Fix 3: Verify Docker Compose CI configuration
 print_status "Verifying Docker Compose CI configuration..."
-if [ -f "docker-compose.ci.yml" ]; then
-    print_success "docker-compose.ci.yml found"
+if [ -f "compose/docker-compose.ci.yml" ]; then
+    print_success "compose/docker-compose.ci.yml found"
 
     # Test backend build
     print_status "Testing backend Docker build..."
-    if docker-compose -f docker-compose.ci.yml build radio-backend --no-cache; then
+    if docker compose -f compose/docker-compose.ci.yml build radio-backend --no-cache; then
         print_success "Backend Docker build successful"
     else
         print_warning "Backend Docker build failed (may work in CI environment)"
     fi
 else
-    print_error "docker-compose.ci.yml not found"
+    print_error "compose/docker-compose.ci.yml not found"
     exit 1
 fi
 
@@ -175,7 +175,7 @@ cd ..
 
 # Test backend
 echo "Testing backend..."
-docker-compose -f docker-compose.ci.yml up radio-backend -d
+docker compose -f compose/docker-compose.ci.yml up radio-backend -d
 sleep 15
 
 # Health check
@@ -183,12 +183,12 @@ if curl -f http://localhost:8000/health; then
     echo "✅ Backend health check passed"
 else
     echo "❌ Backend health check failed"
-    docker-compose -f docker-compose.ci.yml logs radio-backend
+    docker compose -f compose/docker-compose.ci.yml logs radio-backend
     exit 1
 fi
 
 # Cleanup
-docker-compose -f docker-compose.ci.yml down -v
+docker compose -f compose/docker-compose.ci.yml down -v
 
 echo "✅ Local CI simulation completed successfully!"
 EOF

@@ -15,8 +15,8 @@ NC='\033[0m' # No Color
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"
-COMPOSE_PROD_FILE="$PROJECT_DIR/docker-compose.prod.yml"
+COMPOSE_FILE="$PROJECT_DIR/compose/docker-compose.yml"
+COMPOSE_PROD_FILE="$PROJECT_DIR/compose/docker-compose.prod.yml"
 
 # Function to print colored output
 print_info() {
@@ -39,8 +39,12 @@ print_error() {
 PLATFORM=$(uname -m)
 COMPOSE_OVERRIDE=""
 if [[ "$PLATFORM" == "arm64" || "$PLATFORM" == "aarch64" ]]; then
-    COMPOSE_OVERRIDE="-f $PROJECT_DIR/docker-compose.override.yml"
-    print_info "Detected Apple Silicon (arm64) - using optimized configuration"
+    if [[ -f "$PROJECT_DIR/compose/docker-compose.override.yml" ]]; then
+        COMPOSE_OVERRIDE="-f $PROJECT_DIR/compose/docker-compose.override.yml"
+        print_info "Detected Apple Silicon (arm64) - using optimized configuration"
+    else
+        print_info "Detected Apple Silicon (arm64) - using default configuration"
+    fi
 fi
 
 # Function to check if Docker is running
@@ -50,8 +54,8 @@ check_docker() {
         exit 1
     fi
 
-    if ! command -v docker-compose >/dev/null 2>&1; then
-        print_error "docker-compose is not installed. Please install Docker Compose."
+    if ! docker compose version >/dev/null 2>&1; then
+        print_error "Docker Compose v2 is not available. Please install Docker Compose v2 or update Docker Desktop."
         exit 1
     fi
 
@@ -61,7 +65,7 @@ check_docker() {
 # Function to check if services are running
 check_services() {
     local running_services
-    running_services=$(docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE ps --services --filter "status=running" 2>/dev/null || echo "")
+    running_services=$(docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE ps --services --filter "status=running" 2>/dev/null || echo "")
 
     if [[ -n "$running_services" ]]; then
         return 0  # Services are running
@@ -80,13 +84,13 @@ start_dev() {
     print_info "Building Docker images..."
     if [[ "$PLATFORM" == "arm64" || "$PLATFORM" == "aarch64" ]]; then
         print_info "Using Apple Silicon optimized build..."
-        docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE build --no-cache
+        docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE build --no-cache
     else
-        docker-compose -f "$COMPOSE_FILE" build
+        docker compose -f "$COMPOSE_FILE" build
     fi
 
     print_info "Starting services..."
-    docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE up -d
+    docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE up -d
 
     # Wait for services to be healthy
     print_info "Waiting for services to be ready..."
@@ -95,7 +99,7 @@ start_dev() {
     local attempt=0
 
     while [ $attempt -lt $max_attempts ]; do
-        if docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE ps | grep -q "Up (healthy)"; then
+        if docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE ps | grep -q "Up (healthy)"; then
             break
         fi
 
@@ -109,18 +113,22 @@ start_dev() {
 
     # Check final status
     if check_services; then
-        print_success "🚀 Radio WiFi Development Environment is running!"
+        print_success "🚀 Backend is running!"
         echo
-        echo "📱 Frontend: http://localhost:3000"
-        echo "🔧 Backend:  http://localhost:8000"
-        echo "📋 API Docs: http://localhost:8000/docs"
-        echo "🐳 Traefik:  http://localhost:8080 (run with --traefik)"
+        echo "🔧 Backend API: http://localhost:8000"
+        echo "📋 API Docs:    http://localhost:8000/docs"
+        echo
+        print_info "To start the frontend (in a new terminal):"
+        echo "   cd frontend && npm run dev"
+        echo
+        print_info "Then access:"
+        echo "   📱 Frontend: http://localhost:5173"
         echo
         echo "📊 Useful commands:"
-        echo "   $0 logs       - View logs"
+        echo "   $0 logs       - View backend logs"
         echo "   $0 status     - Check service status"
-        echo "   $0 stop       - Stop all services"
-        echo "   $0 restart    - Restart services"
+        echo "   $0 stop       - Stop backend"
+        echo "   $0 restart    - Restart backend"
         echo
         return 0
     else
@@ -135,7 +143,7 @@ stop_dev() {
     print_info "Stopping Radio WiFi development environment..."
 
     cd "$PROJECT_DIR"
-    docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE down
+    docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE down
 
     print_success "Services stopped"
 }
@@ -145,7 +153,7 @@ restart_dev() {
     print_info "Restarting Radio WiFi development environment..."
 
     cd "$PROJECT_DIR"
-    docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE restart
+    docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE restart
 
     print_success "Services restarted"
 }
@@ -158,10 +166,10 @@ show_status() {
 
     if check_services; then
         echo
-        docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE ps
+        docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE ps
         echo
         print_info "Service health:"
-        docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE ps --format "table {{.Service}}\t{{.Status}}\t{{.Ports}}"
+        docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE ps --format "table {{.Service}}\t{{.Status}}\t{{.Ports}}"
     else
         print_warning "No services are currently running"
         echo
@@ -177,10 +185,10 @@ show_logs() {
 
     if [[ -n "$service" ]]; then
         print_info "Showing logs for service: $service"
-        docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE logs -f "$service"
+        docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE logs -f "$service"
     else
         print_info "Showing logs for all services (Ctrl+C to exit)"
-        docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE logs -f
+        docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE logs -f
     fi
 }
 
@@ -196,8 +204,8 @@ open_shell() {
     cd "$PROJECT_DIR"
 
     print_info "Opening shell in $service..."
-    docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE exec "$service" /bin/bash 2>/dev/null || \
-    docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE exec "$service" /bin/sh
+    docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE exec "$service" /bin/bash 2>/dev/null || \
+    docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE exec "$service" /bin/sh
 }
 
 # Function to rebuild services
@@ -208,12 +216,12 @@ rebuild() {
 
     if [[ -n "$service" ]]; then
         print_info "Rebuilding service: $service"
-        docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE build --no-cache "$service"
-        docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE up -d "$service"
+        docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE build --no-cache "$service"
+        docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE up -d "$service"
     else
         print_info "Rebuilding all services..."
-        docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE build --no-cache
-        docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE up -d
+        docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE build --no-cache
+        docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE up -d
     fi
 
     print_success "Rebuild complete"
@@ -226,7 +234,7 @@ cleanup() {
     cd "$PROJECT_DIR"
 
     # Stop and remove containers
-    docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE down -v
+    docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE down -v
 
     # Remove unused images
     docker image prune -f
@@ -246,16 +254,16 @@ start_with_services() {
     cd "$PROJECT_DIR"
 
     if [[ "$profiles" == "traefik" ]]; then
-        COMPOSE_PROFILES=traefik docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE up -d
+        COMPOSE_PROFILES=traefik docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE up -d
         print_success "Started with Traefik reverse proxy"
         echo "🌐 Access via: http://radio.local"
         echo "🐳 Traefik dashboard: http://localhost:8080"
     elif [[ "$profiles" == "mdns" ]]; then
-        COMPOSE_PROFILES=mdns docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE up -d
+        COMPOSE_PROFILES=mdns docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE up -d
         print_success "Started with mDNS support"
         echo "🌐 Access via: http://radio.local"
     elif [[ "$profiles" == "all" ]]; then
-        COMPOSE_PROFILES=traefik,mdns docker-compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE up -d
+        COMPOSE_PROFILES=traefik,mdns docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE up -d
         print_success "Started with all optional services"
         echo "🌐 Access via: http://radio.local"
         echo "🐳 Traefik dashboard: http://localhost:8080"
