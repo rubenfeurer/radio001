@@ -39,8 +39,12 @@ print_error() {
 PLATFORM=$(uname -m)
 COMPOSE_OVERRIDE=""
 if [[ "$PLATFORM" == "arm64" || "$PLATFORM" == "aarch64" ]]; then
-    COMPOSE_OVERRIDE="-f $PROJECT_DIR/docker-compose.override.yml"
-    print_info "Detected Apple Silicon (arm64) - using optimized configuration"
+    if [[ -f "$PROJECT_DIR/compose/docker-compose.override.yml" ]]; then
+        COMPOSE_OVERRIDE="-f $PROJECT_DIR/compose/docker-compose.override.yml"
+        print_info "Detected Apple Silicon (arm64) - using optimized configuration"
+    else
+        print_info "Detected Apple Silicon (arm64) - using default configuration"
+    fi
 fi
 
 # Function to check if Docker is running
@@ -109,18 +113,22 @@ start_dev() {
 
     # Check final status
     if check_services; then
-        print_success "🚀 Radio WiFi Development Environment is running!"
+        print_success "🚀 Backend is running!"
         echo
-        echo "📱 Frontend: http://localhost:3000"
-        echo "🔧 Backend:  http://localhost:8000"
-        echo "📋 API Docs: http://localhost:8000/docs"
-        echo "🐳 Traefik:  http://localhost:8080 (run with --traefik)"
+        echo "🔧 Backend API: http://localhost:8000"
+        echo "📋 API Docs:    http://localhost:8000/docs"
+        echo
+        print_info "To start the frontend (in a new terminal):"
+        echo "   cd frontend && npm run dev"
+        echo
+        print_info "Then access:"
+        echo "   📱 Frontend: http://localhost:5173"
         echo
         echo "📊 Useful commands:"
-        echo "   $0 logs       - View logs"
+        echo "   $0 logs       - View backend logs"
         echo "   $0 status     - Check service status"
-        echo "   $0 stop       - Stop all services"
-        echo "   $0 restart    - Restart services"
+        echo "   $0 stop       - Stop backend"
+        echo "   $0 restart    - Restart backend"
         echo
         return 0
     else

@@ -83,16 +83,16 @@ If you prefer manual setup:
    cd radio001
    ```
 
-2. **Start development environment:**
+2. **Start backend (Docker):**
    ```bash
    # Use the helper script
    ./scripts/dev-environment.sh start
    
-   # Or manually start backend:
+   # Or manually:
    docker compose -f compose/docker-compose.yml up radio-backend -d
    ```
 
-3. **Setup frontend:**
+3. **Start frontend (local):**
    ```bash
    cd frontend
    npm install
@@ -100,8 +100,9 @@ If you prefer manual setup:
    ```
 
 4. **Access the app:**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8000/docs
+   - Frontend: http://localhost:5173 (Vite dev server)
+   - Backend API: http://localhost:8000
+   - API Docs: http://localhost:8000/docs
 
 ### Production Deployment
 
