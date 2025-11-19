@@ -118,14 +118,14 @@ jobs:
       - name: View backend logs
         if: failure()
         run: |
-          docker-compose -f compose/docker-compose.ci.yml logs radio-backend
+          docker compose -f compose/docker-compose.ci.yml logs radio-backend
 
       - name: Run quick backend tests
         run: |
           echo "Running quick backend test suite..."
 
           # Run tests inside the backend container
-          docker-compose -f compose/docker-compose.ci.yml exec -T radio-backend bash -c "
+          docker compose -f compose/docker-compose.ci.yml exec -T radio-backend bash -c "
             # Set test environment
             export NODE_ENV=development
             export MOCK_HARDWARE=true
@@ -149,7 +149,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker-compose -f compose/docker-compose.ci.yml down -v
+          docker compose -f compose/docker-compose.ci.yml down -v
 
   # =============================================================================
   # Quick Test Summary
