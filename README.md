@@ -48,7 +48,7 @@ A unified **Radio + WiFi Configuration** system for Raspberry Pi Zero 2 W, combi
 
 ### Prerequisites
 - **Node.js** 20+ (for local development)
-- **Docker** & Docker Compose (for backend)
+- **Docker** & Docker Compose v2 (for backend)
 - **Raspberry Pi Zero 2 W** or compatible ARM64 device (for production)
 
 ### Development Setup
@@ -59,9 +59,13 @@ A unified **Radio + WiFi Configuration** system for Raspberry Pi Zero 2 W, combi
    cd radio001
    ```
 
-2. **Start backend (Docker):**
+2. **Start development environment:**
    ```bash
-   docker-compose -f compose/docker-compose.yml up radio-backend -d
+   # Easy way - use the helper script
+   ./scripts/dev-environment.sh start
+   
+   # Or manually start backend:
+   docker compose -f compose/docker-compose.yml up radio-backend -d
    ```
 
 3. **Setup frontend (Local):**
@@ -83,7 +87,7 @@ Deploy to Raspberry Pi:
 ./scripts/deploy-pi.sh
 
 # Or manually:
-docker-compose -f compose/docker-compose.prod.yml up -d
+docker compose -f compose/docker-compose.prod.yml up -d
 ```
 
 ## 📁 Project Structure
@@ -100,9 +104,47 @@ radio001/
 │   ├── api/routes/        # API endpoints
 │   └── main.py            # Unified WiFi + Radio API
 ├── compose/               # Docker configurations
+├── scripts/               # Helper scripts (see below)
 ├── data/                  # Station storage
 ├── assets/sounds/         # Notification sounds
 └── docs/                  # Documentation
+```
+
+## 🔧 Helper Scripts
+
+The `scripts/` directory contains various helper scripts for development and CI/CD:
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| **dev-environment.sh** | Manage Docker development environment | `./scripts/dev-environment.sh [start\|stop\|restart\|status\|logs]` |
+| **backend-test-status.sh** | Check backend testing infrastructure status | `./scripts/backend-test-status.sh` |
+| **ci-pipeline-fix.sh** | Fix CI/CD pipeline issues (ARM64/AMD64 compatibility) | `./scripts/ci-pipeline-fix.sh` |
+| **test-ci.sh** | Run local CI simulation | `./scripts/test-ci.sh` |
+| **setup-dev.sh** | Initial development environment setup | `./scripts/setup-dev.sh` |
+| **setup-hooks.sh** | Setup Git hooks | `./scripts/setup-hooks.sh` |
+| **setup-github-protection.sh** | Configure GitHub branch protection | `./scripts/setup-github-protection.sh` |
+| **wifi-init.sh** | Initialize WiFi configuration on Raspberry Pi | `./scripts/wifi-init.sh` |
+
+### Common Script Examples
+
+```bash
+# Start development environment
+./scripts/dev-environment.sh start
+
+# Check development status
+./scripts/dev-environment.sh status
+
+# View backend logs
+./scripts/dev-environment.sh logs radio-backend
+
+# Stop all services
+./scripts/dev-environment.sh stop
+
+# Check backend test infrastructure
+./scripts/backend-test-status.sh
+
+# Fix CI pipeline issues
+./scripts/ci-pipeline-fix.sh
 ```
 
 ## 📚 Documentation
