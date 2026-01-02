@@ -35,8 +35,10 @@ class WebSocketClient {
 					this.reconnectTimer = null;
 				}
 
-				// Request initial status
-				this.send({ type: 'get_status' });
+				// Request initial status after a short delay to ensure connection is fully established
+				setTimeout(() => {
+					this.send({ type: 'get_status' });
+				}, 100);
 			};
 
 			this.ws.onmessage = (event) => {
