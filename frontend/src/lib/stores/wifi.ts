@@ -130,37 +130,19 @@ export const getStatus = async () => {
 	error.set(null);
 
 	try {
-		const response = await fetch('/api/wifi/status');
-		const result: ApiResponse = await response.json();
+		const response = await fetch('/api/system/status');
 
-		if (result.success && result.data) {
-			// Transform backend response to expected SystemStatus structure
-			const backendData = result.data as any;
-			const systemStatus: SystemStatus = {
-				hostname: 'radio', // Default value
-				uptime: 0,
-				memory: { total: 0, used: 0, free: 0 },
-				cpu: { load: 0 },
-				network: {
-					wifi: {
-						wifiInterface: 'wlan0',
-						status: backendData.connected ? 'connected' : 'disconnected',
-						ssid: backendData.ssid || undefined,
-						ip: backendData.ip_address || undefined,
-						signal: backendData.signal_strength || undefined,
-						mode: backendData.mode === 'host' ? 'hotspot' : 'client'
-					}
-				},
-				services: {}
-			};
-			status.set(systemStatus);
-		} else {
-			throw new Error(result.message || 'Failed to get status');
+		if (!response.ok) {
+			throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 		}
+
+		// Backend now returns SystemStatus directly (no ApiResponse wrapper)
+		const systemStatus: SystemStatus = await response.json();
+		status.set(systemStatus);
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Status check failed';
 		setError(message);
-		console.error('WiFi status error:', err);
+		console.error('System status error:', err);
 	} finally {
 		isLoading.set(false);
 	}
