@@ -38,11 +38,15 @@ print_error() {
 # Detect platform for ARM64 builds
 PLATFORM=$(uname -m)
 COMPOSE_OVERRIDE=""
+IS_RASPBERRY_PI=false
+AUTO_PRODUCTION_MODE=false
 
 # Detect if running on Raspberry Pi or Apple Silicon
 if [[ "$PLATFORM" == "arm64" || "$PLATFORM" == "aarch64" ]]; then
     if [[ -f "/proc/device-tree/model" ]] && grep -q "Raspberry Pi" /proc/device-tree/model 2>/dev/null; then
         PLATFORM_NAME="Raspberry Pi ARM64"
+        IS_RASPBERRY_PI=true
+        AUTO_PRODUCTION_MODE=true
     elif [[ "$(uname -s)" == "Darwin" ]]; then
         PLATFORM_NAME="Apple Silicon (arm64)"
     else
@@ -86,6 +90,14 @@ check_services() {
 
 # Function to start development environment
 start_dev() {
+    # Check if running on Raspberry Pi and auto-switch to production mode
+    if [[ "$AUTO_PRODUCTION_MODE" == true ]]; then
+        print_warning "Detected Raspberry Pi - automatically starting in production mode"
+        print_info "Use 'start --dev' to force development mode"
+        start_prod
+        return $?
+    fi
+
     print_info "Starting Radio WiFi development environment..."
 
     cd "$PROJECT_DIR"
@@ -108,7 +120,7 @@ start_dev() {
         docker compose -f "$COMPOSE_FILE" build
     fi
 
-    print_info "Starting services..."
+    print_info "Starting services in DEVELOPMENT mode..."
     docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE up -d
 
     # Wait for services to be healthy
@@ -157,12 +169,87 @@ start_dev() {
     fi
 }
 
+# Function to start production environment
+start_prod() {
+    print_info "Starting Radio WiFi in PRODUCTION mode..."
+
+    cd "$PROJECT_DIR"
+
+    # Create /opt/radio directories for production bind mounts
+    print_info "Setting up production data directories..."
+    if [ ! -d "/opt/radio/data" ]; then
+        sudo mkdir -p /opt/radio/data /opt/radio/logs /opt/radio/config
+        sudo chown -R $USER:$USER /opt/radio
+        print_success "Created /opt/radio directories"
+    fi
+
+    # Fix data directory permissions for Docker container
+    print_info "Setting up data directory permissions..."
+    if [ ! -d "data" ]; then
+        mkdir -p data
+    fi
+    # Set ownership to UID 999 (radio user in container)
+    sudo chown -R 999:999 data/ 2>/dev/null || chown -R 999:999 data/ 2>/dev/null || true
+    sudo chmod -R 755 data/ 2>/dev/null || chmod -R 755 data/ 2>/dev/null || true
+
+    # Build and start services using production compose file
+    print_info "Building production Docker images..."
+    if [[ "$PLATFORM" == "arm64" || "$PLATFORM" == "aarch64" ]]; then
+        print_info "Building for $PLATFORM_NAME..."
+        docker compose -f "$COMPOSE_PROD_FILE" build --no-cache
+    else
+        docker compose -f "$COMPOSE_PROD_FILE" build
+    fi
+
+    print_info "Starting services in PRODUCTION mode..."
+    docker compose -f "$COMPOSE_PROD_FILE" up -d
+
+    # Wait for services to be healthy
+    print_info "Waiting for services to be ready..."
+
+    local max_attempts=60
+    local attempt=0
+
+    while [ $attempt -lt $max_attempts ]; do
+        if docker compose -f "$COMPOSE_PROD_FILE" ps | grep -q "Up (healthy)"; then
+            break
+        fi
+
+        if [ $((attempt % 10)) -eq 0 ]; then
+            print_info "Still waiting for services... (${attempt}/${max_attempts})"
+        fi
+
+        sleep 3
+        attempt=$((attempt + 1))
+    done
+
+    # Check final status
+    if docker compose -f "$COMPOSE_PROD_FILE" ps --services --filter "status=running" 2>/dev/null | grep -q "radio"; then
+        print_success "🚀 Radio WiFi is running in PRODUCTION mode!"
+        echo
+        echo "🌐 Access the app at: http://localhost:3000"
+        echo "📋 API Docs:          http://localhost:8000/docs"
+        echo
+        echo "📊 Useful commands:"
+        echo "   $0 logs       - View logs"
+        echo "   $0 status     - Check service status"
+        echo "   $0 stop       - Stop services"
+        echo
+        return 0
+    else
+        print_error "Failed to start services properly"
+        docker compose -f "$COMPOSE_PROD_FILE" ps
+        return 1
+    fi
+}
+
 # Function to stop development environment
 stop_dev() {
     print_info "Stopping Radio WiFi development environment..."
 
     cd "$PROJECT_DIR"
     docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE down
+    docker compose -f "$COMPOSE_PROD_FILE" down 2>/dev/null || true
 
     print_success "Services stopped"
 }
@@ -294,9 +381,11 @@ show_help() {
     echo "Usage: $0 [COMMAND] [OPTIONS]"
     echo
     echo "Commands:"
-    echo "  start              Start development environment"
-    echo "  stop               Stop development environment"
-    echo "  restart            Restart development environment"
+    echo "  start              Start environment (auto-detects Pi for production mode)"
+    echo "  start --dev        Force development mode (even on Raspberry Pi)"
+    echo "  start --prod       Force production mode"
+    echo "  stop               Stop environment"
+    echo "  restart            Restart environment"
     echo "  status             Show service status"
     echo "  logs [service]     Show logs (all services or specific service)"
     echo "  shell <service>    Open shell in service container"
@@ -307,15 +396,19 @@ show_help() {
     echo "  --all              Start with all optional services"
     echo
     echo "Examples:"
-    echo "  $0 start                    # Start basic development environment"
+    echo "  $0 start                    # Start (auto-detects mode)"
+    echo "  $0 start --dev              # Force development mode"
+    echo "  $0 start --prod             # Force production mode"
     echo "  $0 start --traefik          # Start with Traefik for radio.local access"
     echo "  $0 logs radio-backend       # Show backend logs"
     echo "  $0 shell radio-app          # Open shell in frontend container"
     echo "  $0 rebuild radio-backend    # Rebuild only backend service"
     echo
     echo "Services:"
-    echo "  radio-app       Frontend (Nuxt 3) on port 3000"
+    echo "  radio-app       Frontend (SvelteKit) on port 3000"
     echo "  radio-backend   Backend (FastAPI) on port 8000"
+    echo
+    echo "Note: On Raspberry Pi, production mode starts automatically unless --dev is specified"
     echo
 }
 
@@ -328,6 +421,15 @@ main() {
     case "${1:-start}" in
         start)
             case "${2:-}" in
+                --dev)
+                    # Force development mode (disable auto-production for Pi)
+                    AUTO_PRODUCTION_MODE=false
+                    start_dev
+                    ;;
+                --prod)
+                    # Force production mode
+                    start_prod
+                    ;;
                 --traefik)
                     start_with_services "traefik"
                     ;;

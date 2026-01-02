@@ -28,7 +28,6 @@ services:
       # Device access for WiFi management
       - /dev:/dev:rw
       - /sys/class/net:/sys/class/net:ro
-      - /proc/net:/proc/net:ro
     environment:
       # Production settings
       - NODE_ENV=production
