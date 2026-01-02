@@ -183,6 +183,13 @@ start_prod() {
         print_success "Created /opt/radio directories"
     fi
 
+    # Create /etc/raspiwifi directory for backend config
+    if [ ! -d "/etc/raspiwifi" ]; then
+        sudo mkdir -p /etc/raspiwifi
+        sudo chown -R $USER:$USER /etc/raspiwifi
+        print_success "Created /etc/raspiwifi directory"
+    fi
+
     # Fix data directory permissions for Docker container
     print_info "Setting up data directory permissions..."
     if [ ! -d "data" ]; then

@@ -21,13 +21,21 @@
 - All Docker configurations are in `compose/` directory.
 
 ## Testing instructions
-- Backend tests: Run `pytest` from the `backend/` directory (142 tests in the suite).
-- Frontend tests: Run `npm test` from the `frontend/` directory.
-- To test specific backend modules, use `pytest tests/test_<module>.py`.
-- To test API endpoints, use `pytest tests/api/` or access the interactive docs at http://localhost:8000/docs.
-- Before committing, ensure all tests pass for both frontend and backend.
-- For hardware-related tests, the system supports mock mode - check `backend/hardware/` for GPIO mocking.
-- After changing API routes or data models, verify the OpenAPI schema at http://localhost:8000/openapi.json.
+- **Backend tests**: See `backend/TESTING.md` for comprehensive testing guide
+- **Quick test runner**: Use `backend/run_tests.sh` for easy testing with various options
+- Common test commands:
+  - `cd backend && ./run_tests.sh` - Run all tests locally
+  - `cd backend && ./run_tests.sh -t unit` - Run only unit tests
+  - `cd backend && ./run_tests.sh -t api -v` - Run API tests with verbose output
+  - `cd backend && ./run_tests.sh --clean --coverage 80` - Run with 80% coverage threshold
+  - `cd backend && pytest` - Direct pytest (142 tests in the suite)
+- Frontend tests: Run `npm test` from the `frontend/` directory
+- To test specific backend modules, use `pytest tests/test_<module>.py`
+- To test API endpoints, use `pytest tests/api/` or access the interactive docs at http://localhost:8000/docs
+- Before committing, ensure all tests pass for both frontend and backend
+- For hardware-related tests, the system supports mock mode - check `backend/hardware/` for GPIO mocking
+- After changing API routes or data models, verify the OpenAPI schema at http://localhost:8000/openapi.json
+- **CRITICAL**: When writing RadioManager tests, follow the proven pattern in `backend/TESTING.md` to avoid test failures
 
 ## Backend development
 - FastAPI backend uses Python 3.11+ with async/await patterns.
@@ -99,7 +107,12 @@ cd frontend && npm run dev
 ./scripts/dev-environment.sh logs radio-backend # Specific service
 
 # Run all backend tests
-cd backend && pytest
+cd backend && ./run_tests.sh              # Using test runner (recommended)
+cd backend && pytest                       # Direct pytest
+
+# Run specific backend test types
+cd backend && ./run_tests.sh -t unit      # Unit tests only
+cd backend && ./run_tests.sh -t api -v    # API tests with verbose output
 
 # Run all frontend tests
 cd frontend && npm test
