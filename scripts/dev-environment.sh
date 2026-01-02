@@ -80,6 +80,15 @@ start_dev() {
 
     cd "$PROJECT_DIR"
 
+    # Fix data directory permissions for Docker container
+    print_info "Setting up data directory permissions..."
+    if [ ! -d "data" ]; then
+        mkdir -p data
+    fi
+    # Set ownership to UID 999 (radio user in container)
+    sudo chown -R 999:999 data/ 2>/dev/null || chown -R 999:999 data/ 2>/dev/null || true
+    sudo chmod -R 755 data/ 2>/dev/null || chmod -R 755 data/ 2>/dev/null || true
+
     # Build and start services
     print_info "Building Docker images..."
     if [[ "$PLATFORM" == "arm64" || "$PLATFORM" == "aarch64" ]]; then

@@ -127,6 +127,17 @@ chmod +x ../.husky/* 2>/dev/null || true
 print_success "Frontend dependencies configured"
 cd ..
 
+# Setup data directory permissions
+print_status "Setting up data directory permissions..."
+if [ ! -d "data" ]; then
+    mkdir -p data
+    print_status "Created data directory"
+fi
+# Set ownership to UID 999 (radio user in container)
+sudo chown -R 999:999 data/ 2>/dev/null || chown -R 999:999 data/ 2>/dev/null || true
+sudo chmod -R 755 data/ 2>/dev/null || chmod -R 755 data/ 2>/dev/null || true
+print_success "Data directory permissions configured"
+
 # Test Docker setup
 print_status "Testing Docker environment..."
 
