@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y \
     procps \
     net-tools \
     iputils-ping \
+    wireless-tools \
+    iw \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
