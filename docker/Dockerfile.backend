@@ -34,6 +34,10 @@ RUN groupadd -r radio && useradd -r -g radio radio && \
     mkdir -p /tmp/radio /var/log/radio /data /app/data && \
     chown -R radio:radio /tmp/radio /var/log/radio /data /app/data
 
+# Configure passwordless sudo for WiFi management commands (RaspiWiFi-style permissions)
+RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown" > /etc/sudoers.d/radio && \
+    chmod 0440 /etc/sudoers.d/radio
+
 # Copy requirements first for better caching
 COPY backend/requirements.txt .
 

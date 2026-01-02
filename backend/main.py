@@ -4,6 +4,7 @@ Inspired by RaspiWiFi with minimal dependencies and clean architecture
 """
 
 import asyncio
+import logging
 import os
 import sys
 from contextlib import asynccontextmanager
@@ -11,6 +12,12 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 import uvicorn
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 from api.routes.radio import router as radio_router
 
 # Radio system imports
@@ -317,10 +324,15 @@ class WiFiManager:
 
         if Config.IS_DEVELOPMENT:
             # Simulate connection in development
+            logger.info(
+                f"Development mode: Simulating WiFi connection to {credentials.ssid}"
+            )
             await asyncio.sleep(1)
             return True
 
         try:
+            logger.info(f"Creating wpa_supplicant.conf for {credentials.ssid}")
+
             # Create wpa_supplicant.conf (same as RaspiWiFi)
             wpa_config = [
                 "ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev",
@@ -340,50 +352,90 @@ class WiFiManager:
             # Write wpa_supplicant.conf
             temp_file = Path("/tmp/wpa_supplicant.conf.tmp")
             temp_file.write_text("\n".join(wpa_config))
+            logger.debug(f"Wrote temporary config to {temp_file}")
 
             # Move to final location (requires root)
             process = await asyncio.create_subprocess_exec(
-                "sudo", "mv", str(temp_file), str(Config.WPA_SUPPLICANT_FILE)
+                "sudo",
+                "mv",
+                str(temp_file),
+                str(Config.WPA_SUPPLICANT_FILE),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
-            await process.communicate()
+            stdout, stderr = await process.communicate()
 
-            return process.returncode == 0
+            if process.returncode == 0:
+                logger.info(f"Successfully wrote {Config.WPA_SUPPLICANT_FILE}")
+                return True
+            else:
+                logger.error(f"Failed to move config file: {stderr.decode()}")
+                return False
 
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error writing WiFi credentials: {e}", exc_info=True)
             return False
 
     @staticmethod
     async def switch_to_client_mode():
-        """Switch from host mode to client mode (RaspiWiFi method)"""
+        """Switch from host mode to client mode (RaspiWiFi-inspired method)"""
 
         if Config.IS_DEVELOPMENT:
+            logger.info("Development mode: Skipping mode switch")
             return
 
         try:
             # Remove host mode marker (RaspiWiFi method)
             if Config.HOST_MODE_FILE.exists():
                 Config.HOST_MODE_FILE.unlink()
+                logger.info(f"Removed host mode marker: {Config.HOST_MODE_FILE}")
 
-            # Restore original configurations and reboot (RaspiWiFi method)
-            commands = [
-                "sudo rm -f /etc/cron.raspiwifi/aphost_bootstrapper",
-                "sudo cp /usr/lib/raspiwifi/reset_device/static_files/apclient_bootstrapper /etc/cron.raspiwifi/",
-                "sudo chmod +x /etc/cron.raspiwifi/apclient_bootstrapper",
-                "sudo mv /etc/dnsmasq.conf.original /etc/dnsmasq.conf",
-                "sudo mv /etc/dhcpcd.conf.original /etc/dhcpcd.conf",
-            ]
+            # Restore original configurations if they exist (RaspiWiFi backup pattern)
+            restore_commands = []
 
-            for cmd in commands:
-                process = await asyncio.create_subprocess_shell(cmd)
-                await process.communicate()
+            dnsmasq_original = Path("/etc/dnsmasq.conf.original")
+            if dnsmasq_original.exists():
+                restore_commands.append(
+                    (
+                        "sudo mv /etc/dnsmasq.conf.original /etc/dnsmasq.conf",
+                        "dnsmasq.conf",
+                    )
+                )
+
+            dhcpcd_original = Path("/etc/dhcpcd.conf.original")
+            if dhcpcd_original.exists():
+                restore_commands.append(
+                    (
+                        "sudo mv /etc/dhcpcd.conf.original /etc/dhcpcd.conf",
+                        "dhcpcd.conf",
+                    )
+                )
+
+            # Execute restore commands with error checking
+            for cmd, desc in restore_commands:
+                try:
+                    process = await asyncio.create_subprocess_shell(
+                        cmd,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    stdout, stderr = await process.communicate()
+
+                    if process.returncode == 0:
+                        logger.info(f"Restored {desc}")
+                    else:
+                        logger.warning(f"Failed to restore {desc}: {stderr.decode()}")
+                except Exception as e:
+                    logger.warning(f"Error restoring {desc}: {e}")
+
+            logger.info("Mode switch to client complete, initiating reboot...")
 
             # Reboot to apply changes
             await asyncio.create_subprocess_shell("sudo reboot")
 
         except Exception as e:
-            raise HTTPException(
-                status_code=500, detail=f"Failed to switch mode: {str(e)}"
-            )
+            logger.error(f"Failed to switch mode: {e}", exc_info=True)
+            raise
 
 
 # =============================================================================
@@ -558,32 +610,50 @@ async def scan_wifi_networks():
 
 @app.post("/wifi/connect", response_model=ApiResponse)
 async def connect_wifi(credentials: WiFiCredentials, background_tasks: BackgroundTasks):
-    """Connect to WiFi network"""
+    """Connect to WiFi network (RaspiWiFi-style)"""
     try:
         # Validate credentials
         if not credentials.ssid.strip():
             raise HTTPException(status_code=400, detail="SSID cannot be empty")
 
-        # Attempt connection
+        logger.info(f"Attempting to connect to WiFi: {credentials.ssid}")
+
+        # Write wpa_supplicant.conf with credentials
         success = await WiFiManager.connect_network(credentials)
 
         if not success:
+            logger.error(f"Failed to write WiFi credentials for {credentials.ssid}")
             return ApiResponse(
-                success=False, message="Failed to create WiFi configuration"
+                success=False,
+                message="Failed to save WiFi credentials. Check system permissions.",
             )
 
-        # Schedule mode switch in background (RaspiWiFi approach)
-        background_tasks.add_task(WiFiManager.switch_to_client_mode)
+        logger.info(f"WiFi credentials saved for {credentials.ssid}")
 
-        return ApiResponse(
-            success=True,
-            message=f"Connecting to {credentials.ssid}. System will reboot to client mode.",
-            data={"ssid": credentials.ssid},
-        )
+        # Execute mode switch (not in background so we can catch errors)
+        # Note: If in hotspot mode, this will remove host_mode marker and reboot
+        try:
+            await WiFiManager.switch_to_client_mode()
+            # If we reach here, reboot is starting
+            return ApiResponse(
+                success=True,
+                message=f"WiFi configured. System rebooting to connect to '{credentials.ssid}'...",
+                data={
+                    "ssid": credentials.ssid,
+                    "instructions": "System will reboot. Connect your device to the new WiFi network and navigate to http://radio.local",
+                },
+            )
+        except Exception as e:
+            logger.error(f"Mode switch failed: {e}", exc_info=True)
+            return ApiResponse(
+                success=False,
+                message=f"Failed to switch mode: {str(e)}. System remains in current mode.",
+            )
 
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Connect WiFi error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

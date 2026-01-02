@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies
+# Install system dependencies (including sudo for WiFi management)
 RUN apt-get update && apt-get install -y \
     curl \
     procps \
@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     iputils-ping \
     wireless-tools \
     iw \
+    sudo \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -25,6 +26,10 @@ WORKDIR /app
 
 # Create non-root user
 RUN groupadd -r radio && useradd -r -g radio radio
+
+# Configure passwordless sudo for WiFi management commands (RaspiWiFi-style permissions)
+RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown" > /etc/sudoers.d/radio && \
+    chmod 0440 /etc/sudoers.d/radio
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt requirements-test.txt ./
