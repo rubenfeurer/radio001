@@ -68,3 +68,22 @@ export interface ConnectionResult {
 	ip?: string;
 	error?: string;
 }
+
+export interface RadioStation {
+	id: string;
+	name: string;
+	url: string;
+	genre?: string;
+	bitrate?: number;
+	country?: string;
+	favicon?: string;
+}
+
+export interface PlaybackStatus {
+	is_playing: boolean;
+	current_station?: RadioStation;
+	stream_title?: string;
+	bitrate?: number;
+	codec?: string;
+	error?: string;
+}
