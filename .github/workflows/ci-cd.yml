@@ -151,6 +151,7 @@ jobs:
         run: |
           npm install
           cd frontend && npm run build:ci
+          cd ..
           docker compose -f compose/docker-compose.prod.yml up -d
           sleep 20
           curl -f http://localhost || echo "Production test skipped - no nginx setup in CI"
