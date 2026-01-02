@@ -218,7 +218,7 @@ jobs:
 
           # Test API directly
           echo "Testing API directly..."
-          if curl -f http://localhost:8000/api/health; then
+          if curl -f http://localhost:8000/health; then
             echo "Direct API test passed"
           else
             echo "Direct API test failed"
