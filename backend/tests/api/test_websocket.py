@@ -190,7 +190,7 @@ class TestWebSocketRoutes:
         assert station_msg.type == "station_change"
 
     @patch("api.routes.websocket.RadioManager")
-    @patch("api.routes.websocket.get_system_metrics")
+    @patch("api.routes.system.get_system_metrics")
     @patch("api.routes.websocket.manager")
     async def test_websocket_client_message_handling(
         self, mock_manager, mock_get_system_metrics, mock_radio_manager
