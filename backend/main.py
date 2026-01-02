@@ -3,36 +3,50 @@ FastAPI Backend for Radio WiFi Configuration
 Inspired by RaspiWiFi with minimal dependencies and clean architecture
 """
 
+import asyncio
 import os
 import sys
-import asyncio
-from pathlib import Path
-from typing import List, Optional, Any
 from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Any, List, Optional
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
 import uvicorn
+from api.routes.radio import router as radio_router
 
 # Radio system imports
 from api.routes.stations import router as stations_router
-from api.routes.radio import router as radio_router
-from api.routes.websocket import router as websocket_router, setup_radio_manager_with_websocket
-
+from api.routes.system import router as system_router
+from api.routes.websocket import router as websocket_router
+from api.routes.websocket import (
+    setup_radio_manager_with_websocket,
+    start_metrics_broadcast,
+    stop_metrics_broadcast,
+)
+from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
 # =============================================================================
 # Configuration
 # =============================================================================
 
+
 class Config:
     """Application configuration - inspired by RaspiWiFi's simple approach"""
 
     # Paths (following RaspiWiFi convention)
-    RASPIWIFI_DIR = Path("/tmp/radio") if os.getenv("NODE_ENV") == "development" else Path("/etc/raspiwifi")
+    RASPIWIFI_DIR = (
+        Path("/tmp/radio")
+        if os.getenv("NODE_ENV") == "development"
+        else Path("/etc/raspiwifi")
+    )
     config_file = RASPIWIFI_DIR / "raspiwifi.conf"
     HOST_MODE_FILE = RASPIWIFI_DIR / "host_mode"
-    WPA_SUPPLICANT_FILE = Path("/tmp/wpa_supplicant.conf" if os.getenv("NODE_ENV") == "development" else "/etc/wpa_supplicant/wpa_supplicant.conf")
+    WPA_SUPPLICANT_FILE = Path(
+        "/tmp/wpa_supplicant.conf"
+        if os.getenv("NODE_ENV") == "development"
+        else "/etc/wpa_supplicant/wpa_supplicant.conf"
+    )
 
     # Network interfaces
     WIFI_INTERFACE = os.getenv("WIFI_INTERFACE", "wlan0")
@@ -51,14 +65,14 @@ class Config:
     NOTIFICATION_VOLUME: int = 40
 
     # Hardware Settings (GPIO pins)
-    BUTTON_PIN_1: int = 17      # GPIO17 (Pin 11) - Station 1
-    BUTTON_PIN_2: int = 16      # GPIO16 (Pin 36) - Station 2
-    BUTTON_PIN_3: int = 26      # GPIO26 (Pin 37) - Station 3
+    BUTTON_PIN_1: int = 17  # GPIO17 (Pin 11) - Station 1
+    BUTTON_PIN_2: int = 16  # GPIO16 (Pin 36) - Station 2
+    BUTTON_PIN_3: int = 26  # GPIO26 (Pin 37) - Station 3
 
     # Rotary Encoder Settings
-    ROTARY_CLK: int = 11        # GPIO11 (Pin 23) - Clock
-    ROTARY_DT: int = 9          # GPIO9  (Pin 21) - Data
-    ROTARY_SW: int = 10         # GPIO10 (Pin 19) - Switch/Button
+    ROTARY_CLK: int = 11  # GPIO11 (Pin 23) - Clock
+    ROTARY_DT: int = 9  # GPIO9  (Pin 21) - Data
+    ROTARY_SW: int = 10  # GPIO10 (Pin 19) - Switch/Button
     ROTARY_CLOCKWISE_INCREASES: bool = True  # Volume direction
     ROTARY_VOLUME_STEP: int = 5  # Volume change per step
 
@@ -86,8 +100,10 @@ class Config:
 # Data Models
 # =============================================================================
 
+
 class WiFiNetwork(BaseModel):
     """WiFi network model"""
+
     ssid: str
     signal: Optional[int] = None
     encryption: str = "Unknown"
@@ -96,12 +112,14 @@ class WiFiNetwork(BaseModel):
 
 class WiFiCredentials(BaseModel):
     """WiFi connection credentials"""
+
     ssid: str = Field(..., min_length=1, max_length=32)
     password: str = Field(default="", max_length=63)
 
 
 class SystemStatus(BaseModel):
     """System status model"""
+
     mode: str  # "client" or "host"
     connected: bool
     ssid: Optional[str] = None
@@ -111,6 +129,7 @@ class SystemStatus(BaseModel):
 
 class ApiResponse(BaseModel):
     """Standard API response"""
+
     success: bool
     message: str
     data: Optional[Any] = None
@@ -120,6 +139,7 @@ class ApiResponse(BaseModel):
 # WiFi Management (RaspiWiFi inspired)
 # =============================================================================
 
+
 class WiFiManager:
     """WiFi management class inspired by RaspiWiFi's approach"""
 
@@ -127,9 +147,9 @@ class WiFiManager:
     def _parse_signal_strength(line: str) -> Optional[int]:
         """Parse signal strength from iwlist output line"""
         try:
-            signal_part = line.split('Signal level=')[1].split()[0]
-            if 'dBm' in signal_part:
-                signal = int(signal_part.replace('dBm', ''))
+            signal_part = line.split("Signal level=")[1].split()[0]
+            if "dBm" in signal_part:
+                signal = int(signal_part.replace("dBm", ""))
                 # Convert dBm to percentage (rough approximation)
                 return max(0, min(100, 2 * (signal + 100)))
         except (ValueError, IndexError):
@@ -139,23 +159,23 @@ class WiFiManager:
     @staticmethod
     def _parse_encryption(line: str) -> str:
         """Parse encryption type from iwlist output line"""
-        if 'off' in line:
-            return 'Open'
-        return 'WPA'
+        if "off" in line:
+            return "Open"
+        return "WPA"
 
     @staticmethod
     def _parse_frequency(line: str) -> Optional[str]:
         """Parse frequency from iwlist output line"""
         try:
-            return line.split('Frequency:')[1].split()[0]
+            return line.split("Frequency:")[1].split()[0]
         except IndexError:
             return None
 
     @staticmethod
     def _parse_ssid(line: str) -> Optional[str]:
         """Parse SSID from iwlist output line"""
-        ssid = line.split('ESSID:')[1].strip('"')
-        if ssid and ssid != '':
+        ssid = line.split("ESSID:")[1].strip('"')
+        if ssid and ssid != "":
             return ssid
         return None
 
@@ -165,35 +185,35 @@ class WiFiManager:
         networks = []
         current_network = {}
 
-        for line in output.split('\n'):
+        for line in output.split("\n"):
             line = line.strip()
 
-            if 'ESSID:' in line:
+            if "ESSID:" in line:
                 ssid = WiFiManager._parse_ssid(line)
                 if ssid:
-                    current_network['ssid'] = ssid
+                    current_network["ssid"] = ssid
 
-            elif 'Signal level=' in line:
+            elif "Signal level=" in line:
                 signal = WiFiManager._parse_signal_strength(line)
                 if signal is not None:
-                    current_network['signal'] = signal
+                    current_network["signal"] = signal
 
-            elif 'Encryption key:' in line:
-                current_network['encryption'] = WiFiManager._parse_encryption(line)
+            elif "Encryption key:" in line:
+                current_network["encryption"] = WiFiManager._parse_encryption(line)
 
-            elif 'Frequency:' in line:
+            elif "Frequency:" in line:
                 freq = WiFiManager._parse_frequency(line)
                 if freq:
-                    current_network['frequency'] = freq
+                    current_network["frequency"] = freq
 
             # If we have a complete network, add it
-            elif 'ssid' in current_network and line.startswith('Cell'):
+            elif "ssid" in current_network and line.startswith("Cell"):
                 if len(current_network) > 1:  # Has more than just SSID
                     networks.append(WiFiNetwork(**current_network))
                 current_network = {}
 
         # Don't forget the last network
-        if 'ssid' in current_network and len(current_network) > 1:
+        if "ssid" in current_network and len(current_network) > 1:
             networks.append(WiFiNetwork(**current_network))
 
         return networks
@@ -205,17 +225,28 @@ class WiFiManager:
         if Config.IS_DEVELOPMENT:
             # Return mock data for development
             return [
-                WiFiNetwork(ssid="HomeWiFi", signal=-45, encryption="WPA2", frequency="2.4GHz"),
-                WiFiNetwork(ssid="GuestNetwork", signal=-60, encryption="Open", frequency="5GHz"),
-                WiFiNetwork(ssid="NeighborWiFi", signal=-75, encryption="WPA3", frequency="2.4GHz"),
+                WiFiNetwork(
+                    ssid="HomeWiFi", signal=-45, encryption="WPA2", frequency="2.4GHz"
+                ),
+                WiFiNetwork(
+                    ssid="GuestNetwork", signal=-60, encryption="Open", frequency="5GHz"
+                ),
+                WiFiNetwork(
+                    ssid="NeighborWiFi",
+                    signal=-75,
+                    encryption="WPA3",
+                    frequency="2.4GHz",
+                ),
             ]
 
         try:
             # Use iwlist scan (same as RaspiWiFi)
             process = await asyncio.create_subprocess_exec(
-                "iwlist", Config.WIFI_INTERFACE, "scan",
+                "iwlist",
+                Config.WIFI_INTERFACE,
+                "scan",
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
             )
             stdout, stderr = await process.communicate()
 
@@ -236,7 +267,7 @@ class WiFiManager:
                 mode="host",
                 connected=False,
                 ssid="Radio-Setup",
-                ip_address="192.168.4.1"
+                ip_address="192.168.4.1",
             )
 
         try:
@@ -248,14 +279,15 @@ class WiFiManager:
                     mode="host",
                     connected=True,
                     ssid="Radio-Setup",
-                    ip_address="192.168.4.1"
+                    ip_address="192.168.4.1",
                 )
 
             # Check client connection using iwconfig (RaspiWiFi method)
             process = await asyncio.create_subprocess_exec(
-                "iwconfig", Config.WIFI_INTERFACE,
+                "iwconfig",
+                Config.WIFI_INTERFACE,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
             )
             stdout, stderr = await process.communicate()
 
@@ -269,16 +301,12 @@ class WiFiManager:
             ssid = None
 
             if connected:
-                for line in output.split('\n'):
-                    if 'ESSID:' in line:
-                        ssid = line.split('ESSID:')[1].strip('"')
+                for line in output.split("\n"):
+                    if "ESSID:" in line:
+                        ssid = line.split("ESSID:")[1].strip('"')
                         break
 
-            return SystemStatus(
-                mode="client",
-                connected=connected,
-                ssid=ssid
-            )
+            return SystemStatus(mode="client", connected=connected, ssid=ssid)
 
         except Exception:
             return SystemStatus(mode="client", connected=False)
@@ -299,7 +327,7 @@ class WiFiManager:
                 "update_config=1",
                 "",
                 "network={",
-                f'    ssid="{credentials.ssid}"'
+                f'    ssid="{credentials.ssid}"',
             ]
 
             if credentials.password:
@@ -311,7 +339,7 @@ class WiFiManager:
 
             # Write wpa_supplicant.conf
             temp_file = Path("/tmp/wpa_supplicant.conf.tmp")
-            temp_file.write_text('\n'.join(wpa_config))
+            temp_file.write_text("\n".join(wpa_config))
 
             # Move to final location (requires root)
             process = await asyncio.create_subprocess_exec(
@@ -342,7 +370,7 @@ class WiFiManager:
                 "sudo cp /usr/lib/raspiwifi/reset_device/static_files/apclient_bootstrapper /etc/cron.raspiwifi/",
                 "sudo chmod +x /etc/cron.raspiwifi/apclient_bootstrapper",
                 "sudo mv /etc/dnsmasq.conf.original /etc/dnsmasq.conf",
-                "sudo mv /etc/dhcpcd.conf.original /etc/dhcpcd.conf"
+                "sudo mv /etc/dhcpcd.conf.original /etc/dhcpcd.conf",
             ]
 
             for cmd in commands:
@@ -353,7 +381,9 @@ class WiFiManager:
             await asyncio.create_subprocess_shell("sudo reboot")
 
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to switch mode: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to switch mode: {str(e)}"
+            )
 
 
 # =============================================================================
@@ -362,6 +392,7 @@ class WiFiManager:
 
 # Global radio manager instance
 radio_manager = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -378,18 +409,32 @@ async def lifespan(app: FastAPI):
     try:
         print("Initializing radio system...")
         radio_manager = await setup_radio_manager_with_websocket(
-            config=Config,
-            mock_mode=Config.IS_DEVELOPMENT
+            config=Config, mock_mode=Config.IS_DEVELOPMENT
         )
         print("Radio system initialized successfully")
     except Exception as e:
         print(f"ERROR: Error initializing radio system: {e}")
         print("WARNING: Continuing without radio functionality")
 
+    # Start system metrics broadcast
+    try:
+        await start_metrics_broadcast()
+        print("System metrics broadcast started")
+    except Exception as e:
+        print(f"ERROR: Failed to start metrics broadcast: {e}")
+
     yield
 
     # Shutdown
     print("Radio WiFi Backend shutting down...")
+
+    # Stop system metrics broadcast
+    try:
+        await stop_metrics_broadcast()
+        print("System metrics broadcast stopped")
+    except Exception as e:
+        print(f"Error stopping metrics broadcast: {e}")
+
     if radio_manager:
         try:
             await radio_manager.shutdown()
@@ -402,7 +447,7 @@ app = FastAPI(
     title="Radio WiFi Configuration API",
     description="Unified WiFi configuration and internet radio system with 3-slot station management",
     version="2.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Startup configuration moved to lifespan context manager above
@@ -410,13 +455,16 @@ app = FastAPI(
 # CORS middleware for frontend integration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if Config.IS_DEVELOPMENT else ["http://radio.local", "http://radio.local:3000"],
+    allow_origins=["*"]
+    if Config.IS_DEVELOPMENT
+    else ["http://radio.local", "http://radio.local:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include radio API routes
+# Include API routes
+app.include_router(system_router, prefix="/system", tags=["System"])
 app.include_router(stations_router, prefix="/radio/stations", tags=["Radio Stations"])
 app.include_router(radio_router, prefix="/radio", tags=["Radio Control"])
 app.include_router(websocket_router, prefix="/ws", tags=["WebSocket"])
@@ -425,6 +473,7 @@ app.include_router(websocket_router, prefix="/ws", tags=["WebSocket"])
 # =============================================================================
 # API Routes
 # =============================================================================
+
 
 @app.get("/", response_model=ApiResponse)
 async def root():
@@ -435,8 +484,13 @@ async def root():
         data={
             "version": "2.0.0",
             "status": "running",
-            "features": ["wifi_management", "radio_streaming", "3_slot_stations", "hardware_controls"]
-        }
+            "features": [
+                "wifi_management",
+                "radio_streaming",
+                "3_slot_stations",
+                "hardware_controls",
+            ],
+        },
     )
 
 
@@ -451,7 +505,7 @@ async def health_check():
             "config_dir_exists": Config.RASPIWIFI_DIR.exists(),
             "wifi_interface": Config.WIFI_INTERFACE,
             "data_dir_exists": Config.DATA_DIR.exists(),
-            "sounds_dir_exists": Config.SOUNDS_DIR.exists()
+            "sounds_dir_exists": Config.SOUNDS_DIR.exists(),
         }
 
         # Add radio system status if available
@@ -462,26 +516,17 @@ async def health_check():
                     "initialized": True,
                     "volume": radio_status.volume,
                     "is_playing": radio_status.is_playing,
-                    "current_station": radio_status.current_station
+                    "current_station": radio_status.current_station,
                 }
             except Exception as e:
-                system_info["radio_system"] = {
-                    "initialized": False,
-                    "error": str(e)
-                }
+                system_info["radio_system"] = {"initialized": False, "error": str(e)}
         else:
             system_info["radio_system"] = {"initialized": False}
 
-        return ApiResponse(
-            success=True,
-            message="Service healthy",
-            data=system_info
-        )
+        return ApiResponse(success=True, message="Service healthy", data=system_info)
     except Exception as e:
         return ApiResponse(
-            success=False,
-            message=f"Health check failed: {str(e)}",
-            data=None
+            success=False, message=f"Health check failed: {str(e)}", data=None
         )
 
 
@@ -491,9 +536,7 @@ async def get_wifi_status():
     try:
         status = await WiFiManager.get_status()
         return ApiResponse(
-            success=True,
-            message="WiFi status retrieved",
-            data=status.model_dump()
+            success=True, message="WiFi status retrieved", data=status.model_dump()
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -507,7 +550,7 @@ async def scan_wifi_networks():
         return ApiResponse(
             success=True,
             message=f"Found {len(networks)} networks",
-            data=[network.model_dump() for network in networks]
+            data=[network.model_dump() for network in networks],
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -526,8 +569,7 @@ async def connect_wifi(credentials: WiFiCredentials, background_tasks: Backgroun
 
         if not success:
             return ApiResponse(
-                success=False,
-                message="Failed to create WiFi configuration"
+                success=False, message="Failed to create WiFi configuration"
             )
 
         # Schedule mode switch in background (RaspiWiFi approach)
@@ -536,7 +578,7 @@ async def connect_wifi(credentials: WiFiCredentials, background_tasks: Backgroun
         return ApiResponse(
             success=True,
             message=f"Connecting to {credentials.ssid}. System will reboot to client mode.",
-            data={"ssid": credentials.ssid}
+            data={"ssid": credentials.ssid},
         )
 
     except HTTPException:
@@ -549,10 +591,7 @@ async def connect_wifi(credentials: WiFiCredentials, background_tasks: Backgroun
 async def reset_to_host_mode():
     """Reset system to host mode (RaspiWiFi reset functionality)"""
     if Config.IS_DEVELOPMENT:
-        return ApiResponse(
-            success=True,
-            message="Reset simulated in development mode"
-        )
+        return ApiResponse(success=True, message="Reset simulated in development mode")
 
     try:
         # Create host mode marker
@@ -562,10 +601,7 @@ async def reset_to_host_mode():
         # Schedule reboot
         await asyncio.create_subprocess_shell("sudo reboot")
 
-        return ApiResponse(
-            success=True,
-            message="System resetting to host mode..."
-        )
+        return ApiResponse(success=True, message="System resetting to host mode...")
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -590,5 +626,5 @@ if __name__ == "__main__":
         host=Config.HOST,
         port=Config.PORT,
         reload=reload,
-        log_level="info" if not Config.IS_DEVELOPMENT else "debug"
+        log_level="info" if not Config.IS_DEVELOPMENT else "debug",
     )
