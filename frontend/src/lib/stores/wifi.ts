@@ -223,3 +223,13 @@ export const getSignalColor = (signal: number | undefined): string => {
 	if (signal >= 25) return 'text-orange-500';
 	return 'text-red-500';
 };
+
+// WebSocket update handlers (called from websocket.ts)
+export function updateWiFiStatus(newStatus: SystemStatus) {
+	status.set(newStatus);
+}
+
+export function updateWiFiNetworks(newNetworks: WiFiNetwork[]) {
+	networks.set(newNetworks);
+	lastScanTime.set(Date.now());
+}

@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { status, getStatus, isLoading, error } from '$lib/stores/wifi';
+	import { wsClient, isConnected } from '$lib/stores/websocket';
 
 	// SvelteKit page props - explicitly define what we accept
 	export let data: any = undefined;
@@ -14,10 +15,16 @@
 	};
 
 	onMount(() => {
+		// Initial fetch via REST as fallback
 		getStatus();
-		// Auto-refresh every 30 seconds
-		const interval = setInterval(getStatus, 30000);
-		return () => clearInterval(interval);
+
+		// Connect WebSocket for real-time updates
+		wsClient.connect();
+	});
+
+	onDestroy(() => {
+		// Disconnect WebSocket when leaving page
+		wsClient.disconnect();
 	});
 </script>
 
@@ -46,16 +53,30 @@
 						</p>
 					</div>
 				</div>
-				<button
-					on:click={refresh}
-					disabled={refreshing}
-					class="btn-secondary"
-				>
-					<svg class="w-4 h-4" class:animate-spin={refreshing} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-							d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-					</svg>
-				</button>
+				<div class="flex items-center gap-2">
+					<!-- WebSocket connection indicator -->
+					<div class="flex items-center gap-1.5">
+						<div class="w-2 h-2 rounded-full"
+							class:bg-green-500={$isConnected}
+							class:bg-red-500={!$isConnected}
+							title={$isConnected ? 'Connected' : 'Disconnected'}>
+						</div>
+						<span class="text-xs text-gray-500 dark:text-gray-400">
+							{$isConnected ? 'Live' : 'Offline'}
+						</span>
+					</div>
+
+					<button
+						on:click={refresh}
+						disabled={refreshing}
+						class="btn-secondary"
+					>
+						<svg class="w-4 h-4" class:animate-spin={refreshing} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+								d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+						</svg>
+					</button>
+				</div>
 			</div>
 		</div>
 	</header>

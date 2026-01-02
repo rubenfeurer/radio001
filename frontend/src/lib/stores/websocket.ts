@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import { systemStatus } from './system';
+import { updateWiFiStatus } from './wifi';
 import { updateVolume, updatePlaybackStatus, updateStations, updateCurrentStation } from './radio';
 
 export interface WebSocketMessage {
@@ -110,7 +110,7 @@ function handleMessage(message: WebSocketMessage) {
 	switch (message.type) {
 		case 'system_status':
 			if (message.data) {
-				systemStatus.set(message.data);
+				updateWiFiStatus(message.data);
 			}
 			break;
 
