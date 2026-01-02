@@ -35,15 +35,25 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Detect platform for Apple Silicon optimization
+# Detect platform for ARM64 builds
 PLATFORM=$(uname -m)
 COMPOSE_OVERRIDE=""
+
+# Detect if running on Raspberry Pi or Apple Silicon
 if [[ "$PLATFORM" == "arm64" || "$PLATFORM" == "aarch64" ]]; then
+    if [[ -f "/proc/device-tree/model" ]] && grep -q "Raspberry Pi" /proc/device-tree/model 2>/dev/null; then
+        PLATFORM_NAME="Raspberry Pi ARM64"
+    elif [[ "$(uname -s)" == "Darwin" ]]; then
+        PLATFORM_NAME="Apple Silicon (arm64)"
+    else
+        PLATFORM_NAME="ARM64"
+    fi
+
     if [[ -f "$PROJECT_DIR/compose/docker-compose.override.yml" ]]; then
         COMPOSE_OVERRIDE="-f $PROJECT_DIR/compose/docker-compose.override.yml"
-        print_info "Detected Apple Silicon (arm64) - using optimized configuration"
+        print_info "Detected $PLATFORM_NAME - using optimized configuration"
     else
-        print_info "Detected Apple Silicon (arm64) - using default configuration"
+        print_info "Detected $PLATFORM_NAME - using default configuration"
     fi
 fi
 
@@ -92,7 +102,7 @@ start_dev() {
     # Build and start services
     print_info "Building Docker images..."
     if [[ "$PLATFORM" == "arm64" || "$PLATFORM" == "aarch64" ]]; then
-        print_info "Using Apple Silicon optimized build..."
+        print_info "Building for $PLATFORM_NAME..."
         docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE build --no-cache
     else
         docker compose -f "$COMPOSE_FILE" build
