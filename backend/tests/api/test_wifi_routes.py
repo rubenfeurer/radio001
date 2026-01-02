@@ -69,7 +69,7 @@ class TestWiFiManager:
     @pytest.mark.asyncio
     async def test_connect_network_success_open_network(self):
         """Test successful WiFi connection to open network (no password)"""
-        credentials = WiFiCredentials(ssid="OpenNetwork", password=None)
+        credentials = WiFiCredentials(ssid="OpenNetwork", password="")
 
         with (
             patch("pathlib.Path.write_text") as mock_write,
@@ -355,8 +355,8 @@ class TestWiFiManager:
                 # Should find 2 networks
                 assert len(networks) >= 2
 
-                # Check network details
-                network_names = [n["ssid"] for n in networks]
+                # Check network details (networks are WiFiNetwork Pydantic models)
+                network_names = [n.ssid for n in networks]
                 assert "HomeNetwork" in network_names
                 assert "GuestNetwork" in network_names
 
@@ -466,7 +466,9 @@ class TestWiFiRoutes:
             response = await client.get("/wifi/status")
 
             assert response.status_code == 200
-            data = response.json()
+            result = response.json()
+            assert result["success"] is True
+            data = result["data"]
             assert data["mode"] == "client"
             assert data["connected"] is True
             assert data["ssid"] == "HomeNetwork"
@@ -475,18 +477,20 @@ class TestWiFiRoutes:
     async def test_scan_wifi_endpoint(self, client):
         """Test /wifi/scan endpoint"""
 
+        from main import WiFiNetwork
+
         mock_networks = [
-            {"ssid": "Network1", "signal": "-50", "secured": True},
-            {"ssid": "Network2", "signal": "-70", "secured": False},
+            WiFiNetwork(ssid="Network1", signal=-50, encryption="WPA2"),
+            WiFiNetwork(ssid="Network2", signal=-70, encryption="Open"),
         ]
 
         with patch.object(WiFiManager, "scan_networks", return_value=mock_networks):
-            response = await client.get("/wifi/scan")
+            response = await client.post("/wifi/scan")
 
             assert response.status_code == 200
             data = response.json()
             assert data["success"] is True
-            assert len(data["data"]["networks"]) == 2
+            assert len(data["data"]) == 2
 
     @pytest.mark.asyncio
     async def test_scan_wifi_endpoint_failure(self, client):
@@ -496,12 +500,10 @@ class TestWiFiRoutes:
             raise Exception("Scan failed")
 
         with patch.object(WiFiManager, "scan_networks", side_effect=mock_scan_failure):
-            response = await client.get("/wifi/scan")
+            response = await client.post("/wifi/scan")
 
-            assert response.status_code == 200
-            data = response.json()
-            assert data["success"] is False
-            assert "error" in data["message"].lower()
+            # Endpoint raises HTTPException with 500 status on error
+            assert response.status_code == 500
 
 
 class TestWiFiConnectionLoss:
