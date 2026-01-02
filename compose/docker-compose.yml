@@ -14,6 +14,8 @@ services:
     volumes:
       # Source code mounting for hot reload
       - ../backend:/app:cached
+      # Data directory for station storage
+      - ../data:/data:rw
       # Python cache
       - radio_python_cache:/root/.cache/pip
     environment:
