@@ -1,7 +1,6 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount } from 'svelte';
 	import { status, getStatus, isLoading, error } from '$lib/stores/wifi';
-	import { wsClient, isConnected } from '$lib/stores/websocket';
 
 	// SvelteKit page props - explicitly define what we accept
 	export let data: any = undefined;
@@ -15,16 +14,8 @@
 	};
 
 	onMount(() => {
-		// Initial fetch via REST as fallback
+		// Initial fetch via REST
 		getStatus();
-
-		// Connect WebSocket for real-time updates
-		wsClient.connect();
-	});
-
-	onDestroy(() => {
-		// Disconnect WebSocket when leaving page
-		wsClient.disconnect();
 	});
 </script>
 
@@ -54,18 +45,6 @@
 					</div>
 				</div>
 				<div class="flex items-center gap-2">
-					<!-- WebSocket connection indicator -->
-					<div class="flex items-center gap-1.5">
-						<div class="w-2 h-2 rounded-full"
-							class:bg-green-500={$isConnected}
-							class:bg-red-500={!$isConnected}
-							title={$isConnected ? 'Connected' : 'Disconnected'}>
-						</div>
-						<span class="text-xs text-gray-500 dark:text-gray-400">
-							{$isConnected ? 'Live' : 'Offline'}
-						</span>
-					</div>
-
 					<button
 						on:click={refresh}
 						disabled={refreshing}

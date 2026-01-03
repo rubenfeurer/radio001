@@ -14,6 +14,7 @@
 		connectToNetwork,
 		getSavedNetworks,
 		forgetNetwork,
+		resetToHotspot,
 		getSignalColor,
 		requiresPassword
 	} from '$lib/stores/wifi';
@@ -29,6 +30,7 @@
 	let password = '';
 	let showPassword = false;
 	let confirmingForget = false;
+	let confirmingReset = false;
 
 	// Combine available networks with saved network info
 	$: combinedNetworks = $networks.map((network) => {
@@ -85,6 +87,14 @@
 		selectedNetwork = null;
 		password = '';
 		confirmingForget = false;
+	};
+
+	const handleResetToHotspot = async () => {
+		const success = await resetToHotspot();
+		if (success) {
+			// System will reboot - show message
+			confirmingReset = false;
+		}
 	};
 </script>
 
@@ -543,5 +553,56 @@
 				{/if}
 			</div>
 		{/if}
+
+		<!-- Reset to Hotspot Button -->
+		<div class="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+			{#if confirmingReset}
+				<div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+					<div class="flex items-start">
+						<svg class="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+							<path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+						</svg>
+						<div class="ml-3 flex-1">
+							<h3 class="text-sm font-medium text-yellow-800 dark:text-yellow-400">
+								Reset to Hotspot Mode?
+							</h3>
+							<div class="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
+								<p>This will:</p>
+								<ul class="list-disc list-inside mt-1 space-y-1">
+									<li>Disconnect from current WiFi network</li>
+									<li>Enable hotspot mode (SSID: Radio-Setup)</li>
+									<li>Reboot the system</li>
+								</ul>
+								<p class="mt-2">After reboot, connect to "Radio-Setup" network and navigate to <strong>http://radiod.local</strong></p>
+							</div>
+							<div class="mt-4 flex space-x-3">
+								<button
+									on:click={handleResetToHotspot}
+									class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm font-medium"
+								>
+									Yes, Reset to Hotspot
+								</button>
+								<button
+									on:click={() => confirmingReset = false}
+									class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium"
+								>
+									Cancel
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			{:else}
+				<button
+					on:click={() => confirmingReset = true}
+					class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-center space-x-2"
+				>
+					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+					</svg>
+					<span>Reset to Hotspot Mode</span>
+				</button>
+			{/if}
+		</div>
 	</main>
 </div>
