@@ -728,11 +728,12 @@ network={
 
         mock_status = SystemStatus(mode="client", connected=True, ssid="HomeNetwork")
 
+        mock_path = MagicMock()
+        mock_path.exists.return_value = True
+        mock_path.read_text.return_value = wpa_conf_content
+
         with (
-            patch.object(Config.WPA_SUPPLICANT_FILE, "exists", return_value=True),
-            patch.object(
-                Config.WPA_SUPPLICANT_FILE, "read_text", return_value=wpa_conf_content
-            ),
+            patch("main.Config.WPA_SUPPLICANT_FILE", mock_path),
             patch.object(WiFiManager, "get_status", return_value=mock_status),
         ):
             networks = await WiFiManager.list_saved_networks()
@@ -754,7 +755,10 @@ network={
     async def test_list_saved_networks_empty(self):
         """Test listing saved networks when none exist"""
 
-        with patch.object(Config.WPA_SUPPLICANT_FILE, "exists", return_value=False):
+        mock_path = MagicMock()
+        mock_path.exists.return_value = False
+
+        with patch("main.Config.WPA_SUPPLICANT_FILE", mock_path):
             networks = await WiFiManager.list_saved_networks()
 
             assert len(networks) == 0
@@ -776,11 +780,12 @@ network={
     psk="officepass"
 }"""
 
+        mock_path = MagicMock()
+        mock_path.exists.return_value = True
+        mock_path.read_text.return_value = wpa_conf_content
+
         with (
-            patch.object(Config.WPA_SUPPLICANT_FILE, "exists", return_value=True),
-            patch.object(
-                Config.WPA_SUPPLICANT_FILE, "read_text", return_value=wpa_conf_content
-            ),
+            patch("main.Config.WPA_SUPPLICANT_FILE", mock_path),
             patch("pathlib.Path.write_text") as mock_write,
             patch("asyncio.create_subprocess_exec") as mock_subprocess,
         ):
