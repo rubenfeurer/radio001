@@ -382,13 +382,43 @@ class WiFiManager:
                     logger.error(f"Attempt {attempt}: Failed to write config")
                     continue
 
-                # Reconfigure wpa_supplicant to apply new config
+                # Trigger wpa_supplicant to reload by cycling the interface
+                # This forces wpa_supplicant to re-read wpa_supplicant.conf
                 if not Config.IS_DEVELOPMENT:
                     try:
-                        await WiFiManager.run_wpa_cli(["reconfigure"])
-                        logger.info("Reconfigured wpa_supplicant with new credentials")
+                        # Bring interface down
+                        process = await asyncio.create_subprocess_exec(
+                            "sudo",
+                            "ip",
+                            "link",
+                            "set",
+                            Config.WIFI_INTERFACE,
+                            "down",
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.PIPE,
+                        )
+                        await process.communicate()
+
+                        await asyncio.sleep(1)
+
+                        # Bring interface up
+                        process = await asyncio.create_subprocess_exec(
+                            "sudo",
+                            "ip",
+                            "link",
+                            "set",
+                            Config.WIFI_INTERFACE,
+                            "up",
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.PIPE,
+                        )
+                        await process.communicate()
+
+                        logger.info("Cycled WiFi interface to apply new config")
+                        # Give wpa_supplicant time to connect
+                        await asyncio.sleep(3)
                     except Exception as e:
-                        logger.error(f"Failed to reconfigure wpa_supplicant: {e}")
+                        logger.error(f"Failed to cycle WiFi interface: {e}")
                         continue
 
                 # Wait for connection with 40s timeout
@@ -409,7 +439,30 @@ class WiFiManager:
                 import shutil
 
                 shutil.copy(backup_path, Config.WPA_SUPPLICANT_FILE)
-                await WiFiManager.run_wpa_cli(["reconfigure"])
+                # Cycle WiFi interface to apply restored config
+                process = await asyncio.create_subprocess_exec(
+                    "sudo",
+                    "ip",
+                    "link",
+                    "set",
+                    Config.WIFI_INTERFACE,
+                    "down",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await process.communicate()
+                await asyncio.sleep(1)
+                process = await asyncio.create_subprocess_exec(
+                    "sudo",
+                    "ip",
+                    "link",
+                    "set",
+                    Config.WIFI_INTERFACE,
+                    "up",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await process.communicate()
                 logger.info("Restored original WiFi configuration")
             except Exception as e:
                 logger.error(f"Failed to restore backup: {e}")
@@ -499,12 +552,14 @@ class WiFiManager:
         try:
             logger.debug(f"Running wpa_cli command: {' '.join(command)}")
 
-            # Use timeout wrapper to prevent hanging, run with sudo for proper permissions
+            # Use timeout wrapper to prevent hanging
+            # Specify control interface path explicitly since container may not find it automatically
             process = await asyncio.create_subprocess_exec(
-                "sudo",
                 "timeout",
                 "5",
                 "wpa_cli",
+                "-p",
+                "/run/wpa_supplicant",
                 "-i",
                 Config.WIFI_INTERFACE,
                 *command,
@@ -539,7 +594,7 @@ class WiFiManager:
         """
         Wait for WiFi connection to complete (pre-reboot validation).
 
-        Uses wpa_cli to poll connection status every 2 seconds.
+        Uses iw command to poll connection status every 2 seconds.
 
         Args:
             ssid: Expected SSID to connect to
@@ -555,33 +610,34 @@ class WiFiManager:
 
         while (asyncio.get_event_loop().time() - start_time) < timeout:
             try:
-                # Get wpa_supplicant state
-                status_output = await WiFiManager.run_wpa_cli(["status"])
-
-                # Parse status output
-                status_dict = {}
-                for line in status_output.split("\n"):
-                    if "=" in line:
-                        key, value = line.split("=", 1)
-                        status_dict[key] = value
-
-                wpa_state = status_dict.get("wpa_state", "")
-                current_ssid = status_dict.get("ssid", "")
-
-                logger.debug(
-                    f"Connection status: state={wpa_state}, ssid={current_ssid}"
+                # Use iw to check connection status
+                process = await asyncio.create_subprocess_exec(
+                    "iw",
+                    "dev",
+                    Config.WIFI_INTERFACE,
+                    "link",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
                 )
+                stdout, stderr = await process.communicate()
+                output = stdout.decode().strip()
 
-                # Check if connected
-                if wpa_state == "COMPLETED" and current_ssid == ssid:
-                    ip_address = status_dict.get("ip_address", "N/A")
-                    logger.info(f"Successfully connected to {ssid} (IP: {ip_address})")
-                    return True
-
-                # Check for failure states
-                if wpa_state in ["DISCONNECTED", "INACTIVE"]:
-                    logger.warning(f"Connection failed: wpa_state={wpa_state}")
-                    # Don't return immediately, give it more time
+                # Check if connected to the target SSID
+                if "Connected to" in output or "SSID:" in output:
+                    # Parse SSID from output
+                    for line in output.split("\n"):
+                        if "SSID:" in line:
+                            current_ssid = line.split("SSID:")[1].strip()
+                            if current_ssid == ssid:
+                                logger.info(f"Successfully connected to {ssid}")
+                                # Give a moment for DHCP to complete
+                                await asyncio.sleep(2)
+                                return True
+                            else:
+                                logger.debug(
+                                    f"Connected to {current_ssid}, waiting for {ssid}"
+                                )
+                                break
 
             except Exception as e:
                 logger.error(f"Error checking connection status: {e}")
@@ -804,11 +860,33 @@ class WiFiManager:
 
             logger.info(f"Successfully removed network ID {network_id}")
 
-            # Reconfigure wpa_supplicant to reload config
+            # Cycle WiFi interface to reload config
             try:
-                await WiFiManager.run_wpa_cli(["reconfigure"])
+                process = await asyncio.create_subprocess_exec(
+                    "sudo",
+                    "ip",
+                    "link",
+                    "set",
+                    Config.WIFI_INTERFACE,
+                    "down",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await process.communicate()
+                await asyncio.sleep(1)
+                process = await asyncio.create_subprocess_exec(
+                    "sudo",
+                    "ip",
+                    "link",
+                    "set",
+                    Config.WIFI_INTERFACE,
+                    "up",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await process.communicate()
             except Exception as e:
-                logger.warning(f"Could not reconfigure wpa_supplicant: {e}")
+                logger.warning(f"Could not cycle WiFi interface: {e}")
                 # Not critical - config will reload on next reboot
 
             return True
@@ -997,6 +1075,9 @@ async def connect_wifi(credentials: WiFiCredentials, background_tasks: Backgroun
     Returns success only if connection verified.
     """
     logger.info(f"Attempting to connect to WiFi: {credentials.ssid}")
+    logger.debug(
+        f"Password provided: {'Yes' if credentials.password else 'No (empty)'}"
+    )
 
     # Attempt connection with retry (validates before reboot)
     success = await WiFiManager.connect_network(credentials)

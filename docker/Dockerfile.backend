@@ -6,6 +6,7 @@ FROM python:3.11-slim
 # Install system dependencies for WiFi management and build tools
 RUN apt-get update && apt-get install -y \
     wireless-tools \
+    iw \
     wpasupplicant \
     hostapd \
     dnsmasq \
@@ -34,8 +35,12 @@ RUN groupadd -r radio && useradd -r -g radio radio && \
     mkdir -p /tmp/radio /var/log/radio /data /app/data && \
     chown -R radio:radio /tmp/radio /var/log/radio /data /app/data
 
+# Create netdev group for wpa_cli access
+RUN groupmod -g 104 netdev || groupadd -g 104 netdev && \
+    usermod -a -G netdev radio
+
 # Configure passwordless sudo for WiFi management commands (RaspiWiFi-style permissions)
-RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown" > /etc/sudoers.d/radio && \
+RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown, /sbin/iwlist, /usr/sbin/iwlist, /sbin/ip, /usr/sbin/ip, /bin/ip, /usr/bin/timeout" > /etc/sudoers.d/radio && \
     chmod 0440 /etc/sudoers.d/radio
 
 # Copy requirements first for better caching
