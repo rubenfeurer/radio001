@@ -34,7 +34,7 @@ RUN groupmod -g 104 netdev || groupadd -g 104 netdev && \
     useradd -r -g radio -G netdev radio
 
 # Configure passwordless sudo for WiFi management commands (RaspiWiFi-style permissions)
-RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown" > /etc/sudoers.d/radio && \
+RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown, /sbin/iwlist, /usr/sbin/iwlist" > /etc/sudoers.d/radio && \
     chmod 0440 /etc/sudoers.d/radio
 
 # Copy requirements and install Python dependencies

@@ -21,7 +21,6 @@ services:
       - /etc/wpa_supplicant:/etc/wpa_supplicant:rw
       - /run/wpa_supplicant:/run/wpa_supplicant:rw
       - /etc/hostapd:/etc/hostapd:rw
-      - /etc/dnsmasq.conf:/etc/dnsmasq.conf:rw
       - /etc/raspiwifi:/etc/raspiwifi:rw
 
       # Device access for WiFi management

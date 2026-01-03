@@ -154,11 +154,22 @@ class WiFiManager:
     def _parse_signal_strength(line: str) -> Optional[int]:
         """Parse signal strength from iwlist output line"""
         try:
-            signal_part = line.split("Signal level=")[1].split()[0]
-            if "dBm" in signal_part:
-                signal = int(signal_part.replace("dBm", ""))
-                # Convert dBm to percentage (rough approximation)
-                return max(0, min(100, 2 * (signal + 100)))
+            # Handle both "Signal level=" and "Signal level =" formats
+            if "Signal level" in line:
+                # Extract the signal value after "Signal level"
+                signal_part = line.split("Signal level")[1].strip()
+                # Remove leading '=' if present
+                if signal_part.startswith("="):
+                    signal_part = signal_part[1:].strip()
+
+                # Extract dBm value - handle formats like "-29 dBm" or "-29dBm"
+                if "dBm" in signal_part:
+                    # Get everything before "dBm"
+                    signal_str = signal_part.split("dBm")[0].strip()
+                    signal = int(signal_str)
+                    # Convert dBm to percentage (rough approximation)
+                    # dBm ranges typically from -100 (weak) to -30 (strong)
+                    return max(0, min(100, 2 * (signal + 100)))
         except (ValueError, IndexError):
             pass
         return None
@@ -247,8 +258,9 @@ class WiFiManager:
             ]
 
         try:
-            # Use iwlist scan (same as RaspiWiFi)
+            # Use sudo iwlist scan to get all networks (requires elevated privileges)
             process = await asyncio.create_subprocess_exec(
+                "sudo",
                 "iwlist",
                 Config.WIFI_INTERFACE,
                 "scan",
