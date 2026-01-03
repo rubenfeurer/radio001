@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies (including sudo for WiFi management)
+# Install system dependencies (including sudo and wpa_cli for WiFi management)
 RUN apt-get update && apt-get install -y \
     curl \
     procps \
@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     iputils-ping \
     wireless-tools \
     iw \
+    wpasupplicant \
     sudo \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
@@ -24,8 +25,11 @@ RUN apt-get update && apt-get install -y \
 # Create app directory
 WORKDIR /app
 
-# Create non-root user
-RUN groupadd -r radio && useradd -r -g radio radio
+# Create non-root user and add to netdev group for wpa_cli access
+# Use GID 104 to match host's netdev group (standard on Raspberry Pi OS)
+RUN groupmod -g 104 netdev || groupadd -g 104 netdev && \
+    groupadd -r radio && \
+    useradd -r -g radio -G netdev radio
 
 # Configure passwordless sudo for WiFi management commands (RaspiWiFi-style permissions)
 RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown" > /etc/sudoers.d/radio && \

@@ -310,7 +310,16 @@ class WiFiManager:
             if connected:
                 for line in output.split("\n"):
                     if "ESSID:" in line:
-                        ssid = line.split("ESSID:")[1].strip('"')
+                        # Extract SSID and clean up quotes and whitespace
+                        ssid_part = line.split("ESSID:")[1]
+                        # Remove quotes, backslashes, and whitespace
+                        ssid = (
+                            ssid_part.strip()
+                            .strip('"')
+                            .strip()
+                            .replace('\\"', "")
+                            .strip()
+                        )
                         break
 
             return SystemStatus(mode="client", connected=connected, ssid=ssid)
@@ -476,7 +485,12 @@ class WiFiManager:
             return ""
 
         try:
+            logger.debug(f"Running wpa_cli command: {' '.join(command)}")
+
+            # Use timeout wrapper to prevent hanging
             process = await asyncio.create_subprocess_exec(
+                "timeout",
+                "5",
                 "wpa_cli",
                 "-i",
                 Config.WIFI_INTERFACE,
@@ -486,11 +500,23 @@ class WiFiManager:
             )
             stdout, stderr = await process.communicate()
 
-            if process.returncode != 0:
-                logger.error(f"wpa_cli command failed: {stderr.decode()}")
-                raise Exception(f"wpa_cli error: {stderr.decode()}")
+            stdout_text = stdout.decode().strip()
+            stderr_text = stderr.decode().strip()
 
-            return stdout.decode().strip()
+            logger.debug(f"wpa_cli returncode: {process.returncode}")
+            logger.debug(f"wpa_cli stdout: {stdout_text}")
+            logger.debug(f"wpa_cli stderr: {stderr_text}")
+
+            if process.returncode != 0:
+                # timeout command returns 124 on timeout
+                if process.returncode == 124:
+                    raise Exception(f"wpa_cli command timed out after 5 seconds")
+                logger.error(
+                    f"wpa_cli command failed with code {process.returncode}: {stderr_text}"
+                )
+                raise Exception(f"wpa_cli error: {stderr_text or 'Unknown error'}")
+
+            return stdout_text
         except Exception as e:
             logger.error(f"Failed to execute wpa_cli: {e}")
             raise
@@ -611,44 +637,62 @@ class WiFiManager:
     @staticmethod
     async def list_saved_networks() -> List[dict]:
         """
-        List all saved WiFi networks using wpa_cli.
+        List all saved WiFi networks by parsing wpa_supplicant.conf.
 
         Returns:
-            List of saved networks with id, ssid, and flags
+            List of saved networks with id, ssid, and current connection status
         """
         try:
-            output = await WiFiManager.run_wpa_cli(["list_networks"])
+            # Get current connection status
+            current_status = await WiFiManager.get_status()
+            current_ssid = current_status.ssid if current_status.connected else None
 
-            # Parse output
-            # Format: network id / ssid / bssid / flags
-            # 0    HomeNetwork    any    [CURRENT]
-            # 1    OfficeWiFi     any    [DISABLED]
-
-            lines = output.strip().split("\n")
-            if len(lines) < 2:  # Header + at least one network
+            # Parse wpa_supplicant.conf file
+            if not Config.WPA_SUPPLICANT_FILE.exists():
+                logger.warning("wpa_supplicant.conf not found")
                 return []
 
+            config_content = Config.WPA_SUPPLICANT_FILE.read_text()
             networks = []
-            for line in lines[1:]:  # Skip header
-                parts = line.split("\t")
-                if len(parts) >= 2:
-                    network_id = parts[0].strip()
-                    ssid = parts[1].strip()
-                    flags = parts[3].strip() if len(parts) >= 4 else ""
+            network_id = 0
 
-                    is_current = "[CURRENT]" in flags
-                    is_disabled = "[DISABLED]" in flags
+            # Parse network blocks
+            in_network = False
+            current_network = {}
 
-                    networks.append(
-                        {
-                            "id": int(network_id),
-                            "ssid": ssid,
-                            "current": is_current,
-                            "disabled": is_disabled,
-                        }
-                    )
+            for line in config_content.split("\n"):
+                line = line.strip()
 
-            logger.info(f"Found {len(networks)} saved networks")
+                if line.startswith("network={"):
+                    in_network = True
+                    current_network = {"id": network_id}
+                elif line == "}" and in_network:
+                    # End of network block
+                    if "ssid" in current_network:
+                        # Check if this is the currently connected network
+                        current_network["current"] = (
+                            current_ssid is not None
+                            and current_network["ssid"] == current_ssid
+                        )
+                        current_network["disabled"] = (
+                            False  # Not tracking disabled state from file
+                        )
+                        networks.append(current_network)
+                        network_id += 1
+                    in_network = False
+                    current_network = {}
+                elif in_network and "=" in line:
+                    # Parse network property
+                    key, value = line.split("=", 1)
+                    key = key.strip()
+                    value = value.strip().strip('"')
+
+                    if key == "ssid":
+                        current_network["ssid"] = value
+
+            logger.info(
+                f"Found {len(networks)} saved networks (current: {current_ssid})"
+            )
             return networks
 
         except Exception as e:
@@ -658,22 +702,73 @@ class WiFiManager:
     @staticmethod
     async def forget_network(network_id: int) -> bool:
         """
-        Remove a saved WiFi network using wpa_cli.
+        Remove a saved WiFi network by rewriting wpa_supplicant.conf.
 
         Args:
-            network_id: Network ID from list_networks
+            network_id: Network ID (index) from list_saved_networks
 
         Returns:
             True if successfully removed
         """
         try:
-            # Remove network
-            await WiFiManager.run_wpa_cli(["remove_network", str(network_id)])
+            if not Config.WPA_SUPPLICANT_FILE.exists():
+                logger.error("wpa_supplicant.conf not found")
+                return False
 
-            # Save configuration to persist change
-            await WiFiManager.run_wpa_cli(["save_config"])
+            config_content = Config.WPA_SUPPLICANT_FILE.read_text()
+            lines = config_content.split("\n")
+
+            # Parse and rebuild config, skipping the network at network_id
+            new_lines = []
+            in_network = False
+            current_network_id = 0
+            skip_network = False
+
+            for line in lines:
+                stripped = line.strip()
+
+                if stripped.startswith("network={"):
+                    in_network = True
+                    skip_network = current_network_id == network_id
+                    if not skip_network:
+                        new_lines.append(line)
+                elif stripped == "}" and in_network:
+                    if not skip_network:
+                        new_lines.append(line)
+                    in_network = False
+                    current_network_id += 1
+                    skip_network = False
+                elif not skip_network:
+                    new_lines.append(line)
+
+            # Write updated config to temp file
+            temp_file = Path("/tmp/wpa_supplicant.conf.tmp")
+            temp_file.write_text("\n".join(new_lines))
+
+            # Move to final location (requires root)
+            process = await asyncio.create_subprocess_exec(
+                "sudo",
+                "mv",
+                str(temp_file),
+                str(Config.WPA_SUPPLICANT_FILE),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await process.communicate()
+
+            if process.returncode != 0:
+                logger.error(f"Failed to update wpa_supplicant.conf: {stderr.decode()}")
+                return False
 
             logger.info(f"Successfully removed network ID {network_id}")
+
+            # Reconfigure wpa_supplicant to reload config
+            try:
+                await WiFiManager.run_wpa_cli(["reconfigure"])
+            except Exception as e:
+                logger.warning(f"Could not reconfigure wpa_supplicant: {e}")
+                # Not critical - config will reload on next reboot
+
             return True
 
         except Exception as e:
