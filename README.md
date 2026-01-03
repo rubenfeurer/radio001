@@ -14,6 +14,7 @@ A unified **Radio + WiFi Configuration** system for Raspberry Pi Zero 2 W, combi
 - 🔄 **Auto-Retry** - 3 attempts with exponential backoff for reliable connections
 - 🗑️ **Network Forgetting** - Remove saved networks (prevents forgetting active connection)
 - 🔥 **Hotspot Mode** - Reset to "Radio-Setup" AP for reconfiguration
+- ⚡ **Boot Auto-Start** - Automatic startup on power-on with 5s WiFi check and hotspot fallback
 - 📱 **Mobile Optimized** - Responsive design works on phones and tablets
 - 🔒 **Secure by Default** - WPA2/WPA3 support with secure credential handling
 - 🏠 **mDNS Ready** - Access via `http://radiod.local` on supported devices
@@ -110,13 +111,15 @@ If you prefer manual setup:
 
 ### Production Deployment
 
-Deploy to Raspberry Pi:
+Deploy to Raspberry Pi (auto-configures boot startup):
 ```bash
-# Build and deploy
-./scripts/deploy-pi.sh
+# Automatic setup - installs systemd service for boot auto-start
+./scripts/dev-environment.sh start --prod
 
-# Or manually:
-docker compose -f compose/docker-compose.prod.yml up -d
+# System will auto-start on every boot
+# - Checks WiFi connection (5s timeout)
+# - Connects to saved WiFi OR starts hotspot mode
+# - Access at http://radio.local or http://192.168.4.1 (hotspot)
 ```
 
 ## 📁 Project Structure

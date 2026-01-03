@@ -18,6 +18,8 @@ RUN apt-get update && apt-get install -y \
     wireless-tools \
     iw \
     wpasupplicant \
+    hostapd \
+    dnsmasq \
     sudo \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
@@ -47,6 +49,11 @@ RUN if [ "$INSTALL_TEST_DEPS" = "true" ]; then \
 
 # Copy application code
 COPY . .
+
+# Copy boot check script and configuration templates
+COPY --chmod=755 ../scripts/boot-wifi-check.sh /usr/local/bin/boot-wifi-check.sh
+COPY ../config/hostapd/hostapd.conf.template /etc/hostapd/hostapd.conf.template
+COPY ../config/dnsmasq/dnsmasq.conf.template /etc/dnsmasq.conf.template
 
 # Create necessary directories for testing
 RUN mkdir -p /app/data /app/sounds /app/logs /app/htmlcov

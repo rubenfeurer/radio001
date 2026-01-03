@@ -43,6 +43,12 @@ services:
       - HOTSPOT_IP=192.168.4.1
       - HOTSPOT_RANGE=192.168.4.2,192.168.4.20
 
+      # Boot WiFi check settings
+      - WIFI_TIMEOUT=5
+      - WIFI_CHECK_ENABLED=true
+      - HOTSPOT_ENABLE_FALLBACK=true
+      - HOST_MODE_FILE=/etc/raspiwifi/host_mode
+
       # Security settings
       - SESSION_SECRET=${SESSION_SECRET:-prod-secret-key-change-me}
       - JWT_SECRET=${JWT_SECRET:-prod-jwt-secret-change-me}

@@ -169,6 +169,45 @@ start_dev() {
     fi
 }
 
+# Function to install systemd service for boot auto-start
+install_systemd_service() {
+    local SERVICE_FILE="$PROJECT_DIR/config/systemd/radio-wifi.service"
+    local INSTALLED_SERVICE="/etc/systemd/system/radio-wifi.service"
+
+    # Check if service file exists in repo
+    if [[ ! -f "$SERVICE_FILE" ]]; then
+        print_warning "Systemd service file not found at $SERVICE_FILE - skipping auto-start setup"
+        return 0
+    fi
+
+    # Check if service is already installed
+    if [[ -f "$INSTALLED_SERVICE" ]]; then
+        # Check if it's different (needs update)
+        if ! diff -q "$SERVICE_FILE" "$INSTALLED_SERVICE" >/dev/null 2>&1; then
+            print_info "Systemd service has changed - updating..."
+            sudo cp "$SERVICE_FILE" "$INSTALLED_SERVICE"
+            sudo systemctl daemon-reload
+            print_success "Updated systemd service"
+        else
+            print_info "Systemd service already installed and up-to-date"
+        fi
+    else
+        # First-time installation
+        print_info "Installing systemd service for boot auto-start..."
+        sudo cp "$SERVICE_FILE" "$INSTALLED_SERVICE"
+        sudo systemctl daemon-reload
+        sudo systemctl enable radio-wifi.service
+        print_success "Installed and enabled systemd service - will auto-start on boot"
+    fi
+
+    # Check service status
+    if systemctl is-enabled radio-wifi.service >/dev/null 2>&1; then
+        print_success "✓ Boot auto-start is configured"
+    else
+        print_warning "Service installed but not enabled - run 'sudo systemctl enable radio-wifi.service'"
+    fi
+}
+
 # Function to start production environment
 start_prod() {
     print_info "Starting Radio WiFi in PRODUCTION mode..."
@@ -198,6 +237,11 @@ start_prod() {
     # Set ownership to UID 999 (radio user in container)
     sudo chown -R 999:999 data/ 2>/dev/null || chown -R 999:999 data/ 2>/dev/null || true
     sudo chmod -R 755 data/ 2>/dev/null || chmod -R 755 data/ 2>/dev/null || true
+
+    # RASPBERRY PI ONLY: Install systemd service for boot auto-start
+    if [[ "$IS_RASPBERRY_PI" == true ]]; then
+        install_systemd_service
+    fi
 
     # Build and start services using production compose file
     print_info "Building production Docker images..."

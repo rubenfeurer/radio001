@@ -1,0 +1,34 @@
+[Unit]
+Description=Radio WiFi Configuration Service
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/radio/radio001
+ExecStartPre=/usr/bin/docker compose -f compose/docker-compose.prod.yml pull --quiet --ignore-pull-failures
+ExecStart=/usr/bin/docker compose -f compose/docker-compose.prod.yml up -d
+ExecStop=/usr/bin/docker compose -f compose/docker-compose.prod.yml down
+ExecReload=/usr/bin/docker compose -f compose/docker-compose.prod.yml restart
+
+# Restart policy
+Restart=on-failure
+RestartSec=10s
+
+# Security
+User=radio
+Group=radio
+
+# Environment
+Environment=COMPOSE_PROJECT_NAME=radio-wifi
+Environment=NODE_ENV=production
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=radio-wifi
+
+[Install]
+WantedBy=multi-user.target
