@@ -10,9 +10,13 @@ A unified **Radio + WiFi Configuration** system for Raspberry Pi Zero 2 W, combi
 ## ✨ Features
 
 ### 📡 **WiFi Management**
-- 🌐 **Easy WiFi Setup** - Simple web interface for network configuration
+- 🌐 **Unified Network Manager** - Scan, connect, and manage saved networks in one interface
+- 🔄 **Auto-Retry** - 3 attempts with exponential backoff for reliable connections
+- 🗑️ **Network Forgetting** - Remove saved networks (prevents forgetting active connection)
+- 🔥 **Hotspot Mode** - Reset to "Radio-Setup" AP for reconfiguration
 - 📱 **Mobile Optimized** - Responsive design works on phones and tablets
 - 🔒 **Secure by Default** - WPA2/WPA3 support with secure credential handling
+- 🏠 **mDNS Ready** - Access via `http://radiod.local` on supported devices
 
 ### 📻 **Internet Radio**
 - 🎵 **3-Slot Station System** - Quick access to favorite radio stations
@@ -221,18 +225,23 @@ The `scripts/` directory contains helper scripts organized by purpose:
 
 | Route | Description | Status |
 |-------|-------------|--------|
-| `/` | Main dashboard with WiFi + Radio status | ✅ WiFi Complete |
-| `/setup` | WiFi network setup wizard | ✅ Complete |
+| `/` | Main dashboard with WiFi status | ✅ Complete |
+| `/setup` | Unified WiFi manager (scan/connect/forget/reset) | ✅ Complete |
 | `/radio` | Radio station management | 🔄 In Progress |
 | `/settings` | System settings | ✅ Complete |
 | `/status` | Detailed system status | ✅ Complete |
 
 ## 📡 API Endpoints
 
+> **[📖 Interactive API Docs →](http://localhost:8000/docs)** | **[Full Documentation →](./docs/README.md#-api-reference)**
+
 ### WiFi Endpoints
-- `GET /api/wifi/status` - Current WiFi connection status
-- `POST /api/wifi/scan` - Scan for available networks
-- `POST /api/wifi/connect` - Connect to network
+- `GET /wifi/status` - Current WiFi connection status
+- `GET /wifi/scan` - Scan for available networks
+- `POST /wifi/connect` - Connect to network with retry logic
+- `GET /wifi/saved` - List saved networks from wpa_supplicant.conf
+- `DELETE /wifi/saved/{id}` - Forget saved network
+- `POST /system/reset` - Reset to hotspot mode
 
 ### Radio Endpoints *(New)*
 - `GET /radio/status` - Current radio system status

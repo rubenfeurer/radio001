@@ -865,7 +865,7 @@ app.include_router(websocket_router, prefix="/ws", tags=["WebSocket"])
 # =============================================================================
 
 
-@app.get("/", response_model=ApiResponse)
+@app.get("/", response_model=ApiResponse, tags=["General"])
 async def root():
     """Root endpoint"""
     return ApiResponse(
@@ -884,7 +884,7 @@ async def root():
     )
 
 
-@app.get("/health", response_model=ApiResponse)
+@app.get("/health", response_model=ApiResponse, tags=["General"])
 async def health_check():
     """Health check endpoint with additional diagnostic information"""
     try:
@@ -920,7 +920,7 @@ async def health_check():
         )
 
 
-@app.get("/wifi/status", response_model=ApiResponse)
+@app.get("/wifi/status", response_model=ApiResponse, tags=["WiFi Management"])
 async def get_wifi_status():
     """Get current WiFi status"""
     try:
@@ -932,7 +932,7 @@ async def get_wifi_status():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/wifi/scan", response_model=ApiResponse)
+@app.post("/wifi/scan", response_model=ApiResponse, tags=["WiFi Management"])
 async def scan_wifi_networks():
     """Scan for available WiFi networks"""
     try:
@@ -946,7 +946,7 @@ async def scan_wifi_networks():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/wifi/connect", response_model=ApiResponse)
+@app.post("/wifi/connect", response_model=ApiResponse, tags=["WiFi Management"])
 async def connect_wifi(credentials: WiFiCredentials, background_tasks: BackgroundTasks):
     """
     Connect to WiFi network with retry logic and validation.
@@ -989,9 +989,9 @@ async def connect_wifi(credentials: WiFiCredentials, background_tasks: Backgroun
         )
 
 
-@app.get("/wifi/saved", response_model=ApiResponse)
+@app.get("/wifi/saved", response_model=ApiResponse, tags=["WiFi Management"])
 async def get_saved_networks():
-    """Get list of saved WiFi networks using wpa_cli"""
+    """Get list of saved WiFi networks from wpa_supplicant.conf"""
     try:
         networks = await WiFiManager.list_saved_networks()
         return ApiResponse(
@@ -1004,13 +1004,15 @@ async def get_saved_networks():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.delete("/wifi/saved/{network_id}", response_model=ApiResponse)
+@app.delete(
+    "/wifi/saved/{network_id}", response_model=ApiResponse, tags=["WiFi Management"]
+)
 async def forget_saved_network(network_id: int):
     """
     Forget/remove a saved WiFi network.
 
     Args:
-        network_id: Network ID from wpa_cli list_networks
+        network_id: Network ID from saved networks list
     """
     try:
         # Check if network exists
@@ -1046,9 +1048,9 @@ async def forget_saved_network(network_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/system/reset", response_model=ApiResponse)
+@app.post("/system/reset", response_model=ApiResponse, tags=["WiFi Management"])
 async def reset_to_host_mode():
-    """Reset system to host mode (RaspiWiFi reset functionality)"""
+    """Reset system to hotspot mode (creates Radio-Setup AP for reconfiguration)"""
     if Config.IS_DEVELOPMENT:
         return ApiResponse(success=True, message="Reset simulated in development mode")
 

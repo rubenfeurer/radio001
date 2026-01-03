@@ -34,6 +34,9 @@ class TestWiFiManager:
         with (
             patch("pathlib.Path.write_text") as mock_write,
             patch("asyncio.create_subprocess_exec") as mock_subprocess,
+            patch(
+                "main.WiFiManager.wait_for_connection", return_value=True
+            ) as mock_wait,
         ):
             # Mock successful sudo mv command
             mock_process = AsyncMock()
@@ -52,16 +55,13 @@ class TestWiFiManager:
                 assert result is True
 
                 # Verify wpa_supplicant.conf was written
-                mock_write.assert_called_once()
+                mock_write.assert_called()
                 written_config = mock_write.call_args[0][0]
                 assert 'ssid="HomeNetwork"' in written_config
                 assert 'psk="correct_password"' in written_config
 
-                # Verify sudo mv was called
-                mock_subprocess.assert_called_once()
-                call_args = mock_subprocess.call_args[0]
-                assert "sudo" in call_args
-                assert "mv" in call_args
+                # Verify wait_for_connection was called
+                mock_wait.assert_called_once_with("HomeNetwork", timeout=40)
 
             finally:
                 Config.IS_DEVELOPMENT = original_dev
@@ -74,6 +74,9 @@ class TestWiFiManager:
         with (
             patch("pathlib.Path.write_text") as mock_write,
             patch("asyncio.create_subprocess_exec") as mock_subprocess,
+            patch(
+                "main.WiFiManager.wait_for_connection", return_value=True
+            ) as mock_wait,
         ):
             mock_process = AsyncMock()
             mock_process.returncode = 0
@@ -93,6 +96,9 @@ class TestWiFiManager:
                 assert 'ssid="OpenNetwork"' in written_config
                 assert "key_mgmt=NONE" in written_config
                 assert "psk=" not in written_config
+
+                # Verify wait_for_connection was called
+                mock_wait.assert_called_once_with("OpenNetwork", timeout=40)
 
             finally:
                 Config.IS_DEVELOPMENT = original_dev
@@ -412,7 +418,10 @@ class TestWiFiRoutes:
             assert response.status_code == 200
             data = response.json()
             assert data["success"] is True
-            assert "configured" in data["message"].lower()
+            assert (
+                "connected" in data["message"].lower()
+                or "rebooting" in data["message"].lower()
+            )
 
     @pytest.mark.asyncio
     async def test_connect_wifi_endpoint_failure(self, client):
@@ -561,6 +570,9 @@ class TestWiFiConnectionLoss:
         with (
             patch("pathlib.Path.write_text"),
             patch("asyncio.create_subprocess_exec") as mock_subprocess,
+            patch(
+                "main.WiFiManager.wait_for_connection", return_value=True
+            ) as mock_wait,
         ):
             # Simulate successful reconnection
             mock_process = AsyncMock()
@@ -575,6 +587,9 @@ class TestWiFiConnectionLoss:
                 # Attempt reconnection
                 result = await WiFiManager.connect_network(credentials)
                 assert result is True
+
+                # Verify wait_for_connection was called
+                mock_wait.assert_called_once_with("HomeNetwork", timeout=40)
 
             finally:
                 Config.IS_DEVELOPMENT = original_dev
@@ -691,39 +706,55 @@ ip_address=192.168.1.100"""
 
     @pytest.mark.asyncio
     async def test_list_saved_networks_success(self):
-        """Test listing saved networks using wpa_cli"""
+        """Test listing saved networks from wpa_supplicant.conf"""
 
-        wpa_cli_output = """network id / ssid / bssid / flags
-0\tHomeNetwork\tany\t[CURRENT]
-1\tOfficeWiFi\tany\t[DISABLED]
-2\tGuestWiFi\tany\t"""
+        wpa_conf_content = """ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
 
-        with patch.object(WiFiManager, "run_wpa_cli", return_value=wpa_cli_output):
+network={
+    ssid="HomeNetwork"
+    psk="password123"
+}
+
+network={
+    ssid="OfficeWiFi"
+    psk="officepass"
+}
+
+network={
+    ssid="GuestWiFi"
+    key_mgmt=NONE
+}"""
+
+        mock_status = SystemStatus(mode="client", connected=True, ssid="HomeNetwork")
+
+        with (
+            patch.object(Config.WPA_SUPPLICANT_FILE, "exists", return_value=True),
+            patch.object(
+                Config.WPA_SUPPLICANT_FILE, "read_text", return_value=wpa_conf_content
+            ),
+            patch.object(WiFiManager, "get_status", return_value=mock_status),
+        ):
             networks = await WiFiManager.list_saved_networks()
 
             assert len(networks) == 3
             assert networks[0]["id"] == 0
             assert networks[0]["ssid"] == "HomeNetwork"
             assert networks[0]["current"] is True
-            assert networks[0]["disabled"] is False
 
             assert networks[1]["id"] == 1
             assert networks[1]["ssid"] == "OfficeWiFi"
             assert networks[1]["current"] is False
-            assert networks[1]["disabled"] is True
 
             assert networks[2]["id"] == 2
             assert networks[2]["ssid"] == "GuestWiFi"
             assert networks[2]["current"] is False
-            assert networks[2]["disabled"] is False
 
     @pytest.mark.asyncio
     async def test_list_saved_networks_empty(self):
         """Test listing saved networks when none exist"""
 
-        wpa_cli_output = "network id / ssid / bssid / flags"
-
-        with patch.object(WiFiManager, "run_wpa_cli", return_value=wpa_cli_output):
+        with patch.object(Config.WPA_SUPPLICANT_FILE, "exists", return_value=False):
             networks = await WiFiManager.list_saved_networks()
 
             assert len(networks) == 0
@@ -732,18 +763,40 @@ ip_address=192.168.1.100"""
     async def test_forget_network_success(self):
         """Test forgetting a saved network"""
 
-        with patch.object(
-            WiFiManager, "run_wpa_cli", new_callable=AsyncMock
-        ) as mock_wpa_cli:
-            mock_wpa_cli.return_value = ""
+        wpa_conf_content = """ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+
+network={
+    ssid="HomeNetwork"
+    psk="password123"
+}
+
+network={
+    ssid="OfficeWiFi"
+    psk="officepass"
+}"""
+
+        with (
+            patch.object(Config.WPA_SUPPLICANT_FILE, "exists", return_value=True),
+            patch.object(
+                Config.WPA_SUPPLICANT_FILE, "read_text", return_value=wpa_conf_content
+            ),
+            patch("pathlib.Path.write_text") as mock_write,
+            patch("asyncio.create_subprocess_exec") as mock_subprocess,
+        ):
+            mock_process = AsyncMock()
+            mock_process.returncode = 0
+            mock_process.communicate = AsyncMock(return_value=(b"", b""))
+            mock_subprocess.return_value = mock_process
 
             result = await WiFiManager.forget_network(1)
 
             assert result is True
-            # Should call remove_network and save_config
-            assert mock_wpa_cli.call_count == 2
-            assert mock_wpa_cli.call_args_list[0][0][0] == ["remove_network", "1"]
-            assert mock_wpa_cli.call_args_list[1][0][0] == ["save_config"]
+            # Verify config was written (should exclude network at index 1)
+            mock_write.assert_called_once()
+            written_config = mock_write.call_args[0][0]
+            assert "HomeNetwork" in written_config
+            assert "OfficeWiFi" not in written_config
 
     @pytest.mark.asyncio
     async def test_wait_for_connection_success(self):
