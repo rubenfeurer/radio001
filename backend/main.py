@@ -499,8 +499,9 @@ class WiFiManager:
         try:
             logger.debug(f"Running wpa_cli command: {' '.join(command)}")
 
-            # Use timeout wrapper to prevent hanging
+            # Use timeout wrapper to prevent hanging, run with sudo for proper permissions
             process = await asyncio.create_subprocess_exec(
+                "sudo",
                 "timeout",
                 "5",
                 "wpa_cli",
