@@ -38,7 +38,7 @@ RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, 
     chmod 0440 /etc/sudoers.d/radio
 
 # Copy requirements and install Python dependencies
-COPY requirements.txt requirements-test.txt ./
+COPY backend/requirements.txt backend/requirements-test.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install test dependencies for development/CI environments
@@ -47,13 +47,13 @@ RUN if [ "$INSTALL_TEST_DEPS" = "true" ]; then \
         pip install --no-cache-dir -r requirements-test.txt; \
     fi
 
-# Copy application code
-COPY . .
+# Copy boot check script and configuration templates (from project root)
+COPY --chmod=755 scripts/boot-wifi-check.sh /usr/local/bin/boot-wifi-check.sh
+COPY config/hostapd/hostapd.conf.template /etc/hostapd/hostapd.conf.template
+COPY config/dnsmasq/dnsmasq.conf.template /etc/dnsmasq.conf.template
 
-# Copy boot check script and configuration templates
-COPY --chmod=755 ../scripts/boot-wifi-check.sh /usr/local/bin/boot-wifi-check.sh
-COPY ../config/hostapd/hostapd.conf.template /etc/hostapd/hostapd.conf.template
-COPY ../config/dnsmasq/dnsmasq.conf.template /etc/dnsmasq.conf.template
+# Copy application code
+COPY backend/ .
 
 # Create necessary directories for testing
 RUN mkdir -p /app/data /app/sounds /app/logs /app/htmlcov

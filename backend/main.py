@@ -601,7 +601,36 @@ class WiFiManager:
             ]
 
             if credentials.password:
-                wpa_config.append(f'    psk="{credentials.password}"')
+                # Use wpa_passphrase to properly encode the PSK
+                # This handles special characters and spaces correctly
+                logger.info("Generating PSK hash using wpa_passphrase...")
+                process = await asyncio.create_subprocess_exec(
+                    "wpa_passphrase",
+                    credentials.ssid,
+                    credentials.password,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, stderr = await process.communicate()
+
+                if process.returncode != 0:
+                    logger.error(f"wpa_passphrase failed: {stderr.decode()}")
+                    # Fallback to quoted password (less secure but works for simple passwords)
+                    wpa_config.append(f'    psk="{credentials.password}"')
+                else:
+                    # Extract the PSK hash from wpa_passphrase output
+                    output = stdout.decode()
+                    for line in output.split("\n"):
+                        line = line.strip()
+                        if line.startswith("psk=") and not line.startswith('psk="'):
+                            # This is the hashed PSK (64 hex characters)
+                            wpa_config.append(f"    {line}")
+                            logger.info("Using hashed PSK for secure connection")
+                            break
+                    else:
+                        # If hash not found, use quoted password as fallback
+                        logger.warning("PSK hash not found, using quoted password")
+                        wpa_config.append(f'    psk="{credentials.password}"')
             else:
                 wpa_config.append("    key_mgmt=NONE")
 

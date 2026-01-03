@@ -5,8 +5,8 @@ services:
   # FastAPI Backend Service
   radio-backend:
     build:
-      context: ../backend
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: backend/Dockerfile
     image: radio-wifi-backend:latest
     container_name: radio-backend-prod
     hostname: radio-backend

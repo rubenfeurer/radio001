@@ -265,11 +265,18 @@ The `scripts/` directory contains helper scripts organized by purpose:
    ```bash
    git clone <repo-url> radio001
    cd radio001
-   docker compose -f compose/docker-compose.prod.yml up -d
+   ./scripts/dev-environment.sh start --prod
    ```
+   
+   This automatically:
+   - ✅ Installs systemd service for boot auto-start
+   - ✅ Builds and starts containers
+   - ✅ Configures 5s WiFi check → hotspot fallback
+   - ✅ System will start on every reboot
 
 3. **Access via:**
-   - **Web Interface**: http://radio.local or http://[pi-ip]
+   - **WiFi connected**: http://radio.local or http://[pi-ip]
+   - **Hotspot mode**: http://192.168.4.1 (SSID: Radio-Setup)
    - **Hardware Controls**: 3 buttons + rotary encoder
 
 ## 🤝 Contributing

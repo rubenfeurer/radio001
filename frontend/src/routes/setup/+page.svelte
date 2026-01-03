@@ -33,15 +33,30 @@
 	let confirmingReset = false;
 
 	// Combine available networks with saved network info
-	$: combinedNetworks = $networks.map((network) => {
-		const savedNetwork = $savedNetworks.find((s) => s.ssid === network.ssid);
-		return {
-			...network,
-			isSaved: !!savedNetwork,
-			isCurrent: savedNetwork?.current || false,
-			savedId: savedNetwork?.id
-		} as CombinedNetwork;
-	});
+	// Deduplicate networks by SSID to prevent duplicates
+	$: combinedNetworks = $networks
+		.reduce((acc, network) => {
+			// Check if we already have this SSID
+			const existing = acc.find((n) => n.ssid === network.ssid);
+			if (!existing) {
+				const savedNetwork = $savedNetworks.find((s) => s.ssid === network.ssid);
+				acc.push({
+					...network,
+					isSaved: !!savedNetwork,
+					isCurrent: savedNetwork?.current || false,
+					savedId: savedNetwork?.id
+				} as CombinedNetwork);
+			}
+			return acc;
+		}, [] as CombinedNetwork[])
+		.sort((a, b) => {
+			// Sort: current first, then saved, then by signal strength
+			if (a.isCurrent) return -1;
+			if (b.isCurrent) return 1;
+			if (a.isSaved && !b.isSaved) return -1;
+			if (b.isSaved && !a.isSaved) return 1;
+			return b.signal - a.signal;
+		});
 
 	onMount(() => {
 		scanNetworks();
