@@ -91,7 +91,7 @@ chmod +x scripts/*.sh 2>/dev/null || true
 # Setup pre-commit hooks
 print_status "Setting up pre-commit hooks..."
 
-cd app
+cd frontend
 
 # Install dependencies
 if [ -f "package.json" ]; then
@@ -104,61 +104,63 @@ if [ -f "package.json" ]; then
     else
         print_status "Installing dependencies via Docker..."
         cd ..
-        ./scripts/docker-dev.sh shell radio-app "npm install"
-        cd app
+        ./scripts/dev-environment.sh shell radio-backend "cd /app/frontend && npm install"
+        cd frontend
         print_success "Dependencies installed via Docker"
     fi
 else
-    print_error "package.json not found in app directory"
+    print_error "package.json not found in frontend directory"
     exit 1
 fi
 
-# Setup husky hooks
+# Setup husky hooks (if configured)
 print_status "Setting up Git hooks..."
 if command_exists npm; then
-    npm run prepare 2>/dev/null || true
+    npm run prepare 2>/dev/null || print_warning "No prepare script found (Git hooks may not be configured yet)"
 else
-    print_status "Setting up hooks via Docker..."
-    cd ..
-    ./scripts/docker-dev.sh shell radio-app "npm run prepare"
-    cd app
+    print_warning "Skipping Git hooks setup (requires local npm)"
 fi
 
-# Make sure hook files are executable
+# Make sure hook files are executable if they exist
 chmod +x ../.husky/* 2>/dev/null || true
 
-print_success "Git hooks configured"
+print_success "Frontend dependencies configured"
 cd ..
+
+# Setup data directory permissions
+print_status "Setting up data directory permissions..."
+if [ ! -d "data" ]; then
+    mkdir -p data
+    print_status "Created data directory"
+fi
+# Set ownership to UID 999 (radio user in container)
+sudo chown -R 999:999 data/ 2>/dev/null || chown -R 999:999 data/ 2>/dev/null || true
+sudo chmod -R 755 data/ 2>/dev/null || chmod -R 755 data/ 2>/dev/null || true
+print_success "Data directory permissions configured"
 
 # Test Docker setup
 print_status "Testing Docker environment..."
 
 # Build containers
 print_status "Building Docker containers (this may take a few minutes)..."
-if ./scripts/docker-dev.sh start; then
+if ./scripts/dev-environment.sh start; then
     sleep 5
 
-    # Test if services are running
-    if curl -f http://localhost:3000/api/health >/dev/null 2>&1; then
-        print_success "Frontend is running at http://localhost:3000"
-    else
-        print_warning "Frontend health check failed, but containers are running"
-    fi
-
+    # Test if backend is running
     if curl -f http://localhost:8000/health >/dev/null 2>&1; then
         print_success "Backend is running at http://localhost:8000"
     else
-        print_warning "Backend health check failed, but containers are running"
+        print_warning "Backend health check failed, but container is running"
     fi
 
     # Stop containers for now
     print_status "Stopping containers..."
-    ./scripts/docker-dev.sh stop
+    ./scripts/dev-environment.sh stop
 
 else
     print_error "Failed to start Docker environment"
     echo "Check Docker logs for details:"
-    echo "  ./scripts/docker-dev.sh logs"
+    echo "  ./scripts/dev-environment.sh logs"
     exit 1
 fi
 
@@ -221,34 +223,39 @@ echo ""
 echo "🎉 Development Environment Setup Complete!"
 echo "=========================================="
 echo ""
-echo "✅ Docker environment configured"
+echo "✅ Backend Docker environment configured"
 echo "✅ Pre-commit hooks installed"
-echo "✅ Dependencies installed"
+echo "✅ Frontend dependencies installed"
 echo "✅ Platform optimizations applied"
 echo ""
 
 # Next steps
 echo "🚀 Next Steps:"
 echo ""
-echo "1. Start development environment:"
-echo "   ./scripts/docker-dev.sh start"
+echo "1. Start backend (Docker):"
+echo "   ./scripts/dev-environment.sh start"
 echo ""
-echo "2. Open your browser:"
-echo "   Frontend: http://localhost:3000"
-echo "   Backend:  http://localhost:8000"
+echo "2. Start frontend (in a new terminal):"
+echo "   cd frontend && npm run dev"
 echo ""
-echo "3. Make changes and commit:"
+echo "3. Open your browser:"
+echo "   Frontend: http://localhost:5173"
+echo "   Backend API: http://localhost:8000"
+echo "   API Docs: http://localhost:8000/docs"
+echo ""
+echo "4. Make changes and commit:"
 echo "   git add ."
 echo "   git commit -m 'feat: your new feature'"
 echo ""
-echo "4. View logs:"
-echo "   ./scripts/docker-dev.sh logs"
+echo "5. View backend logs:"
+echo "   ./scripts/dev-environment.sh logs"
 echo ""
 
 # Development workflow reminder
 echo "💡 Development Workflow:"
 echo ""
-echo "• Code changes auto-reload in containers"
+echo "• Backend: Code changes auto-reload in Docker container"
+echo "• Frontend: Code changes auto-reload with Vite"
 echo "• Pre-commit hooks auto-fix lint issues"
 echo "• Type checking runs on every commit"
 echo "• Use conventional commit messages"
@@ -257,10 +264,11 @@ echo ""
 # Troubleshooting
 echo "🛠️  Troubleshooting:"
 echo ""
-echo "• Container issues: ./scripts/docker-dev.sh cleanup && ./scripts/docker-dev.sh start"
-echo "• Hook issues: cd app && npm run prepare"
+echo "• Container issues: ./scripts/dev-environment.sh cleanup && ./scripts/dev-environment.sh start"
+echo "• Hook issues: cd frontend && npm run prepare"
+echo "• Dependency issues: cd frontend && rm -rf node_modules && npm install"
 echo "• IDE type errors: Expected - packages are in Docker containers"
-echo "• Documentation: See DEVELOPMENT.md and .github/DEVELOPER_WORKFLOW.md"
+echo "• Documentation: See docs/ directory for detailed guides"
 echo ""
 
 print_success "Setup complete! Happy coding! 🎯"

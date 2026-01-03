@@ -270,16 +270,11 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Install Docker Compose
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose
-
       - name: Build and start test services
         run: |
           # Build backend for integration testing
-          docker-compose -f compose/docker-compose.ci.yml build radio-backend
-          docker-compose -f compose/docker-compose.ci.yml up -d radio-backend
+          docker compose -f compose/docker-compose.ci.yml build radio-backend
+          docker compose -f compose/docker-compose.ci.yml up -d radio-backend
 
           # Wait for services to be ready
           echo "Waiting for backend to be ready..."
@@ -296,7 +291,7 @@ jobs:
         run: |
           echo "🔄 Running Integration Tests..."
 
-          docker-compose -f compose/docker-compose.ci.yml exec -T radio-backend bash -c "
+          docker compose -f compose/docker-compose.ci.yml exec -T radio-backend bash -c "
             export NODE_ENV=development
             export MOCK_HARDWARE=true
             export PYTHONPATH=/app:\$PYTHONPATH
@@ -339,7 +334,7 @@ jobs:
       - name: Cleanup integration services
         if: always()
         run: |
-          docker-compose -f compose/docker-compose.ci.yml down -v
+          docker compose -f compose/docker-compose.ci.yml down -v
 
   # =============================================================================
   # Performance Tests (Optional)

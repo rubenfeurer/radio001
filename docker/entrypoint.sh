@@ -234,6 +234,16 @@ main() {
     # Setup mDNS
     setup_mdns
 
+    # PRODUCTION ONLY: Run boot WiFi check
+    if [ "$NODE_ENV" = "production" ]; then
+        log "Running boot WiFi check..."
+        if [ -x /usr/local/bin/boot-wifi-check.sh ]; then
+            /usr/local/bin/boot-wifi-check.sh || warn "WiFi check failed - continuing anyway"
+        else
+            warn "Boot WiFi check script not found - skipping"
+        fi
+    fi
+
     # Wait for network
     wait_for_network
 

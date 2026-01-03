@@ -1,15 +1,23 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { status, getStatus, isLoading, error } from '$lib/stores/wifi';
+	import { wsClient, isConnected } from '$lib/stores/websocket';
 
 	// SvelteKit page props - explicitly define what we accept
 	export let data: any = undefined;
 
 	onMount(() => {
+		// Initial fetch via REST as fallback
 		getStatus();
-		const interval = setInterval(getStatus, 10000);
-		return () => clearInterval(interval);
+
+		// Connect WebSocket for real-time updates
+		wsClient.connect();
+	});
+
+	onDestroy(() => {
+		// Disconnect WebSocket when leaving page
+		wsClient.disconnect();
 	});
 
 	const formatUptime = (seconds: number) => {

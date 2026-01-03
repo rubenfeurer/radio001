@@ -56,10 +56,10 @@ jobs:
 
       - name: Test backend health
         run: |
-          docker-compose -f compose/docker-compose.ci.yml up -d radio-backend
+          docker compose -f compose/docker-compose.ci.yml up -d radio-backend
           sleep 15
           curl -f http://localhost:8000/health
-          docker-compose -f compose/docker-compose.ci.yml down
+          docker compose -f compose/docker-compose.ci.yml down
 
   # =============================================================================
   # Full Integration Tests (for PRs and main pushes)
@@ -83,11 +83,11 @@ jobs:
 
       - name: Build and test backend
         run: |
-          docker-compose -f compose/docker-compose.ci.yml up -d radio-backend
+          docker compose -f compose/docker-compose.ci.yml up -d radio-backend
           sleep 15
           curl -f http://localhost:8000/health
-          docker-compose -f compose/docker-compose.ci.yml logs radio-backend
-          docker-compose -f compose/docker-compose.ci.yml down
+          docker compose -f compose/docker-compose.ci.yml logs radio-backend
+          docker compose -f compose/docker-compose.ci.yml down
 
       - name: Run backend tests
         run: |
@@ -151,10 +151,11 @@ jobs:
         run: |
           npm install
           cd frontend && npm run build:ci
-          docker-compose -f compose/docker-compose.prod.yml up -d
+          cd ..
+          docker compose -f compose/docker-compose.prod.yml up -d
           sleep 20
           curl -f http://localhost || echo "Production test skipped - no nginx setup in CI"
-          docker-compose -f compose/docker-compose.prod.yml down
+          docker compose -f compose/docker-compose.prod.yml down
 
   # =============================================================================
   # Build and Push Images (for main branch)
@@ -181,25 +182,20 @@ jobs:
           npm run install:force
           npm run build:ci
 
-      - name: Install Docker Compose
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose
-
       - name: Build and test with Docker
         run: |
           # Build backend container
-          docker-compose -f compose/docker-compose.ci.yml build radio-backend --no-cache
+          docker compose -f compose/docker-compose.ci.yml build radio-backend --no-cache
 
           # Start services
-          docker-compose -f compose/docker-compose.ci.yml up -d
+          docker compose -f compose/docker-compose.ci.yml up -d
 
           # Wait for services to be ready
           echo "Waiting for services to start..."
           sleep 45
 
           # Show running containers for debugging
-          docker-compose -f compose/docker-compose.ci.yml ps
+          docker compose -f compose/docker-compose.ci.yml ps
 
           # Test backend health first (frontend depends on it)
           echo "Testing backend health..."
@@ -211,7 +207,7 @@ jobs:
               echo "Backend health check failed (attempt $i/10)"
               if [ $i -eq 10 ]; then
                 echo "Backend logs:"
-                  docker-compose -f compose/docker-compose.ci.yml logs radio-backend
+                  docker compose -f compose/docker-compose.ci.yml logs radio-backend
                 exit 1
               fi
               sleep 10
@@ -223,11 +219,11 @@ jobs:
 
           # Test API directly
           echo "Testing API directly..."
-          if curl -f http://localhost:8000/api/health; then
+          if curl -f http://localhost:8000/health; then
             echo "Direct API test passed"
           else
             echo "Direct API test failed"
-            docker-compose -f compose/docker-compose.ci.yml logs radio-backend
+            docker compose -f compose/docker-compose.ci.yml logs radio-backend
             exit 1
           fi
 
@@ -242,7 +238,7 @@ jobs:
           echo "Running backend tests in Docker container..."
 
           # Run tests inside the backend container
-          docker-compose -f compose/docker-compose.ci.yml exec -T radio-backend bash -c "
+          docker compose -f compose/docker-compose.ci.yml exec -T radio-backend bash -c "
             # Set test environment
             export NODE_ENV=development
             export MOCK_HARDWARE=true
@@ -283,9 +279,9 @@ jobs:
           mkdir -p test-results
 
           # Copy test results from container
-          docker-compose -f compose/docker-compose.ci.yml cp radio-backend:/app/test-results.xml test-results/ || echo "No test-results.xml found"
-          docker-compose -f compose/docker-compose.ci.yml cp radio-backend:/app/coverage.xml test-results/ || echo "No coverage.xml found"
-          docker-compose -f compose/docker-compose.ci.yml cp radio-backend:/app/htmlcov test-results/ || echo "No htmlcov found"
+          docker compose -f compose/docker-compose.ci.yml cp radio-backend:/app/test-results.xml test-results/ || echo "No test-results.xml found"
+          docker compose -f compose/docker-compose.ci.yml cp radio-backend:/app/coverage.xml test-results/ || echo "No coverage.xml found"
+          docker compose -f compose/docker-compose.ci.yml cp radio-backend:/app/htmlcov test-results/ || echo "No htmlcov found"
 
           # Show what we extracted
           ls -la test-results/
@@ -310,8 +306,8 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker-compose -f compose/docker-compose.ci.yml logs
-          docker-compose -f compose/docker-compose.ci.yml down -v
+          docker compose -f compose/docker-compose.ci.yml logs
+          docker compose -f compose/docker-compose.ci.yml down -v
 
   # =============================================================================
   # Security Scanning

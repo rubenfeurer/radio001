@@ -14,10 +14,8 @@
 	};
 
 	onMount(() => {
+		// Initial fetch via REST
 		getStatus();
-		// Auto-refresh every 30 seconds
-		const interval = setInterval(getStatus, 30000);
-		return () => clearInterval(interval);
 	});
 </script>
 
@@ -46,16 +44,18 @@
 						</p>
 					</div>
 				</div>
-				<button
-					on:click={refresh}
-					disabled={refreshing}
-					class="btn-secondary"
-				>
-					<svg class="w-4 h-4" class:animate-spin={refreshing} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-							d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-					</svg>
-				</button>
+				<div class="flex items-center gap-2">
+					<button
+						on:click={refresh}
+						disabled={refreshing}
+						class="btn-secondary"
+					>
+						<svg class="w-4 h-4" class:animate-spin={refreshing} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+								d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+						</svg>
+					</button>
+				</div>
 			</div>
 		</div>
 	</header>
@@ -123,9 +123,9 @@
 			<a href="/setup" class="btn-primary w-full justify-center">
 				<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-						d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+						d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
 				</svg>
-				WiFi Setup
+				WiFi Manager
 			</a>
 
 			<a href="/status" class="btn-secondary w-full justify-center">

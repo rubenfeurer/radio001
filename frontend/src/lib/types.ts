@@ -29,6 +29,20 @@ export interface WiFiStatus {
 	mode: 'client' | 'hotspot' | 'offline';
 }
 
+export interface SavedNetwork {
+	id: number; // wpa_cli network ID
+	ssid: string;
+	current: boolean; // Currently connected
+	disabled: boolean; // Network disabled in wpa_supplicant
+}
+
+export interface ConnectionProgress {
+	status: 'idle' | 'connecting' | 'verifying' | 'success' | 'failed';
+	attempt: number;
+	maxAttempts: number;
+	message: string;
+}
+
 export interface SystemStatus {
 	hostname: string;
 	uptime: number;
@@ -66,5 +80,24 @@ export interface ConnectionResult {
 	message: string;
 	ssid?: string;
 	ip?: string;
+	error?: string;
+}
+
+export interface RadioStation {
+	id: string;
+	name: string;
+	url: string;
+	genre?: string;
+	bitrate?: number;
+	country?: string;
+	favicon?: string;
+}
+
+export interface PlaybackStatus {
+	is_playing: boolean;
+	current_station?: RadioStation;
+	stream_title?: string;
+	bitrate?: number;
+	codec?: string;
 	error?: string;
 }

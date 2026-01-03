@@ -10,13 +10,14 @@ Tests WebSocket functionality including:
 - Error handling and disconnection scenarios
 """
 
-import pytest
 import asyncio
 import json
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 import websockets
-from websockets.exceptions import ConnectionClosed
 from httpx import AsyncClient
-from unittest.mock import AsyncMock, patch, MagicMock
+from websockets.exceptions import ConnectionClosed
 
 
 @pytest.mark.websocket
@@ -52,7 +53,7 @@ class TestWebSocketRoutes:
         assert isinstance(stats["total_messages_sent"], int)
         assert isinstance(stats["connections_info"], list)
 
-    @patch('api.routes.websocket.manager')
+    @patch("api.routes.websocket.manager")
     async def test_websocket_status_callback(self, mock_manager):
         """Test WebSocket status update callback."""
         from api.routes.websocket import websocket_status_callback
@@ -64,12 +65,11 @@ class TestWebSocketRoutes:
         await websocket_status_callback("test_update", {"test": "data"})
 
         # Should have called broadcast
-        mock_manager.broadcast.assert_called_once_with({
-            "type": "test_update",
-            "data": {"test": "data"}
-        })
+        mock_manager.broadcast.assert_called_once_with(
+            {"type": "test_update", "data": {"test": "data"}}
+        )
 
-    @patch('api.routes.websocket.manager')
+    @patch("api.routes.websocket.manager")
     async def test_websocket_status_callback_no_data(self, mock_manager):
         """Test WebSocket status callback without data."""
         from api.routes.websocket import websocket_status_callback
@@ -80,12 +80,11 @@ class TestWebSocketRoutes:
         await websocket_status_callback("volume_update")
 
         # Should have called broadcast with empty data
-        mock_manager.broadcast.assert_called_once_with({
-            "type": "volume_update",
-            "data": {}
-        })
+        mock_manager.broadcast.assert_called_once_with(
+            {"type": "volume_update", "data": {}}
+        )
 
-    @patch('api.routes.websocket.manager')
+    @patch("api.routes.websocket.manager")
     async def test_websocket_callback_error_handling(self, mock_manager):
         """Test WebSocket callback error handling."""
         from api.routes.websocket import websocket_status_callback
@@ -134,7 +133,7 @@ class TestWebSocketRoutes:
         mock_websocket.accept.assert_called_once()
         assert mock_websocket in manager.active_connections
 
-    @patch('api.routes.websocket.ConnectionManager')
+    @patch("api.routes.websocket.ConnectionManager")
     async def test_connection_manager_disconnect(self, mock_connection_manager):
         """Test WebSocket connection manager disconnect."""
         mock_manager = AsyncMock()
@@ -148,7 +147,7 @@ class TestWebSocketRoutes:
         # Should handle disconnect
         mock_manager.disconnect.assert_called_once()
 
-    @patch('api.routes.websocket.ConnectionManager')
+    @patch("api.routes.websocket.ConnectionManager")
     async def test_connection_manager_broadcast(self, mock_connection_manager):
         """Test WebSocket connection manager broadcast."""
         mock_manager = AsyncMock()
@@ -168,9 +167,7 @@ class TestWebSocketRoutes:
 
         # Test valid message
         valid_message = WSMessage(
-            type="test_message",
-            data={"key": "value"},
-            timestamp=1703123456.789
+            type="test_message", data={"key": "value"}, timestamp=1703123456.789
         )
         assert valid_message.type == "test_message"
         assert valid_message.data["key"] == "value"
@@ -182,7 +179,7 @@ class TestWebSocketRoutes:
 
     async def test_websocket_message_timestamps(self):
         """Test that WebSocket messages include timestamps."""
-        from core.models import WSVolumeUpdate, WSStationChange
+        from core.models import WSStationChange, WSVolumeUpdate
 
         # Test volume update message
         volume_msg = WSVolumeUpdate(data={"volume": 75})
@@ -192,16 +189,29 @@ class TestWebSocketRoutes:
         station_msg = WSStationChange(data={"slot": 1, "action": "playing"})
         assert station_msg.type == "station_change"
 
-    @patch('api.routes.websocket.RadioManager')
-    async def test_websocket_client_message_handling(self, mock_radio_manager):
+    @patch("api.routes.websocket.RadioManager")
+    @patch("api.routes.system.get_system_metrics")
+    @patch("api.routes.websocket.manager")
+    async def test_websocket_client_message_handling(
+        self, mock_manager, mock_get_system_metrics, mock_radio_manager
+    ):
         """Test handling of client messages via WebSocket."""
         from api.routes.websocket import handle_client_message
 
         # Mock radio manager
         mock_manager_instance = AsyncMock()
         mock_radio_manager.get_instance.return_value = mock_manager_instance
-        mock_manager_instance.get_status.return_value = AsyncMock()
         mock_manager_instance._station_manager.get_all_stations.return_value = {}
+
+        # Mock system metrics
+        mock_get_system_metrics.return_value = {
+            "hostname": "test",
+            "uptime": 100,
+            "memory": {"total": 1000, "used": 500, "free": 500},
+        }
+
+        # Mock connection manager
+        mock_manager.send_personal_message = AsyncMock()
 
         # Mock WebSocket
         mock_websocket = AsyncMock()
@@ -210,10 +220,11 @@ class TestWebSocketRoutes:
         message = {"type": "get_status", "data": {}}
         await handle_client_message(mock_websocket, message)
 
-        # Should have called get_status
-        mock_manager_instance.get_status.assert_called_once()
+        # Should have called get_system_metrics and sent message
+        mock_get_system_metrics.assert_called_once()
+        mock_manager.send_personal_message.assert_called_once()
 
-    @patch('api.routes.websocket.RadioManager')
+    @patch("api.routes.websocket.RadioManager")
     async def test_websocket_get_stations_message(self, mock_radio_manager):
         """Test WebSocket get_stations message handling."""
         from api.routes.websocket import handle_client_message
@@ -224,13 +235,13 @@ class TestWebSocketRoutes:
         mock_manager_instance._station_manager.get_all_stations.return_value = {
             1: AsyncMock(dict=lambda: {"name": "Test Station"}),
             2: None,
-            3: None
+            3: None,
         }
 
         # Mock WebSocket and connection manager
         mock_websocket = AsyncMock()
 
-        with patch('api.routes.websocket.manager') as mock_manager:
+        with patch("api.routes.websocket.manager") as mock_manager:
             mock_manager.send_personal_message = AsyncMock()
 
             # Test get_stations message
@@ -243,14 +254,14 @@ class TestWebSocketRoutes:
             # Should have sent response
             mock_manager.send_personal_message.assert_called_once()
 
-    @patch('api.routes.websocket.RadioManager')
+    @patch("api.routes.websocket.RadioManager")
     async def test_websocket_ping_pong(self, mock_radio_manager):
         """Test WebSocket ping-pong mechanism."""
         from api.routes.websocket import handle_client_message
 
         mock_websocket = AsyncMock()
 
-        with patch('api.routes.websocket.manager') as mock_manager:
+        with patch("api.routes.websocket.manager") as mock_manager:
             mock_manager.send_personal_message = AsyncMock()
 
             # Test ping message
@@ -263,14 +274,14 @@ class TestWebSocketRoutes:
             sent_message = call_args[0][0]
             assert sent_message["type"] == "pong"
 
-    @patch('api.routes.websocket.RadioManager')
+    @patch("api.routes.websocket.RadioManager")
     async def test_websocket_unknown_message_type(self, mock_radio_manager):
         """Test handling of unknown WebSocket message types."""
         from api.routes.websocket import handle_client_message
 
         mock_websocket = AsyncMock()
 
-        with patch('api.routes.websocket.manager') as mock_manager:
+        with patch("api.routes.websocket.manager") as mock_manager:
             mock_manager.send_personal_message = AsyncMock()
 
             # Test unknown message type
@@ -290,7 +301,7 @@ class TestWebSocketRoutes:
 
         mock_websocket = AsyncMock()
 
-        with patch('api.routes.websocket.manager') as mock_manager:
+        with patch("api.routes.websocket.manager") as mock_manager:
             mock_manager.send_personal_message = AsyncMock()
 
             # Test message without type
@@ -305,13 +316,13 @@ class TestWebSocketRoutes:
 
         mock_websocket = AsyncMock()
 
-        with patch('api.routes.websocket.manager') as mock_manager:
+        with patch("api.routes.websocket.manager") as mock_manager:
             mock_manager.send_personal_message = AsyncMock()
 
             # Test subscription message
             message = {
                 "type": "subscribe",
-                "data": {"types": ["volume_update", "station_change"]}
+                "data": {"types": ["volume_update", "station_change"]},
             }
             await handle_client_message(mock_websocket, message)
 
@@ -402,7 +413,7 @@ class TestWebSocketRoutes:
             assert "connected_duration" in conn_info
             assert "message_count" in conn_info
 
-    @patch('api.routes.websocket.RadioManager')
+    @patch("api.routes.websocket.RadioManager")
     async def test_websocket_hardware_status_message(self, mock_radio_manager):
         """Test WebSocket hardware status message handling."""
         from api.routes.websocket import handle_client_message
@@ -413,12 +424,12 @@ class TestWebSocketRoutes:
         mock_manager_instance.get_hardware_status.return_value = {
             "gpio_available": True,
             "audio_available": True,
-            "mock_mode": False
+            "mock_mode": False,
         }
 
         mock_websocket = AsyncMock()
 
-        with patch('api.routes.websocket.manager') as mock_manager:
+        with patch("api.routes.websocket.manager") as mock_manager:
             mock_manager.send_personal_message = AsyncMock()
 
             # Test get_hardware_status message
@@ -440,9 +451,10 @@ class TestWebSocketRoutes:
 
         mock_websocket = AsyncMock()
 
-        with patch('api.routes.websocket.manager') as mock_manager, \
-             patch('api.routes.websocket.RadioManager') as mock_radio_manager:
-
+        with (
+            patch("api.routes.websocket.manager") as mock_manager,
+            patch("api.routes.websocket.RadioManager") as mock_radio_manager,
+        ):
             # Mock radio manager to raise exception
             mock_radio_manager.get_instance.side_effect = Exception("Radio error")
             mock_manager.send_personal_message = AsyncMock()
@@ -462,15 +474,14 @@ class TestWebSocketRoutes:
         from api.routes.websocket import setup_radio_manager_with_websocket
         from main import Config
 
-        with patch('api.routes.websocket.RadioManager') as mock_radio_manager:
+        with patch("api.routes.websocket.RadioManager") as mock_radio_manager:
             mock_instance = AsyncMock()
             # Fix: create_instance should return the mock instance directly, not as awaitable
             mock_radio_manager.create_instance = AsyncMock(return_value=mock_instance)
 
             # Test setup function
             result = await setup_radio_manager_with_websocket(
-                config=Config,
-                mock_mode=True
+                config=Config, mock_mode=True
             )
 
             assert result == mock_instance
@@ -507,7 +518,7 @@ class TestWebSocketRoutes:
         message = WSMessage(
             type="test_message",
             data={"volume": 75, "station": 1},
-            timestamp=1703123456.789
+            timestamp=1703123456.789,
         )
 
         # Should be serializable to JSON

@@ -13,12 +13,12 @@ import asyncio
 import json
 import logging
 import time
-from typing import Dict, Set, Any, Optional
+from typing import Any, Dict, Optional, Set
+
+from core.models import PlaybackStatus, SystemStatus, WSMessage
+from core.radio_manager import RadioManager
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 from fastapi.websockets import WebSocketState
-
-from core.models import WSMessage, SystemStatus, PlaybackStatus
-from core.radio_manager import RadioManager
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,9 @@ class ConnectionManager:
         self.connection_info: Dict[WebSocket, Dict[str, Any]] = {}
         self._lock = asyncio.Lock()
 
-    async def connect(self, websocket: WebSocket, client_info: Optional[Dict[str, Any]] = None):
+    async def connect(
+        self, websocket: WebSocket, client_info: Optional[Dict[str, Any]] = None
+    ):
         """
         Accept and register a new WebSocket connection.
 
@@ -54,10 +56,12 @@ class ConnectionManager:
             self.connection_info[websocket] = {
                 "connected_at": time.time(),
                 "client_info": client_info or {},
-                "message_count": 0
+                "message_count": 0,
             }
 
-        logger.info(f"WebSocket client connected. Total connections: {len(self.active_connections)}")
+        logger.info(
+            f"WebSocket client connected. Total connections: {len(self.active_connections)}"
+        )
 
     async def disconnect(self, websocket: WebSocket):
         """
@@ -70,9 +74,13 @@ class ConnectionManager:
             self.active_connections.discard(websocket)
             self.connection_info.pop(websocket, None)
 
-        logger.info(f"WebSocket client disconnected. Total connections: {len(self.active_connections)}")
+        logger.info(
+            f"WebSocket client disconnected. Total connections: {len(self.active_connections)}"
+        )
 
-    async def send_personal_message(self, message: Dict[str, Any], websocket: WebSocket):
+    async def send_personal_message(
+        self, message: Dict[str, Any], websocket: WebSocket
+    ):
         """
         Send a message to a specific WebSocket connection.
 
@@ -82,10 +90,7 @@ class ConnectionManager:
         """
         if websocket in self.active_connections:
             try:
-                message_with_timestamp = {
-                    **message,
-                    "timestamp": time.time()
-                }
+                message_with_timestamp = {**message, "timestamp": time.time()}
                 await websocket.send_text(json.dumps(message_with_timestamp))
 
                 # Update message count
@@ -106,10 +111,7 @@ class ConnectionManager:
         if not self.active_connections:
             return
 
-        message_with_timestamp = {
-            **message,
-            "timestamp": time.time()
-        }
+        message_with_timestamp = {**message, "timestamp": time.time()}
 
         message_text = json.dumps(message_with_timestamp)
         disconnected_connections = set()
@@ -143,8 +145,7 @@ class ConnectionManager:
     def get_connection_stats(self) -> Dict[str, Any]:
         """Get connection statistics for monitoring."""
         total_messages = sum(
-            info.get("message_count", 0)
-            for info in self.connection_info.values()
+            info.get("message_count", 0) for info in self.connection_info.values()
         )
 
         return {
@@ -154,10 +155,10 @@ class ConnectionManager:
                 {
                     "connected_duration": time.time() - info.get("connected_at", 0),
                     "message_count": info.get("message_count", 0),
-                    "client_info": info.get("client_info", {})
+                    "client_info": info.get("client_info", {}),
                 }
                 for info in self.connection_info.values()
-            ]
+            ],
         }
 
 
@@ -166,7 +167,9 @@ manager = ConnectionManager()
 
 
 # WebSocket status update callback for RadioManager
-async def websocket_status_callback(update_type: str, data: Optional[Dict[str, Any]] = None):
+async def websocket_status_callback(
+    update_type: str, data: Optional[Dict[str, Any]] = None
+):
     """
     Callback function for RadioManager to broadcast status updates via WebSocket.
 
@@ -175,10 +178,7 @@ async def websocket_status_callback(update_type: str, data: Optional[Dict[str, A
         data: Optional data payload for the update
     """
     try:
-        message = {
-            "type": update_type,
-            "data": data or {}
-        }
+        message = {"type": update_type, "data": data or {}}
         await manager.broadcast(message)
         logger.debug(f"Broadcasted WebSocket update: {update_type}")
     except Exception as e:
@@ -203,17 +203,17 @@ async def websocket_endpoint(websocket: WebSocket):
         # Accept connection
         await manager.connect(websocket, {"host": client_host})
 
-        # Send initial system status
+        # Send initial system status (system metrics, not radio status)
         try:
-            radio_manager = RadioManager.get_instance()
-            initial_status = await radio_manager.get_status()
+            from api.routes.system import get_system_metrics
 
-            await manager.send_personal_message({
-                "type": "system_status",
-                "data": initial_status.dict()
-            }, websocket)
+            initial_metrics = await get_system_metrics()
+
+            await manager.send_personal_message(
+                {"type": "system_status", "data": initial_metrics}, websocket
+            )
         except Exception as e:
-            logger.error(f"Error sending initial status: {e}")
+            logger.error(f"Error sending initial system status: {e}")
 
         # Message handling loop
         while True:
@@ -225,16 +225,19 @@ async def websocket_endpoint(websocket: WebSocket):
                     message = json.loads(data)
                     await handle_client_message(websocket, message)
                 except json.JSONDecodeError:
-                    await manager.send_personal_message({
-                        "type": "error",
-                        "data": {"message": "Invalid JSON format"}
-                    }, websocket)
+                    await manager.send_personal_message(
+                        {"type": "error", "data": {"message": "Invalid JSON format"}},
+                        websocket,
+                    )
                 except Exception as e:
                     logger.error(f"Error handling client message: {e}")
-                    await manager.send_personal_message({
-                        "type": "error",
-                        "data": {"message": "Error processing message"}
-                    }, websocket)
+                    await manager.send_personal_message(
+                        {
+                            "type": "error",
+                            "data": {"message": "Error processing message"},
+                        },
+                        websocket,
+                    )
 
             except WebSocketDisconnect:
                 break
@@ -265,57 +268,72 @@ async def handle_client_message(websocket: WebSocket, message: Dict[str, Any]):
         radio_manager = RadioManager.get_instance()
 
         if message_type == "get_status":
-            # Send current system status
-            status = await radio_manager.get_status()
-            await manager.send_personal_message({
-                "type": "system_status",
-                "data": status.dict()
-            }, websocket)
+            # Send current system metrics
+            from api.routes.system import get_system_metrics
+
+            metrics = await get_system_metrics()
+            await manager.send_personal_message(
+                {"type": "system_status", "data": metrics}, websocket
+            )
 
         elif message_type == "get_stations":
             # Send all stations
             stations = await radio_manager._station_manager.get_all_stations()
-            await manager.send_personal_message({
-                "type": "stations_update",
-                "data": {"stations": {k: v.dict() if v else None for k, v in stations.items()}}
-            }, websocket)
+            await manager.send_personal_message(
+                {
+                    "type": "stations_update",
+                    "data": {
+                        "stations": {
+                            k: v.dict() if v else None for k, v in stations.items()
+                        }
+                    },
+                },
+                websocket,
+            )
 
         elif message_type == "get_hardware_status":
             # Send hardware status
             hw_status = radio_manager.get_hardware_status()
-            await manager.send_personal_message({
-                "type": "hardware_status",
-                "data": hw_status
-            }, websocket)
+            await manager.send_personal_message(
+                {"type": "hardware_status", "data": hw_status}, websocket
+            )
 
         elif message_type == "ping":
             # Respond to ping with pong
-            await manager.send_personal_message({
-                "type": "pong",
-                "data": {"timestamp": time.time()}
-            }, websocket)
+            await manager.send_personal_message(
+                {"type": "pong", "data": {"timestamp": time.time()}}, websocket
+            )
 
         elif message_type == "subscribe":
             # Handle subscription requests (for future use)
             subscription_types = message_data.get("types", [])
-            await manager.send_personal_message({
-                "type": "subscription_confirmed",
-                "data": {"subscribed_to": subscription_types}
-            }, websocket)
+            await manager.send_personal_message(
+                {
+                    "type": "subscription_confirmed",
+                    "data": {"subscribed_to": subscription_types},
+                },
+                websocket,
+            )
 
         else:
             # Unknown message type
-            await manager.send_personal_message({
-                "type": "error",
-                "data": {"message": f"Unknown message type: {message_type}"}
-            }, websocket)
+            await manager.send_personal_message(
+                {
+                    "type": "error",
+                    "data": {"message": f"Unknown message type: {message_type}"},
+                },
+                websocket,
+            )
 
     except Exception as e:
         logger.error(f"Error handling message type '{message_type}': {e}")
-        await manager.send_personal_message({
-            "type": "error",
-            "data": {"message": f"Error processing {message_type} request"}
-        }, websocket)
+        await manager.send_personal_message(
+            {
+                "type": "error",
+                "data": {"message": f"Error processing {message_type} request"},
+            },
+            websocket,
+        )
 
 
 @router.get("/stats")
@@ -344,9 +362,71 @@ async def setup_radio_manager_with_websocket(config, mock_mode: bool = True):
     return await RadioManager.create_instance(
         config=config,
         status_update_callback=websocket_status_callback,
-        mock_mode=mock_mode
+        mock_mode=mock_mode,
     )
 
 
 # Export the callback for use in main application
-__all__ = ["router", "websocket_status_callback", "manager", "setup_radio_manager_with_websocket"]
+# Background task for periodic system metrics broadcast
+_metrics_broadcast_task = None
+
+
+async def broadcast_system_metrics_periodically():
+    """
+    Background task that periodically broadcasts system metrics to all connected clients.
+    Runs every 5 seconds.
+    """
+    from api.routes.system import get_system_metrics
+
+    logger.info("Starting periodic system metrics broadcast")
+
+    while True:
+        try:
+            await asyncio.sleep(5)  # Broadcast every 5 seconds
+
+            if manager.get_connection_count() > 0:
+                metrics = await get_system_metrics()
+                await manager.broadcast({"type": "system_status", "data": metrics})
+                logger.debug(
+                    f"Broadcasted system metrics to {manager.get_connection_count()} clients"
+                )
+        except asyncio.CancelledError:
+            logger.info("System metrics broadcast task cancelled")
+            break
+        except Exception as e:
+            logger.error(f"Error broadcasting system metrics: {e}", exc_info=True)
+            await asyncio.sleep(5)  # Wait before retrying on error
+
+
+async def start_metrics_broadcast():
+    """Start the background task for broadcasting system metrics."""
+    global _metrics_broadcast_task
+
+    if _metrics_broadcast_task is None or _metrics_broadcast_task.done():
+        _metrics_broadcast_task = asyncio.create_task(
+            broadcast_system_metrics_periodically()
+        )
+        logger.info("System metrics broadcast task started")
+
+
+async def stop_metrics_broadcast():
+    """Stop the background task for broadcasting system metrics."""
+    global _metrics_broadcast_task
+
+    if _metrics_broadcast_task and not _metrics_broadcast_task.done():
+        _metrics_broadcast_task.cancel()
+        try:
+            await _metrics_broadcast_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("System metrics broadcast task stopped")
+
+
+__all__ = [
+    "router",
+    "websocket_status_callback",
+    "manager",
+    "setup_radio_manager_with_websocket",
+    "start_metrics_broadcast",
+    "stop_metrics_broadcast",
+]

@@ -1,19 +1,16 @@
 # Production Docker Compose configuration for Radio WiFi Configuration
 # New SvelteKit + FastAPI hybrid architecture for ARM64 compatibility
 
-version: "3.8"
-
 services:
   # FastAPI Backend Service
   radio-backend:
     build:
-      context: ../backend
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: backend/Dockerfile
     image: radio-wifi-backend:latest
     container_name: radio-backend-prod
     hostname: radio-backend
-    ports:
-      - "8000:8000"
+    network_mode: host
     volumes:
       # Persistent data
       - radio_data:/app/data
@@ -22,13 +19,14 @@ services:
 
       # System integration for WiFi management
       - /etc/wpa_supplicant:/etc/wpa_supplicant:rw
+      - /run/wpa_supplicant:/run/wpa_supplicant:rw
       - /etc/hostapd:/etc/hostapd:rw
       - /etc/dnsmasq.conf:/etc/dnsmasq.conf:rw
+      - /etc/raspiwifi:/etc/raspiwifi:rw
 
       # Device access for WiFi management
       - /dev:/dev:rw
       - /sys/class/net:/sys/class/net:ro
-      - /proc/net:/proc/net:ro
     environment:
       # Production settings
       - NODE_ENV=production
@@ -45,6 +43,12 @@ services:
       - HOTSPOT_IP=192.168.4.1
       - HOTSPOT_RANGE=192.168.4.2,192.168.4.20
 
+      # Boot WiFi check settings
+      - WIFI_TIMEOUT=5
+      - WIFI_CHECK_ENABLED=true
+      - HOTSPOT_ENABLE_FALLBACK=true
+      - HOST_MODE_FILE=/etc/raspiwifi/host_mode
+
       # Security settings
       - SESSION_SECRET=${SESSION_SECRET:-prod-secret-key-change-me}
       - JWT_SECRET=${JWT_SECRET:-prod-jwt-secret-change-me}
@@ -52,8 +56,6 @@ services:
       # Features
       - ENABLE_CAPTIVE_PORTAL=true
       - ENABLE_AUTO_CONNECT=true
-    networks:
-      - radio-network
     restart: unless-stopped
     privileged: true
     cap_add:
@@ -73,15 +75,12 @@ services:
     image: nginx:alpine
     container_name: radio-frontend-prod
     hostname: radio-frontend
-    ports:
-      - "80:80" # HTTP
-      - "443:443" # HTTPS (if SSL configured)
+    network_mode: host
     volumes:
       # Static SvelteKit build
-      - ./frontend/build:/usr/share/nginx/html:ro
+      - ../frontend/build:/usr/share/nginx/html:ro
       # Nginx configuration
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       # SSL certificates (optional)
       - radio_ssl:/etc/nginx/ssl:ro
       # Logs
@@ -89,10 +88,8 @@ services:
     environment:
       - NGINX_HOST=radio.local
       - NGINX_PORT=80
-      - BACKEND_HOST=radio-backend
+      - BACKEND_HOST=localhost
       - BACKEND_PORT=8000
-    networks:
-      - radio-network
     restart: unless-stopped
     depends_on:
       - radio-backend
