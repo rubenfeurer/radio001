@@ -29,6 +29,20 @@ export interface WiFiStatus {
 	mode: 'client' | 'hotspot' | 'offline';
 }
 
+export interface SavedNetwork {
+	id: number; // wpa_cli network ID
+	ssid: string;
+	current: boolean; // Currently connected
+	disabled: boolean; // Network disabled in wpa_supplicant
+}
+
+export interface ConnectionProgress {
+	status: 'idle' | 'connecting' | 'verifying' | 'success' | 'failed';
+	attempt: number;
+	maxAttempts: number;
+	message: string;
+}
+
 export interface SystemStatus {
 	hostname: string;
 	uptime: number;

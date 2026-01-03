@@ -320,61 +320,80 @@ class WiFiManager:
 
     @staticmethod
     async def connect_network(credentials: WiFiCredentials) -> bool:
-        """Connect to WiFi network (RaspiWiFi method)"""
+        """
+        Connect to WiFi network with automatic retry (RaspiWiFi method with validation).
 
-        if Config.IS_DEVELOPMENT:
-            # Simulate connection in development
-            logger.info(
-                f"Development mode: Simulating WiFi connection to {credentials.ssid}"
-            )
-            await asyncio.sleep(1)
-            return True
+        Attempts connection up to 3 times with exponential backoff:
+        - Attempt 1: Immediate (0s delay)
+        - Attempt 2: 5s delay
+        - Attempt 3: 10s delay
 
+        Validates connection BEFORE rebooting system.
+        """
+        max_attempts = 3
+        retry_delays = [0, 5, 10]  # Exponential backoff
+
+        # Backup current config in case we need to rollback
+        backup_path = Path("/tmp/wpa_supplicant.conf.backup")
         try:
-            logger.info(f"Creating wpa_supplicant.conf for {credentials.ssid}")
+            if Config.WPA_SUPPLICANT_FILE.exists() and not Config.IS_DEVELOPMENT:
+                import shutil
 
-            # Create wpa_supplicant.conf (same as RaspiWiFi)
-            wpa_config = [
-                "ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev",
-                "update_config=1",
-                "",
-                "network={",
-                f'    ssid="{credentials.ssid}"',
-            ]
-
-            if credentials.password:
-                wpa_config.append(f'    psk="{credentials.password}"')
-            else:
-                wpa_config.append("    key_mgmt=NONE")
-
-            wpa_config.append("}")
-
-            # Write wpa_supplicant.conf
-            temp_file = Path("/tmp/wpa_supplicant.conf.tmp")
-            temp_file.write_text("\n".join(wpa_config))
-            logger.debug(f"Wrote temporary config to {temp_file}")
-
-            # Move to final location (requires root)
-            process = await asyncio.create_subprocess_exec(
-                "sudo",
-                "mv",
-                str(temp_file),
-                str(Config.WPA_SUPPLICANT_FILE),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, stderr = await process.communicate()
-
-            if process.returncode == 0:
-                logger.info(f"Successfully wrote {Config.WPA_SUPPLICANT_FILE}")
-                return True
-            else:
-                logger.error(f"Failed to move config file: {stderr.decode()}")
-                return False
-
+                shutil.copy(Config.WPA_SUPPLICANT_FILE, backup_path)
+                logger.info(f"Backed up current config to {backup_path}")
         except Exception as e:
-            logger.error(f"Error writing WiFi credentials: {e}", exc_info=True)
-            return False
+            logger.warning(f"Could not backup config: {e}")
+
+        for attempt in range(1, max_attempts + 1):
+            logger.info(
+                f"Connection attempt {attempt}/{max_attempts} to {credentials.ssid}"
+            )
+
+            # Add delay before retry (skip for first attempt)
+            if attempt > 1:
+                delay = retry_delays[attempt - 1]
+                logger.info(f"Waiting {delay}s before retry...")
+                await asyncio.sleep(delay)
+
+            try:
+                # Write wpa_supplicant.conf
+                if not await WiFiManager._write_wpa_config(credentials):
+                    logger.error(f"Attempt {attempt}: Failed to write config")
+                    continue
+
+                # Reconfigure wpa_supplicant to apply new config
+                if not Config.IS_DEVELOPMENT:
+                    try:
+                        await WiFiManager.run_wpa_cli(["reconfigure"])
+                        logger.info("Reconfigured wpa_supplicant with new credentials")
+                    except Exception as e:
+                        logger.error(f"Failed to reconfigure wpa_supplicant: {e}")
+                        continue
+
+                # Wait for connection with 40s timeout
+                if await WiFiManager.wait_for_connection(credentials.ssid, timeout=40):
+                    logger.info(f"Successfully connected on attempt {attempt}")
+                    return True
+
+                logger.warning(f"Attempt {attempt} failed: Connection timeout")
+
+            except Exception as e:
+                logger.error(f"Attempt {attempt} failed with exception: {e}")
+
+        # All attempts failed - restore backup if exists
+        logger.error(f"All {max_attempts} connection attempts failed")
+
+        if backup_path.exists() and not Config.IS_DEVELOPMENT:
+            try:
+                import shutil
+
+                shutil.copy(backup_path, Config.WPA_SUPPLICANT_FILE)
+                await WiFiManager.run_wpa_cli(["reconfigure"])
+                logger.info("Restored original WiFi configuration")
+            except Exception as e:
+                logger.error(f"Failed to restore backup: {e}")
+
+        return False
 
     @staticmethod
     async def switch_to_client_mode():
@@ -436,6 +455,230 @@ class WiFiManager:
         except Exception as e:
             logger.error(f"Failed to switch mode: {e}", exc_info=True)
             raise
+
+    @staticmethod
+    async def run_wpa_cli(command: List[str]) -> str:
+        """
+        Execute wpa_cli command and return output.
+
+        Args:
+            command: List of wpa_cli command arguments (e.g., ['list_networks'])
+
+        Returns:
+            stdout output as string
+        """
+        if Config.IS_DEVELOPMENT:
+            # Mock data for development
+            if command == ["list_networks"]:
+                return "network id / ssid / bssid / flags\n0\tTestNetwork\tany\t[DISABLED]\n"
+            elif command == ["status"]:
+                return "wpa_state=DISCONNECTED\n"
+            return ""
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "wpa_cli",
+                "-i",
+                Config.WIFI_INTERFACE,
+                *command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await process.communicate()
+
+            if process.returncode != 0:
+                logger.error(f"wpa_cli command failed: {stderr.decode()}")
+                raise Exception(f"wpa_cli error: {stderr.decode()}")
+
+            return stdout.decode().strip()
+        except Exception as e:
+            logger.error(f"Failed to execute wpa_cli: {e}")
+            raise
+
+    @staticmethod
+    async def wait_for_connection(ssid: str, timeout: int = 40) -> bool:
+        """
+        Wait for WiFi connection to complete (pre-reboot validation).
+
+        Uses wpa_cli to poll connection status every 2 seconds.
+
+        Args:
+            ssid: Expected SSID to connect to
+            timeout: Maximum wait time in seconds (default: 40)
+
+        Returns:
+            True if connected successfully, False if timeout/failed
+        """
+        logger.info(f"Waiting for connection to {ssid} (timeout: {timeout}s)")
+
+        start_time = asyncio.get_event_loop().time()
+        poll_interval = 2  # Check every 2 seconds
+
+        while (asyncio.get_event_loop().time() - start_time) < timeout:
+            try:
+                # Get wpa_supplicant state
+                status_output = await WiFiManager.run_wpa_cli(["status"])
+
+                # Parse status output
+                status_dict = {}
+                for line in status_output.split("\n"):
+                    if "=" in line:
+                        key, value = line.split("=", 1)
+                        status_dict[key] = value
+
+                wpa_state = status_dict.get("wpa_state", "")
+                current_ssid = status_dict.get("ssid", "")
+
+                logger.debug(
+                    f"Connection status: state={wpa_state}, ssid={current_ssid}"
+                )
+
+                # Check if connected
+                if wpa_state == "COMPLETED" and current_ssid == ssid:
+                    ip_address = status_dict.get("ip_address", "N/A")
+                    logger.info(f"Successfully connected to {ssid} (IP: {ip_address})")
+                    return True
+
+                # Check for failure states
+                if wpa_state in ["DISCONNECTED", "INACTIVE"]:
+                    logger.warning(f"Connection failed: wpa_state={wpa_state}")
+                    # Don't return immediately, give it more time
+
+            except Exception as e:
+                logger.error(f"Error checking connection status: {e}")
+
+            await asyncio.sleep(poll_interval)
+
+        logger.error(f"Connection timeout after {timeout}s")
+        return False
+
+    @staticmethod
+    async def _write_wpa_config(credentials: WiFiCredentials) -> bool:
+        """Helper method to write wpa_supplicant.conf (extracted from connect_network)"""
+        if Config.IS_DEVELOPMENT:
+            logger.info(
+                f"Development mode: Simulating WiFi connection to {credentials.ssid}"
+            )
+            await asyncio.sleep(1)
+            return True
+
+        try:
+            logger.info(f"Creating wpa_supplicant.conf for {credentials.ssid}")
+
+            # Create wpa_supplicant.conf (same as RaspiWiFi)
+            wpa_config = [
+                "ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev",
+                "update_config=1",
+                "",
+                "network={",
+                f'    ssid="{credentials.ssid}"',
+            ]
+
+            if credentials.password:
+                wpa_config.append(f'    psk="{credentials.password}"')
+            else:
+                wpa_config.append("    key_mgmt=NONE")
+
+            wpa_config.append("}")
+
+            # Write to temp file
+            temp_file = Path("/tmp/wpa_supplicant.conf.tmp")
+            temp_file.write_text("\n".join(wpa_config))
+            logger.debug(f"Wrote temporary config to {temp_file}")
+
+            # Move to final location (requires root)
+            process = await asyncio.create_subprocess_exec(
+                "sudo",
+                "mv",
+                str(temp_file),
+                str(Config.WPA_SUPPLICANT_FILE),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await process.communicate()
+
+            if process.returncode == 0:
+                logger.info(f"Successfully wrote {Config.WPA_SUPPLICANT_FILE}")
+                return True
+            else:
+                logger.error(f"Failed to move config file: {stderr.decode()}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error writing WiFi credentials: {e}", exc_info=True)
+            return False
+
+    @staticmethod
+    async def list_saved_networks() -> List[dict]:
+        """
+        List all saved WiFi networks using wpa_cli.
+
+        Returns:
+            List of saved networks with id, ssid, and flags
+        """
+        try:
+            output = await WiFiManager.run_wpa_cli(["list_networks"])
+
+            # Parse output
+            # Format: network id / ssid / bssid / flags
+            # 0    HomeNetwork    any    [CURRENT]
+            # 1    OfficeWiFi     any    [DISABLED]
+
+            lines = output.strip().split("\n")
+            if len(lines) < 2:  # Header + at least one network
+                return []
+
+            networks = []
+            for line in lines[1:]:  # Skip header
+                parts = line.split("\t")
+                if len(parts) >= 2:
+                    network_id = parts[0].strip()
+                    ssid = parts[1].strip()
+                    flags = parts[3].strip() if len(parts) >= 4 else ""
+
+                    is_current = "[CURRENT]" in flags
+                    is_disabled = "[DISABLED]" in flags
+
+                    networks.append(
+                        {
+                            "id": int(network_id),
+                            "ssid": ssid,
+                            "current": is_current,
+                            "disabled": is_disabled,
+                        }
+                    )
+
+            logger.info(f"Found {len(networks)} saved networks")
+            return networks
+
+        except Exception as e:
+            logger.error(f"Failed to list saved networks: {e}")
+            return []
+
+    @staticmethod
+    async def forget_network(network_id: int) -> bool:
+        """
+        Remove a saved WiFi network using wpa_cli.
+
+        Args:
+            network_id: Network ID from list_networks
+
+        Returns:
+            True if successfully removed
+        """
+        try:
+            # Remove network
+            await WiFiManager.run_wpa_cli(["remove_network", str(network_id)])
+
+            # Save configuration to persist change
+            await WiFiManager.run_wpa_cli(["save_config"])
+
+            logger.info(f"Successfully removed network ID {network_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to remove network {network_id}: {e}")
+            return False
 
 
 # =============================================================================
@@ -610,50 +853,101 @@ async def scan_wifi_networks():
 
 @app.post("/wifi/connect", response_model=ApiResponse)
 async def connect_wifi(credentials: WiFiCredentials, background_tasks: BackgroundTasks):
-    """Connect to WiFi network (RaspiWiFi-style)"""
+    """
+    Connect to WiFi network with retry logic and validation.
+
+    Now validates connection BEFORE rebooting system.
+    Returns success only if connection verified.
+    """
+    logger.info(f"Attempting to connect to WiFi: {credentials.ssid}")
+
+    # Attempt connection with retry (validates before reboot)
+    success = await WiFiManager.connect_network(credentials)
+
+    if not success:
+        logger.error(f"Failed to connect to {credentials.ssid} after retries")
+        return ApiResponse(
+            success=False,
+            message=f"Failed to connect to '{credentials.ssid}'. Check password and try again.",
+            data={"ssid": credentials.ssid, "attempts": 3, "timeout": 40},
+        )
+
+    # Connection successful - now switch to client mode and reboot
     try:
-        # Validate credentials
-        if not credentials.ssid.strip():
-            raise HTTPException(status_code=400, detail="SSID cannot be empty")
+        logger.info(f"Connection verified. Switching to client mode and rebooting...")
+        await WiFiManager.switch_to_client_mode()
 
-        logger.info(f"Attempting to connect to WiFi: {credentials.ssid}")
+        return ApiResponse(
+            success=True,
+            message=f"Connected to '{credentials.ssid}'. System rebooting to apply changes...",
+            data={
+                "ssid": credentials.ssid,
+                "instructions": "System will reboot. Reconnect to the new WiFi network and navigate to http://radio.local",
+            },
+        )
+    except Exception as e:
+        logger.error(f"Mode switch failed: {e}", exc_info=True)
+        return ApiResponse(
+            success=False,
+            message=f"Connected to WiFi but mode switch failed: {str(e)}",
+            data={"ssid": credentials.ssid},
+        )
 
-        # Write wpa_supplicant.conf with credentials
-        success = await WiFiManager.connect_network(credentials)
 
-        if not success:
-            logger.error(f"Failed to write WiFi credentials for {credentials.ssid}")
-            return ApiResponse(
-                success=False,
-                message="Failed to save WiFi credentials. Check system permissions.",
+@app.get("/wifi/saved", response_model=ApiResponse)
+async def get_saved_networks():
+    """Get list of saved WiFi networks using wpa_cli"""
+    try:
+        networks = await WiFiManager.list_saved_networks()
+        return ApiResponse(
+            success=True,
+            message=f"Found {len(networks)} saved networks",
+            data={"networks": networks},
+        )
+    except Exception as e:
+        logger.error(f"Failed to get saved networks: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/wifi/saved/{network_id}", response_model=ApiResponse)
+async def forget_saved_network(network_id: int):
+    """
+    Forget/remove a saved WiFi network.
+
+    Args:
+        network_id: Network ID from wpa_cli list_networks
+    """
+    try:
+        # Check if network exists
+        saved_networks = await WiFiManager.list_saved_networks()
+        network = next((n for n in saved_networks if n["id"] == network_id), None)
+
+        if not network:
+            raise HTTPException(
+                status_code=404, detail=f"Network ID {network_id} not found"
             )
 
-        logger.info(f"WiFi credentials saved for {credentials.ssid}")
+        # Don't allow forgetting currently connected network
+        if network.get("current", False):
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot forget currently connected network. Connect to another network first.",
+            )
 
-        # Execute mode switch (not in background so we can catch errors)
-        # Note: If in hotspot mode, this will remove host_mode marker and reboot
-        try:
-            await WiFiManager.switch_to_client_mode()
-            # If we reach here, reboot is starting
+        # Remove network
+        success = await WiFiManager.forget_network(network_id)
+
+        if success:
             return ApiResponse(
-                success=True,
-                message=f"WiFi configured. System rebooting to connect to '{credentials.ssid}'...",
-                data={
-                    "ssid": credentials.ssid,
-                    "instructions": "System will reboot. Connect your device to the new WiFi network and navigate to http://radio.local",
-                },
+                success=True, message=f"Successfully forgot network: {network['ssid']}"
             )
-        except Exception as e:
-            logger.error(f"Mode switch failed: {e}", exc_info=True)
-            return ApiResponse(
-                success=False,
-                message=f"Failed to switch mode: {str(e)}. System remains in current mode.",
-            )
+        else:
+            raise HTTPException(status_code=500, detail="Failed to remove network")
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Connect WiFi error: {e}", exc_info=True)
+        logger.error(f"Error forgetting network {network_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

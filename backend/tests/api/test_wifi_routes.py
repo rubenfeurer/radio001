@@ -625,3 +625,304 @@ class TestWiFiCredentialsValidation:
             assert response.status_code == 200
             data = response.json()
             assert data["success"] is True
+
+
+class TestWpaCli:
+    """Test wpa_cli integration and saved networks functionality"""
+
+    @pytest.mark.asyncio
+    async def test_run_wpa_cli_list_networks(self):
+        """Test wpa_cli list_networks command execution"""
+
+        wpa_cli_output = """network id / ssid / bssid / flags
+0\tHomeNetwork\tany\t[CURRENT]
+1\tOfficeWiFi\tany\t[DISABLED]"""
+
+        with patch("asyncio.create_subprocess_exec") as mock_subprocess:
+            mock_process = AsyncMock()
+            mock_process.returncode = 0
+            mock_process.communicate = AsyncMock(
+                return_value=(wpa_cli_output.encode(), b"")
+            )
+            mock_subprocess.return_value = mock_process
+
+            original_dev = Config.IS_DEVELOPMENT
+            Config.IS_DEVELOPMENT = False
+
+            try:
+                result = await WiFiManager.run_wpa_cli(["list_networks"])
+
+                assert result == wpa_cli_output
+                mock_subprocess.assert_called_once()
+                call_args = mock_subprocess.call_args[0]
+                assert "wpa_cli" in call_args
+                assert "list_networks" in call_args
+
+            finally:
+                Config.IS_DEVELOPMENT = original_dev
+
+    @pytest.mark.asyncio
+    async def test_run_wpa_cli_status(self):
+        """Test wpa_cli status command execution"""
+
+        wpa_cli_output = """wpa_state=COMPLETED
+ssid=HomeNetwork
+ip_address=192.168.1.100"""
+
+        with patch("asyncio.create_subprocess_exec") as mock_subprocess:
+            mock_process = AsyncMock()
+            mock_process.returncode = 0
+            mock_process.communicate = AsyncMock(
+                return_value=(wpa_cli_output.encode(), b"")
+            )
+            mock_subprocess.return_value = mock_process
+
+            original_dev = Config.IS_DEVELOPMENT
+            Config.IS_DEVELOPMENT = False
+
+            try:
+                result = await WiFiManager.run_wpa_cli(["status"])
+
+                assert "wpa_state=COMPLETED" in result
+                assert "ssid=HomeNetwork" in result
+
+            finally:
+                Config.IS_DEVELOPMENT = original_dev
+
+    @pytest.mark.asyncio
+    async def test_list_saved_networks_success(self):
+        """Test listing saved networks using wpa_cli"""
+
+        wpa_cli_output = """network id / ssid / bssid / flags
+0\tHomeNetwork\tany\t[CURRENT]
+1\tOfficeWiFi\tany\t[DISABLED]
+2\tGuestWiFi\tany\t"""
+
+        with patch.object(WiFiManager, "run_wpa_cli", return_value=wpa_cli_output):
+            networks = await WiFiManager.list_saved_networks()
+
+            assert len(networks) == 3
+            assert networks[0]["id"] == 0
+            assert networks[0]["ssid"] == "HomeNetwork"
+            assert networks[0]["current"] is True
+            assert networks[0]["disabled"] is False
+
+            assert networks[1]["id"] == 1
+            assert networks[1]["ssid"] == "OfficeWiFi"
+            assert networks[1]["current"] is False
+            assert networks[1]["disabled"] is True
+
+            assert networks[2]["id"] == 2
+            assert networks[2]["ssid"] == "GuestWiFi"
+            assert networks[2]["current"] is False
+            assert networks[2]["disabled"] is False
+
+    @pytest.mark.asyncio
+    async def test_list_saved_networks_empty(self):
+        """Test listing saved networks when none exist"""
+
+        wpa_cli_output = "network id / ssid / bssid / flags"
+
+        with patch.object(WiFiManager, "run_wpa_cli", return_value=wpa_cli_output):
+            networks = await WiFiManager.list_saved_networks()
+
+            assert len(networks) == 0
+
+    @pytest.mark.asyncio
+    async def test_forget_network_success(self):
+        """Test forgetting a saved network"""
+
+        with patch.object(
+            WiFiManager, "run_wpa_cli", new_callable=AsyncMock
+        ) as mock_wpa_cli:
+            mock_wpa_cli.return_value = ""
+
+            result = await WiFiManager.forget_network(1)
+
+            assert result is True
+            # Should call remove_network and save_config
+            assert mock_wpa_cli.call_count == 2
+            assert mock_wpa_cli.call_args_list[0][0][0] == ["remove_network", "1"]
+            assert mock_wpa_cli.call_args_list[1][0][0] == ["save_config"]
+
+    @pytest.mark.asyncio
+    async def test_wait_for_connection_success(self):
+        """Test successful connection validation"""
+
+        wpa_cli_status = """wpa_state=COMPLETED
+ssid=HomeNetwork
+ip_address=192.168.1.100"""
+
+        with patch.object(WiFiManager, "run_wpa_cli", return_value=wpa_cli_status):
+            result = await WiFiManager.wait_for_connection("HomeNetwork", timeout=5)
+
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_wait_for_connection_timeout(self):
+        """Test connection validation timeout"""
+
+        wpa_cli_status = """wpa_state=DISCONNECTED
+ssid="""
+
+        with patch.object(WiFiManager, "run_wpa_cli", return_value=wpa_cli_status):
+            result = await WiFiManager.wait_for_connection("HomeNetwork", timeout=2)
+
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_wait_for_connection_wrong_network(self):
+        """Test connection validation when connected to different network"""
+
+        wpa_cli_status = """wpa_state=COMPLETED
+ssid=OtherNetwork
+ip_address=192.168.1.100"""
+
+        with patch.object(WiFiManager, "run_wpa_cli", return_value=wpa_cli_status):
+            result = await WiFiManager.wait_for_connection("HomeNetwork", timeout=2)
+
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_connect_with_retry_success_first_attempt(self):
+        """Test connection succeeds on first attempt"""
+
+        credentials = WiFiCredentials(ssid="HomeNetwork", password="password123")
+
+        with (
+            patch.object(WiFiManager, "_write_wpa_config", return_value=True),
+            patch.object(WiFiManager, "run_wpa_cli", new_callable=AsyncMock),
+            patch.object(WiFiManager, "wait_for_connection", return_value=True),
+            patch("pathlib.Path.exists", return_value=False),
+        ):
+            result = await WiFiManager.connect_network(credentials)
+
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_connect_with_retry_success_second_attempt(self):
+        """Test connection succeeds on second attempt after first fails"""
+
+        credentials = WiFiCredentials(ssid="HomeNetwork", password="password123")
+
+        with (
+            patch.object(WiFiManager, "_write_wpa_config", return_value=True),
+            patch.object(WiFiManager, "run_wpa_cli", new_callable=AsyncMock),
+            patch.object(WiFiManager, "wait_for_connection", side_effect=[False, True]),
+            patch("pathlib.Path.exists", return_value=False),
+        ):
+            result = await WiFiManager.connect_network(credentials)
+
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_connect_with_retry_all_failed(self):
+        """Test connection fails after all retry attempts"""
+
+        credentials = WiFiCredentials(ssid="HomeNetwork", password="wrong_password")
+
+        with (
+            patch.object(WiFiManager, "_write_wpa_config", return_value=True),
+            patch.object(WiFiManager, "run_wpa_cli", new_callable=AsyncMock),
+            patch.object(WiFiManager, "wait_for_connection", return_value=False),
+            patch("pathlib.Path.exists", return_value=False),
+        ):
+            result = await WiFiManager.connect_network(credentials)
+
+            assert result is False
+
+
+class TestWiFiSavedNetworksAPI:
+    """Test saved networks API endpoints"""
+
+    @pytest_asyncio.fixture
+    async def client(self):
+        """Create test client"""
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            yield ac
+
+    @pytest.mark.asyncio
+    async def test_get_saved_networks_success(self, client):
+        """Test GET /wifi/saved endpoint"""
+
+        mock_networks = [
+            {"id": 0, "ssid": "HomeNetwork", "current": True, "disabled": False},
+            {"id": 1, "ssid": "OfficeWiFi", "current": False, "disabled": True},
+        ]
+
+        with patch.object(
+            WiFiManager, "list_saved_networks", return_value=mock_networks
+        ):
+            response = await client.get("/wifi/saved")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert len(data["data"]["networks"]) == 2
+            assert data["data"]["networks"][0]["ssid"] == "HomeNetwork"
+
+    @pytest.mark.asyncio
+    async def test_get_saved_networks_empty(self, client):
+        """Test GET /wifi/saved when no networks saved"""
+
+        with patch.object(WiFiManager, "list_saved_networks", return_value=[]):
+            response = await client.get("/wifi/saved")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert len(data["data"]["networks"]) == 0
+
+    @pytest.mark.asyncio
+    async def test_forget_network_success(self, client):
+        """Test DELETE /wifi/saved/{network_id} endpoint"""
+
+        mock_networks = [
+            {"id": 0, "ssid": "HomeNetwork", "current": True, "disabled": False},
+            {"id": 1, "ssid": "OfficeWiFi", "current": False, "disabled": False},
+        ]
+
+        with (
+            patch.object(
+                WiFiManager, "list_saved_networks", return_value=mock_networks
+            ),
+            patch.object(WiFiManager, "forget_network", return_value=True),
+        ):
+            response = await client.delete("/wifi/saved/1")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert "OfficeWiFi" in data["message"]
+
+    @pytest.mark.asyncio
+    async def test_forget_network_not_found(self, client):
+        """Test forgetting non-existent network"""
+
+        mock_networks = [
+            {"id": 0, "ssid": "HomeNetwork", "current": True, "disabled": False}
+        ]
+
+        with patch.object(
+            WiFiManager, "list_saved_networks", return_value=mock_networks
+        ):
+            response = await client.delete("/wifi/saved/99")
+
+            assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_forget_current_network_blocked(self, client):
+        """Test cannot forget currently connected network"""
+
+        mock_networks = [
+            {"id": 0, "ssid": "HomeNetwork", "current": True, "disabled": False}
+        ]
+
+        with patch.object(
+            WiFiManager, "list_saved_networks", return_value=mock_networks
+        ):
+            response = await client.delete("/wifi/saved/0")
+
+            assert response.status_code == 400
+            data = response.json()
+            assert "currently connected" in data["detail"].lower()

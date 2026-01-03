@@ -7,6 +7,7 @@
 		isScanning,
 		isConnecting,
 		error,
+		connectionProgress,
 		scanNetworks,
 		connectToNetwork,
 		getSignalColor,
@@ -98,6 +99,38 @@
 					<p class="text-red-800 dark:text-red-200 text-sm">
 						{$error}
 					</p>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Connection Progress -->
+		{#if $connectionProgress.status !== 'idle'}
+			<div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+				<div class="flex items-start">
+					{#if $connectionProgress.status === 'connecting' || $connectionProgress.status === 'verifying'}
+						<svg class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" fill="none" viewBox="0 0 24 24">
+							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+						</svg>
+					{:else if $connectionProgress.status === 'success'}
+						<svg class="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+							<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+						</svg>
+					{:else if $connectionProgress.status === 'failed'}
+						<svg class="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+							<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+						</svg>
+					{/if}
+					<div class="ml-3 flex-1">
+						<p class="text-sm font-medium {$connectionProgress.status === 'success' ? 'text-green-600 dark:text-green-400' : $connectionProgress.status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}">
+							{$connectionProgress.message}
+						</p>
+						{#if $connectionProgress.maxAttempts > 1}
+							<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+								Attempt {$connectionProgress.attempt}/{$connectionProgress.maxAttempts}
+							</p>
+						{/if}
+					</div>
 				</div>
 			</div>
 		{/if}
