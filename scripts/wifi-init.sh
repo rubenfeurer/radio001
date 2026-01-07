@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # WiFi Initialization Script for Radio WiFi Configuration
-# This script initializes WiFi interfaces and sets up the system for configuration
+# This script initializes WiFi interfaces using NetworkManager (nmcli)
 
 set -e
 
@@ -94,32 +94,23 @@ init_wifi_interface() {
     return 0
 }
 
-# Check for existing WiFi connections
+# Check for existing WiFi connections using nmcli
 check_existing_connections() {
     log "Checking for existing WiFi connections..."
 
-    if command -v wpa_cli >/dev/null 2>&1; then
-        local status
-        status=$(wpa_cli -i "$WIFI_INTERFACE" status 2>/dev/null | grep "wpa_state" | cut -d'=' -f2)
+    if command -v nmcli >/dev/null 2>&1; then
+        local state=$(nmcli -t -f TYPE,STATE,CONNECTION device status 2>/dev/null | grep "^wifi:" || true)
 
-        case "$status" in
-            "COMPLETED")
-                local ssid
-                ssid=$(wpa_cli -i "$WIFI_INTERFACE" status 2>/dev/null | grep "^ssid=" | cut -d'=' -f2)
-                success "Connected to WiFi network: $ssid"
-                return 0
-                ;;
-            "DISCONNECTED"|"INACTIVE")
-                warn "WiFi interface disconnected"
-                return 1
-                ;;
-            *)
-                warn "WiFi connection status: $status"
-                return 1
-                ;;
-        esac
+        if echo "$state" | grep -q "connected"; then
+            local ssid=$(echo "$state" | cut -d: -f3)
+            success "Connected to WiFi network: $ssid"
+            return 0
+        else
+            warn "WiFi interface not connected"
+            return 1
+        fi
     else
-        warn "wpa_cli not available - cannot check connection status"
+        warn "nmcli not available - cannot check connection status"
         return 1
     fi
 }
@@ -140,24 +131,24 @@ setup_development() {
     {
       "ssid": "HomeWiFi",
       "bssid": "00:11:22:33:44:55",
-      "signal": -45,
-      "frequency": "2412",
+      "signal": 75,
+      "frequency": "2412 MHz",
       "security": "WPA2",
       "channel": 1
     },
     {
       "ssid": "GuestNetwork",
       "bssid": "00:11:22:33:44:66",
-      "signal": -60,
-      "frequency": "5180",
+      "signal": 60,
+      "frequency": "5180 MHz",
       "security": "Open",
       "channel": 36
     },
     {
       "ssid": "OfficeWiFi",
       "bssid": "00:11:22:33:44:77",
-      "signal": -55,
-      "frequency": "2437",
+      "signal": 45,
+      "frequency": "2437 MHz",
       "security": "WPA3",
       "channel": 6
     }
@@ -198,7 +189,7 @@ create_systemd_services() {
 check_network_tools() {
     log "Checking network tools availability..."
 
-    local tools=("ip" "iwconfig" "iwlist")
+    local tools=("ip" "nmcli")
     local missing_tools=()
 
     for tool in "${tools[@]}"; do
@@ -211,7 +202,7 @@ check_network_tools() {
     done
 
     # Check optional tools
-    local optional_tools=("wpa_cli" "hostapd" "dnsmasq")
+    local optional_tools=("hostapd" "dnsmasq" "iw")
     for tool in "${optional_tools[@]}"; do
         if command -v "$tool" >/dev/null 2>&1; then
             success "$tool is available"
@@ -230,7 +221,7 @@ check_network_tools() {
 
 # Main initialization function
 main() {
-    log "=== Radio WiFi Initialization ==="
+    log "=== Radio WiFi Initialization (NetworkManager) ==="
     log "WiFi Interface: $WIFI_INTERFACE"
     log "Hotspot SSID: $HOTSPOT_SSID"
     log "Hotspot IP: $HOTSPOT_IP"
@@ -273,7 +264,7 @@ main() {
     log "=== Initialization Summary ==="
     log "Interface: $WIFI_INTERFACE"
     log "Mode: $(is_raspberry_pi && echo "Production" || echo "Development")"
-    log "Tools: $(check_network_tools >/dev/null 2>&1 && echo "Available" || echo "Limited")"
+    log "NetworkManager: $(command -v nmcli >/dev/null 2>&1 && echo "Available" || echo "Not Available")"
     log "=========================="
 }
 

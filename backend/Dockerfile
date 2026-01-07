@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies (including sudo and wpa_cli for WiFi management)
+# Install system dependencies (including NetworkManager for WiFi management)
 RUN apt-get update && apt-get install -y \
     curl \
     procps \
@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y \
     iproute2 \
     wireless-tools \
     iw \
-    wpasupplicant \
+    network-manager \
     hostapd \
     dnsmasq \
     sudo \
@@ -34,8 +34,8 @@ RUN groupmod -g 104 netdev || groupadd -g 104 netdev && \
     groupadd -r radio && \
     useradd -r -g radio -G netdev radio
 
-# Configure passwordless sudo for WiFi management commands (RaspiWiFi-style permissions)
-RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown, /sbin/iwlist, /usr/sbin/iwlist, /sbin/ip, /usr/sbin/ip, /bin/ip, /usr/bin/timeout" > /etc/sudoers.d/radio && \
+# Configure passwordless sudo for WiFi management commands (nmcli permissions)
+RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown, /sbin/ip, /usr/sbin/ip, /bin/ip, /usr/bin/nmcli, /usr/bin/killall" > /etc/sudoers.d/radio && \
     chmod 0440 /etc/sudoers.d/radio
 
 # Copy requirements and install Python dependencies

@@ -20,9 +20,10 @@ services:
       # Python cache
       - radio_python_cache:/root/.cache/pip
 
-      # System integration for WiFi management
-      - /etc/wpa_supplicant:/etc/wpa_supplicant:rw
-      - /run/wpa_supplicant:/run/wpa_supplicant:rw
+      # System integration for WiFi management (NetworkManager)
+      - /etc/NetworkManager:/etc/NetworkManager:rw
+      - /var/lib/NetworkManager:/var/lib/NetworkManager:rw
+      - /run/NetworkManager:/run/NetworkManager:rw
       - /etc/hostapd:/etc/hostapd:rw
       - /etc/raspiwifi:/etc/raspiwifi:rw
 

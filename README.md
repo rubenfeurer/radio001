@@ -10,7 +10,7 @@ A unified **Radio + WiFi Configuration** system for Raspberry Pi Zero 2 W, combi
 ## ✨ Features
 
 ### 📡 **WiFi Management**
-- 🌐 **Unified Network Manager** - Scan, connect, and manage saved networks in one interface
+- 🌐 **NetworkManager Integration** - Modern WiFi management using nmcli for reliability
 - 🔄 **Auto-Retry** - 3 attempts with exponential backoff for reliable connections
 - 🗑️ **Network Forgetting** - Remove saved networks (prevents forgetting active connection)
 - 🔥 **Hotspot Mode** - Reset to "Radio-Setup" AP for reconfiguration
@@ -242,7 +242,7 @@ The `scripts/` directory contains helper scripts organized by purpose:
 - `GET /wifi/status` - Current WiFi connection status
 - `GET /wifi/scan` - Scan for available networks
 - `POST /wifi/connect` - Connect to network with retry logic
-- `GET /wifi/saved` - List saved networks from wpa_supplicant.conf
+- `GET /wifi/saved` - List saved networks from NetworkManager
 - `DELETE /wifi/saved/{id}` - Forget saved network
 - `POST /system/reset` - Reset to hotspot mode
 

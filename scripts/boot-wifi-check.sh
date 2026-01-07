@@ -2,7 +2,7 @@
 
 # Boot WiFi Check Script
 # Checks WiFi connectivity on boot and switches between client/hotspot modes
-# Runs inside the privileged Docker container with network access
+# Uses NetworkManager (nmcli) instead of wpa_supplicant
 
 set -e
 
@@ -49,27 +49,22 @@ wait_for_interface() {
     return 1
 }
 
-# Check if WiFi is connected
+# Check if WiFi is connected using nmcli
 check_wifi_connection() {
-    # Use wpa_cli to check connection status
-    if ! command -v wpa_cli >/dev/null 2>&1; then
-        warn "wpa_cli not available"
+    if ! command -v nmcli >/dev/null 2>&1; then
+        warn "nmcli not available"
         return 1
     fi
 
-    # Check if wpa_supplicant is running on the interface
-    if ! wpa_cli -i "$WIFI_INTERFACE" status >/dev/null 2>&1; then
-        log "wpa_supplicant not running on $WIFI_INTERFACE"
-        return 1
-    fi
+    # Check if any WiFi connection is active
+    local state=$(nmcli -t -f TYPE,STATE device status 2>/dev/null | grep "^wifi:" | cut -d: -f2)
 
-    # Check if connected (wpa_state=COMPLETED)
-    if wpa_cli -i "$WIFI_INTERFACE" status 2>/dev/null | grep -q "wpa_state=COMPLETED"; then
+    if [ "$state" = "connected" ]; then
         log "WiFi is connected"
         return 0
     fi
 
-    log "WiFi not connected (wpa_state not COMPLETED)"
+    log "WiFi not connected (state: ${state:-unknown})"
     return 1
 }
 
@@ -132,12 +127,10 @@ activate_hotspot_mode() {
     touch "$HOST_MODE_FILE"
     log "Created host mode marker: $HOST_MODE_FILE"
 
-    # Stop wpa_supplicant on the interface if running
-    if pgrep -f "wpa_supplicant.*$WIFI_INTERFACE" >/dev/null; then
-        log "Stopping wpa_supplicant on $WIFI_INTERFACE..."
-        wpa_cli -i "$WIFI_INTERFACE" terminate 2>/dev/null || true
-        sleep 2
-    fi
+    # Disconnect any active WiFi connections
+    log "Disconnecting active WiFi connections..."
+    nmcli device disconnect "$WIFI_INTERFACE" 2>/dev/null || true
+    sleep 2
 
     # Configure interface with static IP
     log "Configuring $WIFI_INTERFACE with IP $HOTSPOT_IP..."
@@ -210,10 +203,8 @@ activate_client_mode() {
         log "Removed host mode marker: $HOST_MODE_FILE"
     fi
 
-    # Ensure wpa_supplicant is running
-    if ! pgrep -f "wpa_supplicant.*$WIFI_INTERFACE" >/dev/null; then
-        log "wpa_supplicant not running, WiFi management handled by system"
-    fi
+    # Ensure NetworkManager is managing the WiFi interface
+    nmcli device set "$WIFI_INTERFACE" managed yes 2>/dev/null || true
 
     log "========================================="
     log "CLIENT mode active - WiFi connected"
@@ -223,7 +214,7 @@ activate_client_mode() {
 # Main execution
 main() {
     log "========================================="
-    log "Boot WiFi Check Starting"
+    log "Boot WiFi Check Starting (NetworkManager)"
     log "========================================="
     log "WiFi interface: $WIFI_INTERFACE"
     log "WiFi timeout: ${WIFI_TIMEOUT}s"

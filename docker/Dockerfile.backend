@@ -7,7 +7,7 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y \
     wireless-tools \
     iw \
-    wpasupplicant \
+    network-manager \
     hostapd \
     dnsmasq \
     iproute2 \
@@ -39,8 +39,8 @@ RUN groupadd -r radio && useradd -r -g radio radio && \
 RUN groupmod -g 104 netdev || groupadd -g 104 netdev && \
     usermod -a -G netdev radio
 
-# Configure passwordless sudo for WiFi management commands (RaspiWiFi-style permissions)
-RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown, /sbin/iwlist, /usr/sbin/iwlist, /sbin/ip, /usr/sbin/ip, /bin/ip, /usr/bin/timeout" > /etc/sudoers.d/radio && \
+# Configure passwordless sudo for WiFi management commands (nmcli permissions)
+RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown, /sbin/ip, /usr/sbin/ip, /bin/ip, /usr/bin/nmcli, /usr/bin/killall" > /etc/sudoers.d/radio && \
     chmod 0440 /etc/sudoers.d/radio
 
 # Copy requirements first for better caching
