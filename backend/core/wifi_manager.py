@@ -84,8 +84,7 @@ class WiFiManager:
 
     def _parse_nmcli_scan(self, output: str) -> List[WiFiNetwork]:
         """Parse nmcli scan output into WiFiNetwork objects"""
-        networks = []
-        seen_ssids = set()  # Track unique SSIDs
+        networks_dict = {}  # Use dict to track best signal per SSID
 
         lines = output.strip().split("\n")
         for line in lines:
@@ -98,13 +97,11 @@ class WiFiManager:
                 continue
 
             ssid = parts[0].strip()
-            if not ssid or ssid in seen_ssids:
+            if not ssid:
                 continue
 
-            seen_ssids.add(ssid)
-
             try:
-                signal = int(parts[1].strip()) if parts[1].strip() else None
+                signal = int(parts[1].strip()) if parts[1].strip() else 0
                 security = parts[2].strip() if parts[2].strip() else "Open"
                 freq = parts[3].strip() if parts[3].strip() else None
 
@@ -132,18 +129,22 @@ class WiFiManager:
                     except (ValueError, IndexError):
                         pass
 
-                networks.append(
-                    WiFiNetwork(
+                # Keep the network with the best signal for each SSID
+                if ssid not in networks_dict or signal > networks_dict[ssid].signal:
+                    networks_dict[ssid] = WiFiNetwork(
                         ssid=ssid,
                         signal=signal,
                         encryption=encryption,
                         frequency=frequency,
                     )
-                )
             except (ValueError, IndexError) as e:
                 logger.debug(f"Skipping malformed line: {line} ({e})")
                 continue
 
+        # Convert dict to list and sort by signal strength
+        networks = sorted(
+            networks_dict.values(), key=lambda n: n.signal or 0, reverse=True
+        )
         return networks
 
     async def scan_networks(self) -> List[WiFiNetwork]:
@@ -167,8 +168,9 @@ class WiFiManager:
             ]
 
         try:
-            # Request fresh scan first
-            await asyncio.create_subprocess_exec(
+            # Request fresh scan first (requires sudo for permission)
+            rescan_process = await asyncio.create_subprocess_exec(
+                "sudo",
                 "nmcli",
                 "device",
                 "wifi",
@@ -176,11 +178,20 @@ class WiFiManager:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
+            rescan_stdout, rescan_stderr = await rescan_process.communicate()
 
-            # Wait a moment for scan to complete
-            await asyncio.sleep(1)
+            if rescan_process.returncode != 0:
+                logger.warning(
+                    f"WiFi rescan returned non-zero: {rescan_stderr.decode()}"
+                )
+            else:
+                logger.info("WiFi rescan completed successfully")
 
-            # Get scan results with custom format
+            # Wait longer for scan to complete (networks take time to be discovered)
+            # Increased to 5 seconds to ensure all networks are found
+            await asyncio.sleep(5)
+
+            # Get scan results with custom format (--rescan ensures fresh data)
             process = await asyncio.create_subprocess_exec(
                 "nmcli",
                 "-t",
@@ -189,6 +200,8 @@ class WiFiManager:
                 "device",
                 "wifi",
                 "list",
+                "--rescan",
+                "no",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -245,7 +258,7 @@ class WiFiManager:
 
             # Look for WiFi connection
             connected = False
-            ssid = None
+            connection_name = None
 
             for line in output.split("\n"):
                 if not line.strip():
@@ -254,15 +267,39 @@ class WiFiManager:
                 if len(parts) >= 3 and parts[0] == "wifi":
                     if "connected" in parts[1]:
                         connected = True
-                        ssid = parts[2].strip() if parts[2].strip() else None
+                        connection_name = parts[2].strip() if parts[2].strip() else None
                         break
+
+            # Get actual SSID from the active WiFi connection (not the connection name)
+            ssid = None
+            if connected:
+                wifi_list_process = await asyncio.create_subprocess_exec(
+                    "nmcli",
+                    "-t",
+                    "-f",
+                    "IN-USE,SSID",
+                    "device",
+                    "wifi",
+                    "list",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                wifi_stdout, _ = await wifi_list_process.communicate()
+                if wifi_list_process.returncode == 0:
+                    # Find the active connection (marked with *)
+                    for line in wifi_stdout.decode().split("\n"):
+                        if line.startswith("*"):
+                            parts = line.split(":")
+                            if len(parts) >= 2:
+                                ssid = parts[1].strip()
+                                break
 
             # Get IP address and signal strength if connected
             ip_address = None
             signal_strength = None
 
-            if connected and ssid:
-                # Get IP address
+            if connected and connection_name:
+                # Get IP address using connection name
                 ip_process = await asyncio.create_subprocess_exec(
                     "nmcli",
                     "-t",
@@ -270,7 +307,7 @@ class WiFiManager:
                     "IP4.ADDRESS",
                     "connection",
                     "show",
-                    ssid,
+                    connection_name,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
@@ -511,12 +548,12 @@ class WiFiManager:
             current_status = await self.get_status()
             current_ssid = current_status.ssid if current_status.connected else None
 
-            # Get list of saved WiFi connections
+            # Get list of saved WiFi connections with their actual SSIDs
             process = await asyncio.create_subprocess_exec(
                 "nmcli",
                 "-t",
                 "-f",
-                "NAME,TYPE,DEVICE",
+                "NAME,TYPE",
                 "connection",
                 "show",
                 stdout=asyncio.subprocess.PIPE,
@@ -537,15 +574,36 @@ class WiFiManager:
 
                 parts = line.split(":")
                 if len(parts) >= 2 and parts[1] == "802-11-wireless":
-                    ssid = parts[0].strip()
-                    device = parts[2].strip() if len(parts) > 2 else ""
+                    connection_name = parts[0].strip()
+
+                    # Get the actual SSID from connection details
+                    detail_process = await asyncio.create_subprocess_exec(
+                        "nmcli",
+                        "-t",
+                        "-f",
+                        "802-11-wireless.ssid",
+                        "connection",
+                        "show",
+                        connection_name,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    detail_stdout, _ = await detail_process.communicate()
+
+                    # Extract SSID from output (format: "802-11-wireless.ssid:NetworkName")
+                    actual_ssid = connection_name  # Default to connection name
+                    if detail_process.returncode == 0:
+                        detail_output = detail_stdout.decode().strip()
+                        if ":" in detail_output:
+                            actual_ssid = detail_output.split(":", 1)[1].strip()
 
                     networks.append(
                         {
                             "id": network_id,
-                            "ssid": ssid,
+                            "ssid": actual_ssid,
+                            "connection_name": connection_name,
                             "current": current_ssid is not None
-                            and ssid == current_ssid,
+                            and actual_ssid == current_ssid,
                             "disabled": False,
                         }
                     )

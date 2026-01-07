@@ -113,9 +113,19 @@ async def get_system_metrics() -> Dict[str, Any]:
 
     # Get WiFi status (import here to avoid circular dependency)
     try:
-        from main import WiFiManager
+        import os
+        from pathlib import Path
 
-        wifi_status = await WiFiManager.get_status()
+        from core.wifi_manager import WiFiManager
+
+        # Get the wifi_manager instance from main
+        # Since we can't import wifi_manager from main directly, create a temporary instance
+        wifi_mgr = WiFiManager(
+            interface=os.getenv("WIFI_INTERFACE", "wlan0"),
+            host_mode_file=Path("/etc/raspiwifi/host_mode"),
+            development_mode=os.getenv("NODE_ENV") == "development",
+        )
+        wifi_status = await wifi_mgr.get_status()
 
         metrics["network"]["wifi"] = {
             "wifiInterface": "wlan0",

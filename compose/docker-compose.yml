@@ -24,6 +24,8 @@ services:
       - /etc/NetworkManager:/etc/NetworkManager:rw
       - /var/lib/NetworkManager:/var/lib/NetworkManager:rw
       - /run/NetworkManager:/run/NetworkManager:rw
+      - /run/dbus:/run/dbus:rw
+      - /var/run/dbus:/var/run/dbus:rw
       - /etc/hostapd:/etc/hostapd:rw
       - /etc/raspiwifi:/etc/raspiwifi:rw
 
