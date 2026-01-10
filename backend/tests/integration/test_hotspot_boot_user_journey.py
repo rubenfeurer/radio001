@@ -108,7 +108,9 @@ class TestHotspotBootUserJourney:
             response = client.get("/health")
 
             assert response.status_code == 200
-            assert response.json()["status"] == "healthy"
+            data = response.json()
+            assert data["success"] is True
+            assert "healthy" in data["message"].lower()
 
             print("✓ Step 2: Web interface accessible")
             print("  - User can access http://192.168.4.1")
