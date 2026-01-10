@@ -361,127 +361,121 @@ class WiFiManager:
             logger.error(f"Error getting WiFi status: {e}")
             return WiFiStatus(mode="client", connected=False)
 
-    async def connect_network(self, ssid: str, password: str = "") -> bool:
+    async def connect_network(self, ssid: str, password: str = "") -> tuple[bool, str]:
         """
-        Connect to WiFi network using nmcli with automatic retry.
+        Connect to WiFi network using nmcli (single attempt).
 
-        Attempts connection up to 3 times with exponential backoff:
-        - Attempt 1: Immediate (0s delay)
-        - Attempt 2: 5s delay
-        - Attempt 3: 10s delay
-
+        User can manually retry if connection fails.
         Validates connection BEFORE returning success.
+
+        Returns:
+            tuple[bool, str]: (success, error_message)
         """
-        max_attempts = 3
-        retry_delays = [0, 5, 10]  # Exponential backoff
+        last_error = ""
+        logger.info(f"Attempting to connect to {ssid}")
 
-        for attempt in range(1, max_attempts + 1):
-            logger.info(f"Connection attempt {attempt}/{max_attempts} to {ssid}")
+        try:
+            # Check if connection already exists
+            check_process = await asyncio.create_subprocess_exec(
+                "nmcli",
+                "-t",
+                "-f",
+                "NAME",
+                "connection",
+                "show",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            check_stdout, _ = await check_process.communicate()
 
-            # Add delay before retry (skip for first attempt)
-            if attempt > 1:
-                delay = retry_delays[attempt - 1]
-                logger.info(f"Waiting {delay}s before retry...")
-                await asyncio.sleep(delay)
+            connection_exists = ssid in check_stdout.decode()
 
-            try:
-                # Check if connection already exists
-                check_process = await asyncio.create_subprocess_exec(
+            if connection_exists:
+                logger.info(f"Existing connection found for {ssid}, modifying...")
+                # Modify existing connection
+                if password:
+                    process = await asyncio.create_subprocess_exec(
+                        "sudo",
+                        "nmcli",
+                        "connection",
+                        "modify",
+                        ssid,
+                        "wifi-sec.key-mgmt",
+                        "wpa-psk",
+                        "wifi-sec.psk",
+                        password,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    await process.communicate()
+
+                # Bring up the connection
+                process = await asyncio.create_subprocess_exec(
+                    "sudo",
                     "nmcli",
-                    "-t",
-                    "-f",
-                    "NAME",
                     "connection",
-                    "show",
+                    "up",
+                    ssid,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                check_stdout, _ = await check_process.communicate()
+                stdout, stderr = await process.communicate()
 
-                connection_exists = ssid in check_stdout.decode()
-
-                if connection_exists:
-                    logger.info(f"Existing connection found for {ssid}, modifying...")
-                    # Modify existing connection
-                    if password:
-                        process = await asyncio.create_subprocess_exec(
-                            "nmcli",
-                            "connection",
-                            "modify",
-                            ssid,
-                            "wifi-sec.key-mgmt",
-                            "wpa-psk",
-                            "wifi-sec.psk",
-                            password,
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE,
-                        )
-                        await process.communicate()
-
-                    # Bring up the connection
+                if process.returncode != 0:
+                    last_error = stderr.decode().strip()
+                    logger.error(f"nmcli connection up failed: {last_error}")
+                    return False, last_error
+            else:
+                logger.info(f"Creating new connection for {ssid}...")
+                # Create new connection
+                if password:
                     process = await asyncio.create_subprocess_exec(
+                        "sudo",
                         "nmcli",
-                        "connection",
-                        "up",
+                        "device",
+                        "wifi",
+                        "connect",
+                        ssid,
+                        "password",
+                        password,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                else:
+                    # Open network
+                    process = await asyncio.create_subprocess_exec(
+                        "sudo",
+                        "nmcli",
+                        "device",
+                        "wifi",
+                        "connect",
                         ssid,
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.PIPE,
                     )
-                    stdout, stderr = await process.communicate()
 
-                    if process.returncode != 0:
-                        logger.error(
-                            f"Attempt {attempt}: nmcli connection up failed: {stderr.decode()}"
-                        )
-                        continue
-                else:
-                    logger.info(f"Creating new connection for {ssid}...")
-                    # Create new connection
-                    if password:
-                        process = await asyncio.create_subprocess_exec(
-                            "nmcli",
-                            "device",
-                            "wifi",
-                            "connect",
-                            ssid,
-                            "password",
-                            password,
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE,
-                        )
-                    else:
-                        # Open network
-                        process = await asyncio.create_subprocess_exec(
-                            "nmcli",
-                            "device",
-                            "wifi",
-                            "connect",
-                            ssid,
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE,
-                        )
+                stdout, stderr = await process.communicate()
 
-                    stdout, stderr = await process.communicate()
+                if process.returncode != 0:
+                    last_error = stderr.decode().strip()
+                    logger.error(f"nmcli connect failed: {last_error}")
+                    return False, last_error
 
-                    if process.returncode != 0:
-                        logger.error(
-                            f"Attempt {attempt}: nmcli connect failed: {stderr.decode()}"
-                        )
-                        continue
+            # Wait for connection with 40s timeout
+            if await self.wait_for_connection(ssid, timeout=40):
+                logger.info(f"Successfully connected to {ssid}")
+                return True, ""
 
-                # Wait for connection with 40s timeout
-                if await self.wait_for_connection(ssid, timeout=40):
-                    logger.info(f"Successfully connected on attempt {attempt}")
-                    return True
+            last_error = (
+                "Connection timeout - network may be out of range or password incorrect"
+            )
+            logger.warning(f"Connection failed: Connection timeout")
+            return False, last_error
 
-                logger.warning(f"Attempt {attempt} failed: Connection timeout")
-
-            except Exception as e:
-                logger.error(f"Attempt {attempt} failed with exception: {e}")
-
-        # All attempts failed
-        logger.error(f"All {max_attempts} connection attempts failed")
-        return False
+        except Exception as e:
+            last_error = str(e)
+            logger.error(f"Connection failed with exception: {e}")
+            return False, last_error
 
     async def wait_for_connection(self, ssid: str, timeout: int = 40) -> bool:
         """
@@ -646,6 +640,7 @@ class WiFiManager:
 
             # Delete the connection
             process = await asyncio.create_subprocess_exec(
+                "sudo",
                 "nmcli",
                 "connection",
                 "delete",

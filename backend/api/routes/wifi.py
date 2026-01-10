@@ -65,7 +65,7 @@ async def scan_wifi_networks():
 @router.post("/connect", response_model=ApiResponse, tags=["WiFi"])
 async def connect_wifi(credentials: WiFiCredentials, background_tasks: BackgroundTasks):
     """
-    Connect to WiFi network with retry logic and validation.
+    Connect to WiFi network (single attempt - user can manually retry).
 
     Validates connection BEFORE rebooting system.
     Returns success only if connection verified.
@@ -75,15 +75,21 @@ async def connect_wifi(credentials: WiFiCredentials, background_tasks: Backgroun
         f"Password provided: {'Yes' if credentials.password else 'No (empty)'}"
     )
 
-    # Attempt connection with retry (validates before reboot)
-    success = await wifi_manager.connect_network(credentials.ssid, credentials.password)
+    # Attempt connection (validates before reboot)
+    success, error_message = await wifi_manager.connect_network(
+        credentials.ssid, credentials.password
+    )
 
     if not success:
-        logger.error(f"Failed to connect to {credentials.ssid} after retries")
+        logger.error(f"Failed to connect to {credentials.ssid}: {error_message}")
         return ApiResponse(
             success=False,
-            message=f"Failed to connect to '{credentials.ssid}'. Check password and try again.",
-            data={"ssid": credentials.ssid, "attempts": 3, "timeout": 40},
+            message=f"Failed to connect to '{credentials.ssid}': {error_message}",
+            data={
+                "ssid": credentials.ssid,
+                "timeout": 40,
+                "error": error_message,
+            },
         )
 
     # Connection successful - now switch to client mode and reboot

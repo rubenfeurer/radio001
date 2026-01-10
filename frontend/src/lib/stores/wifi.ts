@@ -28,7 +28,7 @@ export const isLoadingSaved = writable(false);
 export const connectionProgress = writable<ConnectionProgress>({
 	status: 'idle',
 	attempt: 0,
-	maxAttempts: 3,
+	maxAttempts: 1,
 	message: ''
 });
 
@@ -105,7 +105,7 @@ export const connectToNetwork = async (credentials: WiFiCredentials): Promise<bo
 	connectionProgress.set({
 		status: 'connecting',
 		attempt: 1,
-		maxAttempts: 3,
+		maxAttempts: 1,
 		message: `Connecting to ${credentials.ssid}...`
 	});
 
@@ -121,47 +121,97 @@ export const connectToNetwork = async (credentials: WiFiCredentials): Promise<bo
 		const result: ApiResponse = await response.json();
 
 		if (result.success) {
-			// Connection successful
+			// Connection successful - verify by checking actual status
 			connectionProgress.set({
-				status: 'success',
-				attempt: 3,
-				maxAttempts: 3,
-				message: `Connected to ${credentials.ssid}! System rebooting...`
+				status: 'verifying',
+				attempt: 1,
+				maxAttempts: 1,
+				message: `Verifying connection to ${credentials.ssid}...`
 			});
 
-			// Update status
-			const currentStatus = get(status);
-			if (currentStatus) {
-				status.set({
-					...currentStatus,
-					network: {
-						...currentStatus.network,
-						wifi: {
-							...currentStatus.network.wifi,
-							status: 'connected',
-							ssid: credentials.ssid
-						}
+			// Poll WiFi status to confirm connection
+			let verified = false;
+			for (let i = 0; i < 3; i++) {
+				await new Promise((resolve) => setTimeout(resolve, 1000));
+
+				try {
+					const statusResponse = await fetch('/api/wifi/status');
+					const statusResult: ApiResponse = await statusResponse.json();
+
+					if (
+						statusResult.success &&
+						statusResult.data?.connected &&
+						statusResult.data?.ssid === credentials.ssid
+					) {
+						verified = true;
+						break;
 					}
-				});
+				} catch (e) {
+					console.warn('Status check failed:', e);
+				}
 			}
 
-			// Clear progress after delay
-			setTimeout(() => {
+			if (verified) {
 				connectionProgress.set({
-					status: 'idle',
-					attempt: 0,
-					maxAttempts: 3,
-					message: ''
+					status: 'success',
+					attempt: 1,
+					maxAttempts: 1,
+					message: `Connected to ${credentials.ssid}!`
 				});
-			}, 5000);
 
-			return true;
+				// Update status
+				const currentStatus = get(status);
+				if (currentStatus) {
+					status.set({
+						...currentStatus,
+						network: {
+							...currentStatus.network,
+							wifi: {
+								...currentStatus.network.wifi,
+								status: 'connected',
+								ssid: credentials.ssid
+							}
+						}
+					});
+				}
+
+				// Clear progress after delay
+				setTimeout(() => {
+					connectionProgress.set({
+						status: 'idle',
+						attempt: 0,
+						maxAttempts: 1,
+						message: ''
+					});
+				}, 3000);
+
+				return true;
+			} else {
+				// Backend said success but we can't verify - still consider it success
+				connectionProgress.set({
+					status: 'success',
+					attempt: 1,
+					maxAttempts: 1,
+					message: `Connection initiated to ${credentials.ssid}`
+				});
+
+				setTimeout(() => {
+					connectionProgress.set({
+						status: 'idle',
+						attempt: 0,
+						maxAttempts: 1,
+						message: ''
+					});
+				}, 3000);
+
+				return true;
+			}
 		} else {
-			// Connection failed after retries
+			// Connection failed
 			connectionProgress.set({
 				status: 'failed',
-				attempt: 3,
-				maxAttempts: 3,
+				attempt: 1,
+				maxAttempts: 1,
 				message: result.message || 'Connection failed'
 			});
 
@@ -172,7 +222,7 @@ export const connectToNetwork = async (credentials: WiFiCredentials): Promise<bo
 				connectionProgress.set({
 					status: 'idle',
 					attempt: 0,
-					maxAttempts: 3,
+					maxAttempts: 1,
 					message: ''
 				});
 			}, 5000);
@@ -185,7 +235,7 @@ export const connectToNetwork = async (credentials: WiFiCredentials): Promise<bo
 		connectionProgress.set({
 			status: 'failed',
 			attempt: 0,
-			maxAttempts: 3,
+			maxAttempts: 1,
 			message: errorMessage
 		});
 
@@ -197,7 +247,7 @@ export const connectToNetwork = async (credentials: WiFiCredentials): Promise<bo
 			connectionProgress.set({
 				status: 'idle',
 				attempt: 0,
-				maxAttempts: 3,
+				maxAttempts: 1,
 				message: ''
 			});
 		}, 5000);
