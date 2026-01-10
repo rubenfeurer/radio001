@@ -13,6 +13,8 @@ services:
     volumes:
       # Source code mounting for hot reload
       - ../backend:/app:cached
+      # Configuration file
+      - ../config/radio.conf:/app/config/radio.conf:ro
       # Data directory for station storage (mounts to /app/data since workdir is /app)
       - ../data:/app/data:rw
       # Assets directory for sounds
@@ -36,17 +38,12 @@ services:
       - /dev:/dev:rw
       - /sys/class/net:/sys/class/net:ro
     environment:
-      # Application settings
-      - NODE_ENV=production
-      - API_PORT=8000
-      - WIFI_INTERFACE=wlan0
-      - HOSTNAME=radio
+      # Config file location
+      - CONFIG_FILE=/app/config/radio.conf
 
-      # Hotspot configuration
-      - HOTSPOT_SSID=Radio-Setup
-      - HOTSPOT_PASSWORD=radio123
-      - HOTSPOT_IP=192.168.4.1
-      - HOTSPOT_RANGE=192.168.4.2,192.168.4.20
+      # Application settings (can be overridden by config file)
+      - NODE_ENV=production
+      - HOSTNAME=radio
 
       # Development flags
       - DEBUG=1

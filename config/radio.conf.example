@@ -1,0 +1,89 @@
+# Radio001 Configuration File - Example
+# Copy this file to radio.conf and customize for your setup
+
+# ============================================
+# WiFi Hotspot Configuration
+# ============================================
+
+# Hotspot Network Name (SSID)
+HOTSPOT_SSID=Radio-Setup
+
+# Hotspot Password (minimum 8 characters for WPA2)
+HOTSPOT_PASSWORD=Configure123!
+
+# Hotspot IP Address
+HOTSPOT_IP=192.168.4.1
+
+# DHCP Range for connected clients
+HOTSPOT_DHCP_RANGE=192.168.4.2,192.168.4.20
+
+# WiFi Interface
+WIFI_INTERFACE=wlan0
+
+# ============================================
+# Network Access Configuration
+# ============================================
+
+# mDNS hostname (access via http://HOSTNAME.local)
+MDNS_HOSTNAME=radio
+
+# Hotspot mode URL (used in UI messages)
+HOTSPOT_URL=http://192.168.4.1
+
+# Alternative hostname URL
+HOSTNAME_URL=http://radio.local
+
+# ============================================
+# Boot Behavior
+# ============================================
+
+# Enable automatic hotspot fallback on boot if WiFi not connected
+HOTSPOT_ENABLE_FALLBACK=true
+
+# WiFi connection timeout on boot (seconds)
+WIFI_BOOT_TIMEOUT=5
+
+# WiFi connection timeout for manual connections (seconds)
+WIFI_CONNECT_TIMEOUT=40
+
+# ============================================
+# System Configuration
+# ============================================
+
+# Host mode marker file (determines if in hotspot mode)
+HOST_MODE_FILE=/etc/raspiwifi/host_mode
+
+# Backend API port
+API_PORT=8000
+
+# Development mode (enables mock hardware/wifi)
+DEVELOPMENT_MODE=false
+
+# ============================================
+# Radio Configuration
+# ============================================
+
+# Number of station slots
+RADIO_STATION_SLOTS=3
+
+# Default volume (0-100)
+RADIO_DEFAULT_VOLUME=50
+
+# Volume step for hardware controls
+RADIO_VOLUME_STEP=5
+
+# Station data directory
+RADIO_DATA_DIR=/app/data
+
+# ============================================
+# Audio Configuration
+# ============================================
+
+# Audio output device
+AUDIO_DEVICE=default
+
+# Enable sound notifications
+ENABLE_SOUND_NOTIFICATIONS=true
+
+# Sound assets directory
+SOUND_ASSETS_DIR=/app/assets/sounds

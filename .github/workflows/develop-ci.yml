@@ -134,12 +134,12 @@ jobs:
             # Install test dependencies
             pip install -r requirements-test.txt
 
-            # Run quick test suite (unit tests only for speed)
+            # Run quick test suite (unit, api, and integration tests)
             python -m pytest \
               --verbose \
               --tb=short \
               --maxfail=3 \
-              -m 'unit or api' \
+              -m 'unit or api or integration' \
               --disable-warnings \
               tests/
 
@@ -180,13 +180,13 @@ jobs:
           export MOCK_HARDWARE=true
           export PYTHONPATH=$PWD:$PYTHONPATH
 
-          # Run focused test suite (unit + API tests for speed)
-          echo "🧪 Running backend unit and API tests..."
+          # Run focused test suite (unit + API + integration tests)
+          echo "🧪 Running backend unit, API, and integration tests..."
           python -m pytest \
             --verbose \
             --tb=short \
             --maxfail=5 \
-            -m 'unit or api' \
+            -m 'unit or api or integration' \
             --disable-warnings \
             --durations=10 \
             tests/
@@ -221,7 +221,8 @@ jobs:
           echo "📊 Test Summary:"
           echo "- Unit tests: ✅ Core functionality validated"
           echo "- API tests: ✅ Endpoints working correctly"
-          echo "- Integration: ✅ Docker container healthy"
+          echo "- Integration tests: ✅ User journeys validated"
+          echo "- Docker: ✅ Container healthy"
           echo ""
           echo "Ready for development! 🚀"
 

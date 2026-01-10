@@ -67,6 +67,10 @@ The easiest way to get started is using the automated setup script:
 git clone <repository-url> radio001
 cd radio001
 
+# Copy configuration file
+cp config/radio.conf.example config/radio.conf
+# Edit config/radio.conf to customize settings (optional)
+
 # Run automated setup (installs everything and tests the environment)
 ./scripts/setup-dev.sh
 ```
@@ -88,7 +92,13 @@ If you prefer manual setup:
    cd radio001
    ```
 
-2. **Start backend (Docker):**
+2. **Setup configuration:**
+   ```bash
+   cp config/radio.conf.example config/radio.conf
+   # Edit config/radio.conf to customize (HOTSPOT_SSID, passwords, etc.)
+   ```
+
+3. **Start backend (Docker):**
    ```bash
    # Use the helper script
    ./scripts/dev-environment.sh start
@@ -97,14 +107,14 @@ If you prefer manual setup:
    docker compose -f compose/docker-compose.yml up radio-backend -d
    ```
 
-3. **Start frontend (local):**
+4. **Start frontend (local):**
    ```bash
    cd frontend
    npm install
    npm run dev
    ```
 
-4. **Access the app:**
+5. **Access the app:**
    - Frontend: http://localhost:5173 (Vite dev server)
    - Backend API: http://localhost:8000
    - API Docs: http://localhost:8000/docs
@@ -122,6 +132,27 @@ Deploy to Raspberry Pi (auto-configures boot startup):
 # - Access at http://radio.local or http://192.168.4.1 (hotspot)
 ```
 
+## ⚙️ Configuration
+
+All system settings are managed in **`config/radio.conf`**:
+
+```bash
+# Copy example configuration
+cp config/radio.conf.example config/radio.conf
+
+# Customize settings
+nano config/radio.conf
+```
+
+### Key Settings:
+- **WiFi Hotspot**: SSID, password, IP address
+- **Network URLs**: Hotspot URL, mDNS hostname
+- **Boot Behavior**: WiFi timeout, auto-fallback
+- **Radio**: Station slots, default volume
+- **Audio**: Output device, notifications
+
+See **[config/README.md](./config/README.md)** for full configuration reference.
+
 ## 📁 Project Structure
 
 ```
@@ -135,6 +166,10 @@ radio001/
 │   ├── hardware/          # GPIO & audio controls
 │   ├── api/routes/        # API endpoints
 │   └── main.py            # Unified WiFi + Radio API
+├── config/                # Configuration files
+│   ├── radio.conf         # Main config (gitignored)
+│   ├── radio.conf.example # Example config
+│   └── polkit/            # NetworkManager permissions
 ├── compose/               # Docker configurations
 ├── scripts/               # Helper scripts (see below)
 ├── data/                  # Station storage
@@ -265,18 +300,24 @@ The `scripts/` directory contains helper scripts organized by purpose:
    ```bash
    git clone <repo-url> radio001
    cd radio001
+   
+   # Setup configuration
+   cp config/radio.conf.example config/radio.conf
+   nano config/radio.conf  # Customize HOTSPOT_SSID, passwords, URLs, etc.
+   
    ./scripts/dev-environment.sh start --prod
    ```
    
    This automatically:
+   - ✅ Loads settings from `config/radio.conf`
    - ✅ Installs systemd service for boot auto-start
    - ✅ Builds and starts containers
-   - ✅ Configures 5s WiFi check → hotspot fallback
+   - ✅ Configures WiFi check → hotspot fallback
    - ✅ System will start on every reboot
 
 3. **Access via:**
    - **WiFi connected**: http://radio.local or http://[pi-ip]
-   - **Hotspot mode**: http://192.168.4.1 (SSID: Radio-Setup)
+   - **Hotspot mode**: http://192.168.4.1 (or custom HOTSPOT_URL)
    - **Hardware Controls**: 3 buttons + rotary encoder
 
 ## 🤝 Contributing

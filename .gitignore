@@ -293,6 +293,9 @@ wpa_supplicant.conf
 hostapd.conf
 dnsmasq.conf
 
+# User configuration (keep example, ignore actual config)
+config/radio.conf
+
 # SSL certificates
 *.pem
 *.key

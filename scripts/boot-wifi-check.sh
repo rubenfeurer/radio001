@@ -6,14 +6,24 @@
 
 set -e
 
-# Configuration from environment variables
+# Load configuration from file
+CONFIG_FILE="${CONFIG_FILE:-/app/config/radio.conf}"
+if [ -f "$CONFIG_FILE" ]; then
+    echo "[boot-wifi-check] Loading configuration from $CONFIG_FILE"
+    # shellcheck disable=SC1090
+    source "$CONFIG_FILE"
+else
+    echo "[boot-wifi-check] WARNING: Config file not found: $CONFIG_FILE, using defaults"
+fi
+
+# Configuration with defaults (fallback if not in config file)
 WIFI_INTERFACE="${WIFI_INTERFACE:-wlan0}"
-WIFI_TIMEOUT="${WIFI_TIMEOUT:-5}"
+WIFI_TIMEOUT="${WIFI_BOOT_TIMEOUT:-5}"
 HOST_MODE_FILE="${HOST_MODE_FILE:-/etc/raspiwifi/host_mode}"
 HOTSPOT_SSID="${HOTSPOT_SSID:-Radio-Setup}"
 HOTSPOT_PASSWORD="${HOTSPOT_PASSWORD:-Configure123!}"
 HOTSPOT_IP="${HOTSPOT_IP:-192.168.4.1}"
-HOTSPOT_RANGE="${HOTSPOT_RANGE:-192.168.4.2,192.168.4.20}"
+HOTSPOT_RANGE="${HOTSPOT_DHCP_RANGE:-192.168.4.2,192.168.4.20}"
 HOTSPOT_ENABLE_FALLBACK="${HOTSPOT_ENABLE_FALLBACK:-true}"
 
 # Logging function
