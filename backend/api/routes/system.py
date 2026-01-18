@@ -19,6 +19,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Global WiFi manager instance (set from main.py)
+wifi_manager = None
+
+
+def set_system_wifi_manager(manager):
+    """Set the WiFi manager instance for system routes"""
+    global wifi_manager
+    wifi_manager = manager
+    logger.info("WiFi manager set in system routes")
+
 
 class SystemMetrics(BaseModel):
     """System metrics including CPU, memory, and uptime"""
@@ -168,3 +178,58 @@ async def health_check():
         Dict: Basic health status
     """
     return {"status": "healthy", "service": "radio-system"}
+
+
+class ApiResponse(BaseModel):
+    """Standard API response"""
+
+    success: bool
+    message: str
+    data: Any = None
+
+
+@router.post("/reset", response_model=ApiResponse, summary="Reset to hotspot mode")
+async def reset_to_hotspot():
+    """
+    Reset system to hotspot mode for WiFi reconfiguration.
+
+    This will:
+    1. Create the host mode marker file
+    2. Disconnect from current WiFi network
+    3. Reboot the system
+
+    After reboot, the boot script will activate hotspot mode.
+
+    Returns:
+        ApiResponse: Success status and message
+    """
+    global wifi_manager
+
+    if wifi_manager is None:
+        # Fallback: create temporary instance if not set
+        from pathlib import Path
+
+        from core.wifi_manager import WiFiManager
+
+        wifi_manager = WiFiManager(
+            interface=os.getenv("WIFI_INTERFACE", "wlan0"),
+            host_mode_file=Path("/etc/raspiwifi/host_mode"),
+            development_mode=os.getenv("NODE_ENV") == "development",
+        )
+
+    try:
+        logger.info("Initiating system reset to hotspot mode...")
+        await wifi_manager.switch_to_host_mode()
+
+        return ApiResponse(
+            success=True,
+            message="Resetting to hotspot mode. System will reboot...",
+            data={
+                "action": "reboot",
+                "mode": "hotspot",
+                "instructions": "After reboot, connect to 'Radio-Setup' WiFi network",
+            },
+        )
+    except Exception as e:
+        logger.error(f"Failed to reset to hotspot mode: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to reset system: {str(e)}")

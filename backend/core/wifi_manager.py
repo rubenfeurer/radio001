@@ -265,7 +265,7 @@ class WiFiManager:
                     continue
                 parts = line.split(":")
                 if len(parts) >= 3 and parts[0] == "wifi":
-                    if "connected" in parts[1]:
+                    if parts[1] == "connected":
                         connected = True
                         connection_name = parts[2].strip() if parts[2].strip() else None
                         break
@@ -708,4 +708,44 @@ class WiFiManager:
 
         except Exception as e:
             logger.error(f"Failed to switch mode: {e}", exc_info=True)
+            raise
+
+    async def switch_to_host_mode(self):
+        """Switch from client mode to host mode (hotspot)"""
+
+        if self.development_mode:
+            logger.info("Development mode: Skipping mode switch to host")
+            return
+
+        try:
+            # Create host mode marker directory if needed
+            self.host_mode_file.parent.mkdir(parents=True, exist_ok=True)
+
+            # Create host mode marker file
+            self.host_mode_file.touch()
+            logger.info(f"Created host mode marker: {self.host_mode_file}")
+
+            # Disconnect any active WiFi connections
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    "sudo",
+                    "nmcli",
+                    "device",
+                    "disconnect",
+                    self.interface,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await process.communicate()
+                logger.info(f"Disconnected WiFi interface {self.interface}")
+            except Exception as e:
+                logger.warning(f"Could not disconnect WiFi: {e}")
+
+            logger.info("Mode switch to host complete, initiating reboot...")
+
+            # Reboot to apply changes - boot script will see host_mode file
+            await asyncio.create_subprocess_shell("sudo reboot")
+
+        except Exception as e:
+            logger.error(f"Failed to switch to host mode: {e}", exc_info=True)
             raise

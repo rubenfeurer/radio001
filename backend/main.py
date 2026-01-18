@@ -23,6 +23,7 @@ from api.routes.radio import router as radio_router
 # Radio system imports
 from api.routes.stations import router as stations_router
 from api.routes.system import router as system_router
+from api.routes.system import set_system_wifi_manager
 from api.routes.websocket import router as websocket_router
 from api.routes.websocket import (
     setup_radio_manager_with_websocket,
@@ -148,6 +149,7 @@ async def lifespan(app: FastAPI):
             development_mode=Config.IS_DEVELOPMENT,
         )
         set_wifi_manager(wifi_manager)
+        set_system_wifi_manager(wifi_manager)
         print("WiFi manager initialized successfully")
     except Exception as e:
         print(f"ERROR: Error initializing WiFi manager: {e}")
