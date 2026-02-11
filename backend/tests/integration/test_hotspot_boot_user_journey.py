@@ -195,10 +195,7 @@ class TestHotspotBootUserJourney:
             # Verify connection success
             assert data["success"] is True
             assert "Connected to 'HomeWiFi'" in data["message"]
-            assert (
-                "rebooting" in data["message"].lower()
-                or "reboot" in data["message"].lower()
-            )
+            assert "successfully" in data["message"].lower()
 
             # Verify connect_network was called with correct parameters
             mock_wifi_manager.connect_network.assert_called_once_with(
@@ -216,9 +213,8 @@ class TestHotspotBootUserJourney:
 
         User journey:
         - Backend validates WiFi connection (40s timeout)
-        - If successful, stops hostapd/dnsmasq
-        - Switches to client mode
-        - System may reboot (in production)
+        - If successful, stops hotspot via nmcli
+        - Switches to client mode (no reboot needed)
         """
         # Simulate connection verification
         success, error = await mock_wifi_manager.connect_network(
@@ -235,11 +231,11 @@ class TestHotspotBootUserJourney:
     @pytest.mark.asyncio
     async def test_step7_verify_client_mode_access(self, client, mock_wifi_manager):
         """
-        Step 7: After reboot, user accesses system via WiFi network
+        Step 7: After mode switch, user accesses system via WiFi network
 
         User journey:
-        - System reboots (or switches mode)
-        - User disconnects from "Radio-Setup" AP
+        - System switches to client mode (no reboot)
+        - Hotspot AP disappears
         - User connects to "HomeWiFi" network
         - User accesses http://radio.local
         - System shows connected to "HomeWiFi"
