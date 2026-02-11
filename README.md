@@ -228,21 +228,11 @@ The `scripts/` directory contains helper scripts organized by purpose:
 
 ## 📚 Documentation
 
-> **[📖 View Complete Documentation →](./docs/index.md)**
-
-### Quick Links
-- **[📋 System Overview](./docs/README.md)** - Detailed features, architecture, and API reference
-- **[🎯 Integration Plan](./docs/RADIO_INTEGRATION_PLAN.md)** - Technical roadmap and implementation status
-- **[🚀 Phase 4 Implementation Plan](./docs/PHASE4_IMPLEMENTATION_PLAN.md)** - Step-by-step frontend integration guide
-- **[🚀 Quick Start](#-quick-start)** - Get up and running in 5 minutes
-
-### What You'll Find
-- **Architecture & Design** - Hybrid SvelteKit + FastAPI system
-- **API Documentation** - WiFi + Radio endpoints with examples
-- **Development Guide** - Setup, testing, and contribution workflow
-- **Deployment Guide** - Raspberry Pi production deployment
-- **Phase Progress** - Current implementation status (Phase 1: 95% complete)
-- **Phase 4 Plan** - Detailed frontend integration implementation guide
+| Document | Description |
+|----------|-------------|
+| **[Configuration Guide](./docs/CONFIGURATION.md)** | All settings in `radio.conf`, Docker integration |
+| **[Radio Integration Plan](./docs/RADIO_INTEGRATION_PLAN.md)** | Backend/frontend roadmap and implementation status |
+| **[Hotspot Debug Guide](./docs/HOTSPOT_HANDOFF.md)** | Hotspot mode internals, recovery procedures |
 
 ## 🎯 Current Status
 
@@ -257,7 +247,6 @@ The `scripts/` directory contains helper scripts organized by purpose:
 - 🔄 **Radio UI Components**: Station cards, volume controls
 - 🔄 **State Management**: Radio store integration  
 - 🔄 **Navigation**: Unified WiFi + Radio interface
-- 📋 **[Implementation Plan](./docs/PHASE4_IMPLEMENTATION_PLAN.md)**: Step-by-step guide ready
 
 ## 🏠 Pages & Features
 

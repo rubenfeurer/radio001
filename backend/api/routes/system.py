@@ -218,9 +218,6 @@ async def activate_hotspot_mode():
             hotspot_ssid=os.getenv("HOTSPOT_SSID", "Radio-Setup"),
             hotspot_password=os.getenv("HOTSPOT_PASSWORD", "Configure123!"),
             hotspot_ip=os.getenv("HOTSPOT_IP", "192.168.4.1"),
-            hotspot_dhcp_range=os.getenv(
-                "HOTSPOT_DHCP_RANGE", "192.168.4.2,192.168.4.20"
-            ),
         )
 
     try:

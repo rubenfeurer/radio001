@@ -31,10 +31,6 @@ services:
       - /etc/hostapd:/etc/hostapd:rw
       - /etc/raspiwifi:/etc/raspiwifi:rw
 
-      # Hotspot config templates
-      - ../config/hostapd/hostapd.conf.template:/etc/hostapd/hostapd.conf.template:ro
-      - ../config/dnsmasq/dnsmasq.conf.template:/etc/dnsmasq.conf.template:ro
-
       # PolicyKit configuration for NetworkManager authorization
       - ../config/polkit:/etc/polkit-1/localauthority/50-local.d:ro
 

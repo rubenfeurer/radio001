@@ -105,13 +105,6 @@ volumes:
   - ../config/radio.conf:/app/config/radio.conf:ro
 ```
 
-Hotspot config templates are also mounted:
-```yaml
-volumes:
-  - ../config/hostapd/hostapd.conf.template:/etc/hostapd/hostapd.conf.template:ro
-  - ../config/dnsmasq/dnsmasq.conf.template:/etc/dnsmasq.conf.template:ro
-```
-
 Changes require restart:
 ```bash
 docker compose restart radio-backend
