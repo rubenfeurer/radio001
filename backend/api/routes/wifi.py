@@ -92,17 +92,17 @@ async def connect_wifi(credentials: WiFiCredentials, background_tasks: Backgroun
             },
         )
 
-    # Connection successful - now switch to client mode and reboot
+    # Connection successful - switch to client mode (stops hotspot if active)
     try:
-        logger.info(f"Connection verified. Switching to client mode and rebooting...")
+        logger.info(f"Connection verified. Switching to client mode...")
         await wifi_manager.switch_to_client_mode()
 
         return ApiResponse(
             success=True,
-            message=f"Connected to '{credentials.ssid}'. System rebooting to apply changes...",
+            message=f"Connected to '{credentials.ssid}' successfully.",
             data={
                 "ssid": credentials.ssid,
-                "instructions": "System will reboot. Reconnect to the new WiFi network and navigate to http://radio.local",
+                "instructions": "Connected to WiFi. Access via http://radio.local",
             },
         )
     except Exception as e:

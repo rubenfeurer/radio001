@@ -286,7 +286,7 @@ export const resetToHotspot = async (): Promise<boolean> => {
 	error.set(null);
 
 	try {
-		const response = await fetch('/api/system/reset', {
+		const response = await fetch('/api/system/hotspot-mode', {
 			method: 'POST'
 		});
 

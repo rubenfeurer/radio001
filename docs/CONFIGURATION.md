@@ -93,11 +93,23 @@ docker compose up
 
 ## 🐳 Docker Integration
 
-Config is mounted as read-only volume in `docker-compose.yml`:
+Config is loaded in two ways in `docker-compose.yml`:
 
 ```yaml
+# Loaded as env vars for the backend process
+env_file:
+  - ../config/radio.conf
+
+# Also mounted for boot scripts
 volumes:
   - ../config/radio.conf:/app/config/radio.conf:ro
+```
+
+Hotspot config templates are also mounted:
+```yaml
+volumes:
+  - ../config/hostapd/hostapd.conf.template:/etc/hostapd/hostapd.conf.template:ro
+  - ../config/dnsmasq/dnsmasq.conf.template:/etc/dnsmasq.conf.template:ro
 ```
 
 Changes require restart:

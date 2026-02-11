@@ -188,17 +188,17 @@ class ApiResponse(BaseModel):
     data: Any = None
 
 
-@router.post("/reset", response_model=ApiResponse, summary="Reset to hotspot mode")
-async def reset_to_hotspot():
+@router.post(
+    "/hotspot-mode", response_model=ApiResponse, summary="Switch to hotspot mode"
+)
+async def activate_hotspot_mode():
     """
     Reset system to hotspot mode for WiFi reconfiguration.
 
     This will:
     1. Create the host mode marker file
     2. Disconnect from current WiFi network
-    3. Reboot the system
-
-    After reboot, the boot script will activate hotspot mode.
+    3. Start hostapd and dnsmasq for the access point
 
     Returns:
         ApiResponse: Success status and message
@@ -215,6 +215,12 @@ async def reset_to_hotspot():
             interface=os.getenv("WIFI_INTERFACE", "wlan0"),
             host_mode_file=Path("/etc/raspiwifi/host_mode"),
             development_mode=os.getenv("NODE_ENV") == "development",
+            hotspot_ssid=os.getenv("HOTSPOT_SSID", "Radio-Setup"),
+            hotspot_password=os.getenv("HOTSPOT_PASSWORD", "Configure123!"),
+            hotspot_ip=os.getenv("HOTSPOT_IP", "192.168.4.1"),
+            hotspot_dhcp_range=os.getenv(
+                "HOTSPOT_DHCP_RANGE", "192.168.4.2,192.168.4.20"
+            ),
         )
 
     try:
@@ -223,11 +229,11 @@ async def reset_to_hotspot():
 
         return ApiResponse(
             success=True,
-            message="Resetting to hotspot mode. System will reboot...",
+            message="Hotspot mode activated. Connect to 'Radio-Setup' WiFi network.",
             data={
-                "action": "reboot",
+                "action": "hotspot_activated",
                 "mode": "hotspot",
-                "instructions": "After reboot, connect to 'Radio-Setup' WiFi network",
+                "instructions": "Connect to 'Radio-Setup' WiFi and navigate to http://192.168.4.1",
             },
         )
     except Exception as e:

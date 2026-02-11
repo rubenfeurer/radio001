@@ -31,12 +31,18 @@ services:
       - /etc/hostapd:/etc/hostapd:rw
       - /etc/raspiwifi:/etc/raspiwifi:rw
 
+      # Hotspot config templates
+      - ../config/hostapd/hostapd.conf.template:/etc/hostapd/hostapd.conf.template:ro
+      - ../config/dnsmasq/dnsmasq.conf.template:/etc/dnsmasq.conf.template:ro
+
       # PolicyKit configuration for NetworkManager authorization
       - ../config/polkit:/etc/polkit-1/localauthority/50-local.d:ro
 
       # Device access for WiFi management
       - /dev:/dev:rw
       - /sys/class/net:/sys/class/net:ro
+    env_file:
+      - ../config/radio.conf
     environment:
       # Config file location
       - CONFIG_FILE=/app/config/radio.conf

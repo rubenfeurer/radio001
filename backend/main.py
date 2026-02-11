@@ -147,6 +147,12 @@ async def lifespan(app: FastAPI):
             interface=Config.WIFI_INTERFACE,
             host_mode_file=Config.HOST_MODE_FILE,
             development_mode=Config.IS_DEVELOPMENT,
+            hotspot_ssid=os.getenv("HOTSPOT_SSID", "Radio-Setup"),
+            hotspot_password=os.getenv("HOTSPOT_PASSWORD", "Configure123!"),
+            hotspot_ip=os.getenv("HOTSPOT_IP", "192.168.4.1"),
+            hotspot_dhcp_range=os.getenv(
+                "HOTSPOT_DHCP_RANGE", "192.168.4.2,192.168.4.20"
+            ),
         )
         set_wifi_manager(wifi_manager)
         set_system_wifi_manager(wifi_manager)

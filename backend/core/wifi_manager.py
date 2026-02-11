@@ -74,13 +74,37 @@ class WiFiManager:
         interface: str = "wlan0",
         host_mode_file: Optional[Path] = None,
         development_mode: bool = False,
+        hotspot_ssid: str = "Radio-Setup",
+        hotspot_password: str = "Configure123!",
+        hotspot_ip: str = "192.168.4.1",
+        hotspot_dhcp_range: str = "192.168.4.2,192.168.4.20",
     ):
         self.interface = interface
         self.host_mode_file = host_mode_file or Path("/etc/raspiwifi/host_mode")
         self.development_mode = development_mode
+        self.hotspot_ssid = hotspot_ssid
+        self.hotspot_password = hotspot_password
+        self.hotspot_ip = hotspot_ip
+        self.hotspot_dhcp_range = hotspot_dhcp_range
         logger.info(
             f"WiFiManager initialized (interface={interface}, dev_mode={development_mode})"
         )
+
+    async def _run_cmd(self, *args: str, check: bool = True) -> tuple[int, str, str]:
+        """Run a subprocess command and return (returncode, stdout, stderr)"""
+        process = await asyncio.create_subprocess_exec(
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await process.communicate()
+        stdout_str = stdout.decode().strip()
+        stderr_str = stderr.decode().strip()
+        if check and process.returncode != 0:
+            logger.warning(
+                f"Command {args} failed ({process.returncode}): {stderr_str}"
+            )
+        return process.returncode, stdout_str, stderr_str
 
     def _parse_nmcli_scan(self, output: str) -> List[WiFiNetwork]:
         """Parse nmcli scan output into WiFiNetwork objects"""
@@ -662,107 +686,156 @@ class WiFiManager:
             return False
 
     async def switch_to_client_mode(self):
-        """Switch from host mode to client mode"""
+        """Switch from host mode to client mode (no reboot needed)"""
 
         if self.development_mode:
             logger.info("Development mode: Skipping mode switch")
             return
 
         try:
+            # Stop hotspot services
+            await self._run_cmd("sudo", "killall", "hostapd", check=False)
+            logger.info("Stopped hostapd")
+
+            await self._run_cmd("sudo", "killall", "dnsmasq", check=False)
+            logger.info("Stopped dnsmasq")
+
             # Remove host mode marker
             if self.host_mode_file.exists():
-                self.host_mode_file.unlink()
+                await self._run_cmd("sudo", "rm", "-f", str(self.host_mode_file))
                 logger.info(f"Removed host mode marker: {self.host_mode_file}")
 
-            # Stop any running hotspot services
-            # Kill hostapd if running
-            try:
-                await asyncio.create_subprocess_exec(
-                    "sudo",
-                    "killall",
-                    "hostapd",
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                logger.info("Stopped hostapd")
-            except Exception:
-                pass
+            # Flush static IP from interface
+            await self._run_cmd(
+                "sudo", "ip", "addr", "flush", "dev", self.interface, check=False
+            )
 
-            # Kill dnsmasq if running
-            try:
-                await asyncio.create_subprocess_exec(
-                    "sudo",
-                    "killall",
-                    "dnsmasq",
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                logger.info("Stopped dnsmasq")
-            except Exception:
-                pass
+            # Re-enable NetworkManager management of the interface
+            await self._run_cmd(
+                "sudo", "nmcli", "device", "set", self.interface, "managed", "yes"
+            )
+            logger.info(f"Re-enabled NetworkManager on {self.interface}")
 
-            logger.info("Mode switch to client complete, initiating reboot...")
-
-            # Reboot to apply changes
-            await asyncio.create_subprocess_shell("sudo reboot")
+            logger.info("Mode switch to client complete")
 
         except Exception as e:
             logger.error(f"Failed to switch mode: {e}", exc_info=True)
             raise
 
+    async def _generate_config(self, template_path: str, output_path: str) -> bool:
+        """Generate config file from template by substituting variables"""
+        try:
+            template = Path(template_path)
+            if not template.exists():
+                logger.error(f"Template not found: {template_path}")
+                return False
+
+            content = template.read_text()
+            content = content.replace("${WIFI_INTERFACE}", self.interface)
+            content = content.replace("${HOTSPOT_SSID}", self.hotspot_ssid)
+            content = content.replace("${HOTSPOT_PASSWORD}", self.hotspot_password)
+            content = content.replace("${HOTSPOT_IP}", self.hotspot_ip)
+            content = content.replace("${HOTSPOT_RANGE}", self.hotspot_dhcp_range)
+
+            # Use sudo tee to write to root-owned paths
+            process = await asyncio.create_subprocess_exec(
+                "sudo",
+                "tee",
+                output_path,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await process.communicate(input=content.encode())
+            if process.returncode != 0:
+                logger.error(f"Failed to write config: {output_path}")
+                return False
+
+            logger.info(f"Generated config: {output_path}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to generate config {output_path}: {e}")
+            return False
+
     async def switch_to_host_mode(self):
-        """Switch from client mode to host mode (hotspot)"""
+        """Switch from client mode to host mode (hotspot) without reboot"""
 
         if self.development_mode:
             logger.info("Development mode: Skipping mode switch to host")
             return
 
         try:
-            # Create host mode marker directory and file using sudo
-            process = await asyncio.create_subprocess_exec(
-                "sudo",
-                "mkdir",
-                "-p",
-                str(self.host_mode_file.parent),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            # 1. Create host mode marker
+            await self._run_cmd("sudo", "mkdir", "-p", str(self.host_mode_file.parent))
+            rc, _, stderr = await self._run_cmd(
+                "sudo", "touch", str(self.host_mode_file)
             )
-            await process.communicate()
-
-            process = await asyncio.create_subprocess_exec(
-                "sudo",
-                "touch",
-                str(self.host_mode_file),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, stderr = await process.communicate()
-
-            if process.returncode != 0:
-                raise Exception(f"Failed to create host mode file: {stderr.decode()}")
-
+            if rc != 0:
+                raise Exception(f"Failed to create host mode file: {stderr}")
             logger.info(f"Created host mode marker: {self.host_mode_file}")
 
-            # Disconnect any active WiFi connections
-            try:
-                process = await asyncio.create_subprocess_exec(
-                    "sudo",
-                    "nmcli",
-                    "device",
-                    "disconnect",
-                    self.interface,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                await process.communicate()
-                logger.info(f"Disconnected WiFi interface {self.interface}")
-            except Exception as e:
-                logger.warning(f"Could not disconnect WiFi: {e}")
+            # 2. Disconnect WiFi
+            await self._run_cmd(
+                "sudo", "nmcli", "device", "disconnect", self.interface, check=False
+            )
+            logger.info(f"Disconnected WiFi interface {self.interface}")
+            await asyncio.sleep(2)
 
-            logger.info("Mode switch to host complete, initiating reboot...")
+            # 3. Configure static IP
+            await self._run_cmd(
+                "sudo", "ip", "addr", "flush", "dev", self.interface, check=False
+            )
+            rc, _, stderr = await self._run_cmd(
+                "sudo",
+                "ip",
+                "addr",
+                "add",
+                f"{self.hotspot_ip}/24",
+                "dev",
+                self.interface,
+            )
+            if rc != 0:
+                raise Exception(f"Failed to set static IP: {stderr}")
+            await self._run_cmd("sudo", "ip", "link", "set", self.interface, "up")
+            logger.info(f"Set static IP {self.hotspot_ip} on {self.interface}")
 
-            # Reboot to apply changes - boot script will see host_mode file
-            await asyncio.create_subprocess_shell("sudo reboot")
+            # 4. Generate hostapd config from template
+            await self._generate_config(
+                "/etc/hostapd/hostapd.conf.template",
+                "/etc/hostapd/hostapd.conf",
+            )
+
+            # 5. Generate dnsmasq config from template
+            await self._generate_config(
+                "/etc/dnsmasq.conf.template",
+                "/etc/dnsmasq.conf",
+            )
+
+            # 6. Start hostapd
+            rc, stdout, stderr = await self._run_cmd(
+                "sudo", "hostapd", "-B", "/etc/hostapd/hostapd.conf"
+            )
+            await asyncio.sleep(2)
+            rc_check, _, _ = await self._run_cmd("pgrep", "hostapd", check=False)
+            if rc_check != 0:
+                logger.error(f"hostapd failed to start: {stderr}")
+                raise Exception("hostapd failed to start")
+            logger.info("hostapd started successfully")
+
+            # 7. Start dnsmasq
+            rc, stdout, stderr = await self._run_cmd(
+                "sudo", "dnsmasq", "-C", "/etc/dnsmasq.conf"
+            )
+            await asyncio.sleep(1)
+            rc_check, _, _ = await self._run_cmd("pgrep", "dnsmasq", check=False)
+            if rc_check != 0:
+                logger.error(f"dnsmasq failed to start: {stderr}")
+                raise Exception("dnsmasq failed to start")
+            logger.info("dnsmasq started successfully")
+
+            logger.info(
+                f"Hotspot mode active: SSID={self.hotspot_ssid}, IP={self.hotspot_ip}"
+            )
 
         except Exception as e:
             logger.error(f"Failed to switch to host mode: {e}", exc_info=True)
