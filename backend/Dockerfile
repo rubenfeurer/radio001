@@ -35,7 +35,7 @@ RUN groupmod -g 104 netdev || groupadd -g 104 netdev && \
     useradd -r -g radio -G netdev radio
 
 # Configure passwordless sudo for WiFi management commands (nmcli permissions)
-RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown, /sbin/ip, /usr/sbin/ip, /bin/ip, /usr/bin/nmcli, /usr/bin/killall" > /etc/sudoers.d/radio && \
+RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /bin/mkdir, /usr/bin/mkdir, /bin/touch, /usr/bin/touch, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown, /sbin/ip, /usr/sbin/ip, /bin/ip, /usr/bin/nmcli, /usr/bin/killall" > /etc/sudoers.d/radio && \
     chmod 0440 /etc/sudoers.d/radio
 
 # Copy requirements and install Python dependencies

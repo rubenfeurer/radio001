@@ -718,11 +718,29 @@ class WiFiManager:
             return
 
         try:
-            # Create host mode marker directory if needed
-            self.host_mode_file.parent.mkdir(parents=True, exist_ok=True)
+            # Create host mode marker directory and file using sudo
+            process = await asyncio.create_subprocess_exec(
+                "sudo",
+                "mkdir",
+                "-p",
+                str(self.host_mode_file.parent),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await process.communicate()
 
-            # Create host mode marker file
-            self.host_mode_file.touch()
+            process = await asyncio.create_subprocess_exec(
+                "sudo",
+                "touch",
+                str(self.host_mode_file),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await process.communicate()
+
+            if process.returncode != 0:
+                raise Exception(f"Failed to create host mode file: {stderr.decode()}")
+
             logger.info(f"Created host mode marker: {self.host_mode_file}")
 
             # Disconnect any active WiFi connections
