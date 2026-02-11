@@ -28,7 +28,6 @@ services:
       - /run/NetworkManager:/run/NetworkManager:rw
       - /run/dbus:/run/dbus:rw
       - /var/run/dbus:/var/run/dbus:rw
-      - /etc/hostapd:/etc/hostapd:rw
       - /etc/raspiwifi:/etc/raspiwifi:rw
 
       # PolicyKit configuration for NetworkManager authorization

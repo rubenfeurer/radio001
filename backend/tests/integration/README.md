@@ -42,9 +42,8 @@ The test covers the complete user journey from system boot to successful WiFi co
 │     └─ Backend validates connection (40s timeout)           │
 │                                                               │
 │  6. System switches modes                                    │
-│     ├─ Stops hotspot (hostapd/dnsmasq)                      │
-│     ├─ Switches to client mode                              │
-│     └─ System may reboot                                     │
+│     ├─ Stops hotspot (nmcli connection down Hotspot)        │
+│     └─ Switches to client mode                              │
 │                                                               │
 │  7. User accesses via WiFi                                   │
 │     ├─ Connects to "HomeWiFi"                               │
@@ -130,7 +129,7 @@ The test covers the complete user journey from system boot to successful WiFi co
 - ✅ Connection request accepts credentials
 - ✅ Saved networks list is empty on first boot
 - ✅ Error responses are properly formatted
-- ✅ Success responses include reboot message
+- ✅ Success responses include connection confirmation
 
 #### User Experience
 - ✅ User can scan for networks multiple times
@@ -251,7 +250,7 @@ PASSED
 ### Test Fails at Step 7
 **Issue:** Not in client mode
 - Check mode switch logic
-- Verify hostapd/dnsmasq stopped
+- Verify `nmcli connection down Hotspot` ran
 - Review system logs
 - Check HOST_MODE_FILE removed
 

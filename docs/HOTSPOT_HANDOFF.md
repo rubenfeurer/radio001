@@ -45,7 +45,7 @@ From `compose/docker-compose.yml`:
 - Volume mounts: `/etc/NetworkManager`, `/run/dbus`, `/etc/raspiwifi` (all `:rw`)
 - `env_file: ../config/radio.conf` — loads hotspot settings as env vars
 
-Sudo permissions (in Dockerfile): `nmcli`, `mkdir`, `touch`, `rm`, `ip`, `killall`, `hostapd`, `dnsmasq`, `tee`
+Sudo permissions (in Dockerfile): `nmcli`, `mkdir`, `touch`, `rm`, `ip`, `killall`
 
 ## Recovery Procedures
 
@@ -114,4 +114,3 @@ curl http://localhost:8000/wifi/status
 ## Known Issues
 
 - `system.py:get_system_metrics()` has a bug: re-imports `os` inside a try block, shadowing the module-level import. Shows as `cannot access local variable 'os'` in logs. Not hotspot-related.
-- Boot script (`scripts/boot-wifi-check.sh`) still uses hostapd/dnsmasq as a separate boot-time fallback path. The Python backend uses nmcli instead.

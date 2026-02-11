@@ -501,7 +501,7 @@ class WiFiManager:
 
     async def wait_for_connection(self, ssid: str, timeout: int = 40) -> bool:
         """
-        Wait for WiFi connection to complete (pre-reboot validation).
+        Wait for WiFi connection to complete (pre-switch validation).
 
         Uses nmcli to poll connection status every 2 seconds.
 

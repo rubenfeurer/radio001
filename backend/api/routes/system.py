@@ -198,7 +198,7 @@ async def activate_hotspot_mode():
     This will:
     1. Create the host mode marker file
     2. Disconnect from current WiFi network
-    3. Start hostapd and dnsmasq for the access point
+    3. Start hotspot via nmcli
 
     Returns:
         ApiResponse: Success status and message

@@ -5,10 +5,10 @@ Handles all WiFi-related endpoints using the WiFiManager module.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
-from core import WiFiCredentials, WiFiManager, WiFiNetworkModel, WiFiStatusModel
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from core import WiFiCredentials, WiFiManager
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -63,11 +63,11 @@ async def scan_wifi_networks():
 
 
 @router.post("/connect", response_model=ApiResponse, tags=["WiFi"])
-async def connect_wifi(credentials: WiFiCredentials, background_tasks: BackgroundTasks):
+async def connect_wifi(credentials: WiFiCredentials):
     """
     Connect to WiFi network (single attempt - user can manually retry).
 
-    Validates connection BEFORE rebooting system.
+    Validates connection before switching from hotspot to client mode.
     Returns success only if connection verified.
     """
     logger.info(f"Attempting to connect to WiFi: {credentials.ssid}")
@@ -75,7 +75,7 @@ async def connect_wifi(credentials: WiFiCredentials, background_tasks: Backgroun
         f"Password provided: {'Yes' if credentials.password else 'No (empty)'}"
     )
 
-    # Attempt connection (validates before reboot)
+    # Attempt connection (validates before mode switch)
     success, error_message = await wifi_manager.connect_network(
         credentials.ssid, credentials.password
     )

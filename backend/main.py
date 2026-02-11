@@ -3,13 +3,12 @@ FastAPI Backend for Radio WiFi Configuration
 Inspired by RaspiWiFi with minimal dependencies and clean architecture
 """
 
-import asyncio
 import logging
 import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any
 
 import uvicorn
 
@@ -30,9 +29,9 @@ from api.routes.websocket import (
     start_metrics_broadcast,
     stop_metrics_broadcast,
 )
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 # =============================================================================
 # Configuration
@@ -50,12 +49,6 @@ class Config:
     )
     config_file = RASPIWIFI_DIR / "raspiwifi.conf"
     HOST_MODE_FILE = RASPIWIFI_DIR / "host_mode"
-    WPA_SUPPLICANT_FILE = Path(
-        "/tmp/wpa_supplicant.conf"
-        if os.getenv("NODE_ENV") == "development"
-        else "/etc/wpa_supplicant/wpa_supplicant.conf"
-    )
-
     # Network interfaces
     WIFI_INTERFACE = os.getenv("WIFI_INTERFACE", "wlan0")
 
@@ -108,7 +101,6 @@ class Config:
 from api.routes.wifi import router as wifi_router
 from api.routes.wifi import set_wifi_manager
 from core import WiFiManager
-from core.wifi_models import WiFiCredentials, WiFiNetworkModel, WiFiStatusModel
 
 
 # Standard API response model

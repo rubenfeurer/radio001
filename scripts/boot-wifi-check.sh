@@ -22,8 +22,6 @@ WIFI_TIMEOUT="${WIFI_BOOT_TIMEOUT:-5}"
 HOST_MODE_FILE="${HOST_MODE_FILE:-/etc/raspiwifi/host_mode}"
 HOTSPOT_SSID="${HOTSPOT_SSID:-Radio-Setup}"
 HOTSPOT_PASSWORD="${HOTSPOT_PASSWORD:-Configure123!}"
-HOTSPOT_IP="${HOTSPOT_IP:-192.168.4.1}"
-HOTSPOT_RANGE="${HOTSPOT_DHCP_RANGE:-192.168.4.2,192.168.4.20}"
 HOTSPOT_ENABLE_FALLBACK="${HOTSPOT_ENABLE_FALLBACK:-true}"
 
 # Logging function
@@ -97,36 +95,7 @@ wait_for_wifi() {
     return 1
 }
 
-# Generate configuration file from template
-generate_config() {
-    local template="$1"
-    local output="$2"
-
-    if [ ! -f "$template" ]; then
-        error "Template file not found: $template"
-        return 1
-    fi
-
-    log "Generating $output from template..."
-
-    # Use envsubst to replace environment variables
-    if command -v envsubst >/dev/null 2>&1; then
-        envsubst < "$template" > "$output"
-    else
-        # Fallback: manual replacement
-        sed -e "s/\${WIFI_INTERFACE}/$WIFI_INTERFACE/g" \
-            -e "s/\${HOTSPOT_SSID}/$HOTSPOT_SSID/g" \
-            -e "s/\${HOTSPOT_PASSWORD}/$HOTSPOT_PASSWORD/g" \
-            -e "s/\${HOTSPOT_IP}/$HOTSPOT_IP/g" \
-            -e "s/\${HOTSPOT_RANGE}/$HOTSPOT_RANGE/g" \
-            "$template" > "$output"
-    fi
-
-    log "Generated $output"
-    return 0
-}
-
-# Activate hotspot mode
+# Activate hotspot mode using nmcli
 activate_hotspot_mode() {
     log "========================================="
     log "Activating HOTSPOT mode"
@@ -142,62 +111,20 @@ activate_hotspot_mode() {
     nmcli device disconnect "$WIFI_INTERFACE" 2>/dev/null || true
     sleep 2
 
-    # Configure interface with static IP
-    log "Configuring $WIFI_INTERFACE with IP $HOTSPOT_IP..."
-    ip addr flush dev "$WIFI_INTERFACE" 2>/dev/null || true
-    ip addr add "${HOTSPOT_IP}/24" dev "$WIFI_INTERFACE"
-    ip link set "$WIFI_INTERFACE" up
-
-    # Generate hostapd configuration
-    if [ -f "/etc/hostapd/hostapd.conf.template" ]; then
-        generate_config "/etc/hostapd/hostapd.conf.template" "/etc/hostapd/hostapd.conf"
+    # Start hotspot using nmcli (handles AP, DHCP, and IP all in one command)
+    log "Starting hotspot via nmcli..."
+    if nmcli device wifi hotspot ifname "$WIFI_INTERFACE" ssid "$HOTSPOT_SSID" password "$HOTSPOT_PASSWORD" 2>&1; then
+        log "nmcli hotspot started successfully"
     else
-        warn "hostapd template not found, using default configuration"
-    fi
-
-    # Generate dnsmasq configuration
-    if [ -f "/etc/dnsmasq.conf.template" ]; then
-        generate_config "/etc/dnsmasq.conf.template" "/etc/dnsmasq.conf"
-    else
-        warn "dnsmasq template not found, using default configuration"
-    fi
-
-    # Start hostapd
-    log "Starting hostapd..."
-    if [ -f "/etc/hostapd/hostapd.conf" ]; then
-        hostapd -B /etc/hostapd/hostapd.conf 2>&1 | head -n 5
-        sleep 2
-
-        if pgrep hostapd >/dev/null; then
-            log "hostapd started successfully"
-        else
-            error "hostapd failed to start"
-        fi
-    else
-        error "hostapd configuration not found"
-    fi
-
-    # Start dnsmasq
-    log "Starting dnsmasq..."
-    if [ -f "/etc/dnsmasq.conf" ]; then
-        dnsmasq -C /etc/dnsmasq.conf 2>&1 | head -n 5
-        sleep 1
-
-        if pgrep dnsmasq >/dev/null; then
-            log "dnsmasq started successfully"
-        else
-            error "dnsmasq failed to start"
-        fi
-    else
-        error "dnsmasq configuration not found"
+        error "nmcli hotspot failed to start"
+        return 1
     fi
 
     log "========================================="
     log "HOTSPOT mode active"
     log "SSID: $HOTSPOT_SSID"
     log "Password: $HOTSPOT_PASSWORD"
-    log "IP: $HOTSPOT_IP"
-    log "Access: http://$HOTSPOT_IP or http://radio.local"
+    log "Access: http://radio.local"
     log "========================================="
 }
 
@@ -206,6 +133,9 @@ activate_client_mode() {
     log "========================================="
     log "Activating CLIENT mode"
     log "========================================="
+
+    # Stop hotspot connection if active
+    nmcli connection down Hotspot 2>/dev/null || true
 
     # Remove host mode marker if it exists
     if [ -f "$HOST_MODE_FILE" ]; then

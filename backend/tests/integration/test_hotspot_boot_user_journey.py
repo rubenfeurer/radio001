@@ -240,7 +240,7 @@ class TestHotspotBootUserJourney:
         - User accesses http://radio.local
         - System shows connected to "HomeWiFi"
         """
-        # Update mock to simulate client mode after reboot
+        # Update mock to simulate client mode after mode switch
         mock_wifi_manager.get_status.return_value = WiFiStatus(
             mode="client",
             connected=True,
