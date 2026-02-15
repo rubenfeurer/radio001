@@ -353,12 +353,19 @@ Temporary Items
 .development
 .test
 
-# OpenSpec temporary files
+# OpenSpec temporary files (track specs and changes, ignore only temp files)
 .openspec/
 openspec/changes/*/temp/
 openspec/changes/*/.temp/
 *.openspec.tmp
 .opsx-cache/
+
+# OpenSpec content to track (remove from ignore)
+!openspec/
+!openspec/specs/
+!openspec/specs/**/*
+!openspec/changes/
+!openspec/changes/**/*
 
 # Monitoring and metrics
 metrics/
