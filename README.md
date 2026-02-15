@@ -166,6 +166,15 @@ radio001/
 │   ├── hardware/          # GPIO & audio controls
 │   ├── api/routes/        # API endpoints
 │   └── main.py            # Unified WiFi + Radio API
+├── openspec/              # Spec-driven development
+│   ├── specs/             # Project specifications (single source of truth)
+│   │   ├── system-configuration/   # Configuration management
+│   │   ├── radio-integration/      # Radio capabilities
+│   │   ├── hotspot-configuration/  # Hotspot mode specs
+│   │   └── wifi-management/        # WiFi system specs
+│   └── changes/           # Development workflow
+│       ├── active-change/ # Current work
+│       └── archive/       # Completed changes & decisions
 ├── config/                # Configuration files
 │   ├── radio.conf         # Main config (gitignored)
 │   ├── radio.conf.example # Example config
@@ -174,7 +183,8 @@ radio001/
 ├── scripts/               # Helper scripts (see below)
 ├── data/                  # Station storage
 ├── assets/sounds/         # Notification sounds
-└── docs/                  # Documentation
+├── claude.md              # AI development guide
+└── README.md              # Project overview & setup
 ```
 
 ## 🔧 Helper Scripts
@@ -226,13 +236,21 @@ The `scripts/` directory contains helper scripts organized by purpose:
 ./scripts/wifi-init.sh                 # Setup WiFi on Raspberry Pi
 ```
 
-## 📚 Documentation
+## 📚 Documentation & Specifications
 
-| Document | Description |
-|----------|-------------|
-| **[Configuration Guide](./docs/CONFIGURATION.md)** | All settings in `radio.conf`, Docker integration |
-| **[Radio Integration Plan](./docs/RADIO_INTEGRATION_PLAN.md)** | Backend/frontend roadmap and implementation status |
-| **[Hotspot Debug Guide](./docs/HOTSPOT_HANDOFF.md)** | Hotspot mode internals, recovery procedures |
+### OpenSpec Specifications (Single Source of Truth)
+| Specification | Description |
+|---------------|-------------|
+| **[System Configuration](./openspec/specs/system-configuration/spec.md)** | All settings in `radio.conf`, Docker integration |
+| **[Radio Integration](./openspec/specs/radio-integration/spec.md)** | Complete radio system capabilities and requirements |
+| **[Hotspot Configuration](./openspec/specs/hotspot-configuration/spec.md)** | NetworkManager-based hotspot mode specifications |
+| **[WiFi Management](./openspec/specs/wifi-management/spec.md)** | WiFi scanning, connection, and management requirements |
+
+### Development Guides
+| Guide | Description |
+|-------|-------------|
+| **[Claude Development Guide](./claude.md)** | AI-assisted development workflow and commands |
+| **[OpenSpec Changes](./openspec/changes/)** | Active development work and decision history |
 
 ## 🎯 Current Status
 
@@ -309,13 +327,49 @@ The `scripts/` directory contains helper scripts organized by purpose:
    - **Hotspot mode**: http://192.168.4.1 (or custom HOTSPOT_URL)
    - **Hardware Controls**: 3 buttons + rotary encoder
 
+## 🛠️ Development Workflow
+
+### Traditional Development
+```bash
+# Direct code editing
+./scripts/dev-environment.sh start
+cd frontend && npm run dev
+```
+
+### Spec-Driven Development (OpenSpec)
+```bash
+# Plan before coding
+npm run opsx:new "add-station-favorites"    # Create change
+npm run opsx:apply                           # Implement with AI
+npm run opsx:archive                         # Complete & preserve
+
+# Or guided tutorial
+npm run opsx:onboard
+```
+
+### Available OpenSpec Commands
+```bash
+# npm scripts (convenient)
+npm run opsx:new          # Start new change
+npm run opsx:continue     # Continue existing change  
+npm run opsx:apply        # Implement tasks
+npm run opsx:onboard      # Guided tutorial
+
+# Slash commands (in AI chat)
+/opsx:new <feature-name>  # Start new change
+/opsx:ff <feature-name>   # Fast-forward: all artifacts at once
+/opsx:apply               # Implement tasks
+/opsx:explore             # Think through problems
+```
+
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+3. **Optional**: Use OpenSpec for planned changes (`npm run opsx:new amazing-feature`)
+4. Commit changes (`git commit -m 'Add amazing feature'`)
+5. Push to branch (`git push origin feature/amazing-feature`)
+6. Open Pull Request
 
 ## 📄 License
 

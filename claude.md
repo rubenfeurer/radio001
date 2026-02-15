@@ -1,5 +1,39 @@
 # Claude Development Guide for Radio001
 
+## 🔄 OpenSpec Workflow (Recommended)
+
+This project uses OpenSpec for spec-driven development. Plan features before coding:
+
+```bash
+# Start new planned change
+npm run opsx:new "add-station-favorites"    # Create change
+npm run opsx:apply                           # Implement with AI
+npm run opsx:archive                         # Complete & preserve
+
+# Guided tutorial
+npm run opsx:onboard                         # Learn the workflow
+```
+
+### Available OpenSpec Commands
+```bash
+# npm scripts (convenient)
+npm run opsx:new          # Start new change
+npm run opsx:continue     # Continue existing change  
+npm run opsx:apply        # Implement tasks
+npm run opsx:onboard      # Guided tutorial
+
+# Slash commands (in AI chat)
+/opsx:new <feature-name>  # Start new change
+/opsx:ff <feature-name>   # Fast-forward: all artifacts at once
+/opsx:apply               # Implement tasks
+/opsx:explore             # Think through problems
+```
+
+### OpenSpec Structure
+- `openspec/specs/` - Project specifications (single source of truth)
+- `openspec/changes/` - Active development work
+- `openspec/changes/archive/` - Completed changes with full decision history
+
 ## Dev environment tips
 - Use `./scripts/dev-environment.sh start` to start the FastAPI backend in Docker (recommended).
 - Alternatively, use `docker-compose -f compose/docker-compose.yml up radio-backend -d` for manual Docker control.
@@ -19,6 +53,9 @@
 - Station data is stored in `data/` directory.
 - Notification sounds are in `assets/sounds/`.
 - All Docker configurations are in `compose/` directory.
+- **Specifications**: `openspec/specs/` contains all system requirements and capabilities
+- **Active changes**: `openspec/changes/` tracks ongoing development work
+- **Decision history**: `openspec/changes/archive/` preserves completed changes
 
 ## Testing instructions
 - **Backend tests**: See `backend/TESTING.md` for comprehensive testing guide
@@ -88,14 +125,20 @@
 - Radio UI components in `frontend/src/lib/components/`.
 - Radio state management in `frontend/src/lib/stores/radio.ts`.
 - Navigation updates to unify WiFi and Radio interfaces.
-- Refer to `docs/PHASE4_IMPLEMENTATION_PLAN.md` for step-by-step implementation guide.
+- **Specifications**: See `openspec/specs/radio-integration/spec.md` for requirements
+- **Use OpenSpec**: Plan new features with `/opsx:new <feature-name>` before coding
 
 ## Common commands
 ```bash
 # Initial setup (first time only)
 ./scripts/setup-dev.sh
 
-# Start development environment
+# OpenSpec workflow (recommended for new features)
+npm run opsx:new "feature-name"              # Plan change
+npm run opsx:apply                           # Implement
+npm run opsx:archive                         # Complete
+
+# Traditional development environment
 ./scripts/dev-environment.sh start
 cd frontend && npm run dev
 

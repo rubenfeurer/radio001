@@ -19,8 +19,7 @@ RUN apt-get update && apt-get install -y \
     wireless-tools \
     iw \
     network-manager \
-    hostapd \
-    dnsmasq \
+    dnsmasq-base \
     sudo \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
@@ -48,10 +47,8 @@ RUN if [ "$INSTALL_TEST_DEPS" = "true" ]; then \
         pip install --no-cache-dir -r requirements-test.txt; \
     fi
 
-# Copy boot check script and configuration templates (from project root)
+# Copy boot check script (from project root)
 COPY --chmod=755 scripts/boot-wifi-check.sh /usr/local/bin/boot-wifi-check.sh
-COPY config/hostapd/hostapd.conf.template /etc/hostapd/hostapd.conf.template
-COPY config/dnsmasq/dnsmasq.conf.template /etc/dnsmasq.conf.template
 
 # Copy application code
 COPY backend/ .
