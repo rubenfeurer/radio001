@@ -353,6 +353,13 @@ Temporary Items
 .development
 .test
 
+# OpenSpec temporary files
+.openspec/
+openspec/changes/*/temp/
+openspec/changes/*/.temp/
+*.openspec.tmp
+.opsx-cache/
+
 # Monitoring and metrics
 metrics/
 monitoring/
