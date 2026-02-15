@@ -63,6 +63,14 @@
     "deploy:pi": "./scripts/deploy-pi.sh",
     "backup:config": "./scripts/backup-config.sh",
     "restore:config": "./scripts/restore-config.sh",
+    "openspec": "npx openspec",
+    "opsx": "npx openspec",
+    "opsx:new": "npx openspec new",
+    "opsx:continue": "npx openspec continue",
+    "opsx:ff": "npx openspec ff",
+    "opsx:apply": "npx openspec apply",
+    "opsx:archive": "npx openspec archive",
+    "opsx:onboard": "npx openspec onboard",
     "clean": "rm -rf frontend/.svelte-kit frontend/build frontend/node_modules node_modules",
     "clean:docker": "docker system prune -f && docker volume prune -f",
     "docs:dev": "echo \"Documentation development not set up yet\"",
@@ -72,11 +80,11 @@
     "postinstall": "./scripts/setup-hooks.sh || echo 'Hook setup skipped'"
   },
   "devDependencies": {
+    "@fission-ai/openspec": "^1.1.1",
     "@types/node": "^20.10.4",
-    "typescript": "^5.3.3",
-    "husky": "^8.0.3"
+    "husky": "^8.0.3",
+    "typescript": "^5.3.3"
   },
-  "optionalDependencies": {},
   "lint-staged": {
     "frontend/**/*.{js,ts,svelte}": [
       "cd frontend && npm run lint:fix"

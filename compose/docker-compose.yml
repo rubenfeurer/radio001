@@ -99,7 +99,32 @@ services:
     depends_on:
       - radio-backend
 
+  # Development service with OpenSpec
+  radio-dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dev
+    container_name: radio-dev
+    hostname: radio-dev
+    network_mode: host
+    volumes:
+      # Mount entire project for OpenSpec access
+      - ..:/workspace/radio001:cached
+      # Node modules cache
+      - radio_node_cache:/home/dev/.npm
+    environment:
+      - NODE_ENV=development
+      - OPENSPEC_TELEMETRY=0
+    working_dir: /workspace/radio001
+    stdin_open: true
+    tty: true
+    profiles:
+      - dev
+    restart: unless-stopped
+
 # Named volumes for development
 volumes:
   radio_python_cache:
+    driver: local
+  radio_node_cache:
     driver: local
