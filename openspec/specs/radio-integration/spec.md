@@ -15,7 +15,7 @@ The system must provide a 3-slot radio station management system with persistent
 
 - **WHEN** a user selects a radio station to play
 - **THEN** the system stops any currently playing stream
-- **AND** starts the new stream using MPV audio backend
+- **AND** starts the new stream using mpg123 audio backend
 - **AND** provides real-time playback status updates via WebSocket
 
 #### Scenario: Volume Management
@@ -70,28 +70,28 @@ The system must support physical hardware controls for radio operation without r
 
 ### Requirement: Audio Backend Integration
 
-The system must provide reliable audio streaming using MPV with proper error handling and recovery.
+The system must provide reliable audio streaming using mpg123 (subprocess) with amixer for ALSA volume control.
 
 #### Scenario: Stream Initialization
 
 - **WHEN** a radio station is selected for playback
-- **THEN** the MPV process is initialized with the stream URL
-- **AND** stream metadata is captured when available
+- **THEN** a mpg123 subprocess is spawned with the stream URL
 - **AND** connection failures are handled gracefully with user feedback
+- **AND** the process is monitored for unexpected exits
 
 #### Scenario: Audio Output Configuration
 
 - **WHEN** the system starts on different hardware platforms
-- **THEN** it automatically detects and configures appropriate audio output
-- **AND** it handles cases where no audio hardware is available (development)
-- **AND** audio output device can be specified in configuration
+- **THEN** it automatically detects and configures appropriate ALSA audio output
+- **AND** it handles cases where no audio hardware is available (mock mode)
+- **AND** volume is controlled system-wide via amixer (PCM or Master control)
 
 #### Scenario: Stream Recovery
 
-- **WHEN** an active radio stream fails or disconnects
-- **THEN** the system attempts automatic reconnection
+- **WHEN** an active radio stream fails or the mpg123 process exits unexpectedly
+- **THEN** the system updates playback state to reflect the failure
 - **AND** it provides clear status updates about connection state
-- **AND** it falls back to stopped state after reasonable retry attempts
+- **AND** it falls back to stopped state
 
 ### Requirement: Station Persistence
 

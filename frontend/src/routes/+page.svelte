@@ -1,22 +1,50 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { status, getStatus, isLoading, error } from '$lib/stores/wifi';
+	import { isConnected, wsClient } from '$lib/stores/websocket';
+	import {
+		stations, currentSlot, currentStation, volume, isPlaying,
+		toggleStation, setVolume, fetchStations, fetchStatus
+	} from '$lib/stores/radio';
 
 	// SvelteKit page props - explicitly define what we accept
 	export let data: any = undefined;
 
 	let refreshing = false;
+	let localVolume = 50;
+
+	// Keep localVolume in sync with store (for WebSocket updates)
+	$: localVolume = $volume;
 
 	const refresh = async () => {
 		refreshing = true;
 		await getStatus();
+		await fetchStatus();
+		await fetchStations();
 		refreshing = false;
 	};
 
 	onMount(() => {
 		// Initial fetch via REST
 		getStatus();
+
+		// Connect WebSocket and fetch radio state
+		wsClient.connect();
+		fetchStatus();
+		fetchStations();
 	});
+
+	function handleStationClick(slot: number) {
+		const station = $stations[slot];
+		if (!station) return;
+		toggleStation(slot);
+	}
+
+	function handleVolumeInput(e: Event) {
+		const target = e.target as HTMLInputElement;
+		const newVolume = parseInt(target.value, 10);
+		setVolume(newVolume);
+	}
 </script>
 
 <svelte:head>
@@ -116,6 +144,73 @@
 					{/if}
 				</div>
 			{/if}
+		</div>
+
+		<!-- Radio Card -->
+		<div class="card p-6 mb-6">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-lg font-semibold text-gray-900 dark:text-white">Radio</h2>
+				{#if !$isConnected}
+					<span class="text-xs text-yellow-600 dark:text-yellow-400">live updates offline</span>
+				{/if}
+			</div>
+
+			<!-- Now Playing -->
+			<div class="flex items-center justify-between mb-4">
+				<div class="flex items-center space-x-2">
+					<span class="w-2 h-2 rounded-full {$isPlaying ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}"></span>
+					<span class="text-sm text-gray-700 dark:text-gray-300">
+						{#if $isPlaying && $currentStation}
+							{$currentStation.name}
+						{:else}
+							Stopped
+						{/if}
+					</span>
+				</div>
+				{#if $isPlaying && $currentStation?.location}
+					<span class="text-xs text-gray-500 dark:text-gray-400">{$currentStation.location}</span>
+				{/if}
+			</div>
+
+			<!-- Station Slot Buttons -->
+			<div class="grid grid-cols-3 gap-2 mb-4">
+				{#each [1, 2, 3] as slot}
+					{@const station = $stations[slot]}
+					{@const isActive = $isPlaying && $currentSlot === slot}
+					<button
+						on:click={() => handleStationClick(slot)}
+						disabled={!station}
+						class="flex flex-col items-center justify-center p-3 rounded-lg border-2 text-center transition-colors
+							{isActive
+								? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30'
+								: station
+									? 'border-gray-200 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-600'
+									: 'border-gray-100 dark:border-gray-800 opacity-50 cursor-not-allowed'}"
+					>
+						<span class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{slot}</span>
+						<span class="text-xs truncate w-full {isActive ? 'text-primary-700 dark:text-primary-300 font-semibold' : 'text-gray-700 dark:text-gray-300'}">
+							{station?.name || '(empty)'}
+						</span>
+					</button>
+				{/each}
+			</div>
+
+			<!-- Volume Slider -->
+			<div class="flex items-center space-x-3">
+				<svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+						d="M15.536 8.464a5 5 0 010 7.072M12 6l-4 4H4v4h4l4 4V6z" />
+				</svg>
+				<input
+					type="range"
+					min="0"
+					max="100"
+					bind:value={localVolume}
+					on:input={handleVolumeInput}
+					class="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-gray-200 dark:bg-gray-700 accent-primary-600"
+				/>
+				<span class="text-xs text-gray-500 dark:text-gray-400 w-8 text-right">{localVolume}</span>
+			</div>
 		</div>
 
 		<!-- Action Buttons -->

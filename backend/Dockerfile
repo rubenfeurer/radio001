@@ -21,6 +21,8 @@ RUN apt-get update && apt-get install -y \
     network-manager \
     dnsmasq-base \
     sudo \
+    mpg123 \
+    alsa-utils \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -31,7 +33,7 @@ WORKDIR /app
 # Use GID 104 to match host's netdev group (standard on Raspberry Pi OS)
 RUN groupmod -g 104 netdev || groupadd -g 104 netdev && \
     groupadd -r radio && \
-    useradd -r -g radio -G netdev radio
+    useradd -r -g radio -G netdev,audio radio
 
 # Configure passwordless sudo for WiFi management commands (nmcli permissions)
 RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /bin/mkdir, /usr/bin/mkdir, /bin/touch, /usr/bin/touch, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown, /sbin/ip, /usr/sbin/ip, /bin/ip, /usr/bin/nmcli, /usr/bin/killall" > /etc/sudoers.d/radio && \

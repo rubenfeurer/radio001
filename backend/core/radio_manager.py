@@ -15,14 +15,15 @@ The RadioManager follows a singleton pattern and integrates with:
 import asyncio
 import logging
 import time
-from typing import Optional, Callable, Dict, Any
 from pathlib import Path
+from typing import Any, Callable, Dict, Optional
 
-from core.models import RadioStation, SystemStatus, PlaybackState, VolumeUpdate
-from core.station_manager import StationManager
-from core.sound_manager import SoundManager
 from hardware.audio_player import AudioPlayer
 from hardware.gpio_controller import GPIOController
+
+from core.models import PlaybackState, RadioStation, SystemStatus, VolumeUpdate
+from core.sound_manager import SoundManager
+from core.station_manager import StationManager
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +39,12 @@ class RadioManager:
     _instance: Optional["RadioManager"] = None
     _lock = asyncio.Lock()
 
-    def __init__(self,
-                 config: Any,
-                 status_update_callback: Optional[Callable] = None,
-                 mock_mode: bool = True):
+    def __init__(
+        self,
+        config: Any,
+        status_update_callback: Optional[Callable] = None,
+        mock_mode: bool = True,
+    ):
         """
         Initialize the RadioManager.
 
@@ -51,7 +54,9 @@ class RadioManager:
             mock_mode: Whether to run in mock mode (for development)
         """
         if RadioManager._instance is not None:
-            raise RuntimeError("RadioManager is a singleton. Use get_instance() instead.")
+            raise RuntimeError(
+                "RadioManager is a singleton. Use get_instance() instead."
+            )
 
         self._config = config
         self._status_update_callback = status_update_callback
@@ -66,7 +71,7 @@ class RadioManager:
         self._status = SystemStatus(
             volume=config.DEFAULT_VOLUME,
             is_playing=False,
-            playback_state=PlaybackState.STOPPED
+            playback_state=PlaybackState.STOPPED,
         )
 
         # Hardware controller (None in mock mode)
@@ -79,10 +84,12 @@ class RadioManager:
         logger.info(f"RadioManager initialized (mock_mode={mock_mode})")
 
     @classmethod
-    async def create_instance(cls,
-                            config: Any,
-                            status_update_callback: Optional[Callable] = None,
-                            mock_mode: bool = True) -> "RadioManager":
+    async def create_instance(
+        cls,
+        config: Any,
+        status_update_callback: Optional[Callable] = None,
+        mock_mode: bool = True,
+    ) -> "RadioManager":
         """
         Create and initialize the RadioManager singleton instance.
 
@@ -104,7 +111,9 @@ class RadioManager:
     def get_instance(cls) -> "RadioManager":
         """Get the existing RadioManager instance."""
         if cls._instance is None:
-            raise RuntimeError("RadioManager not initialized. Call create_instance() first.")
+            raise RuntimeError(
+                "RadioManager not initialized. Call create_instance() first."
+            )
         return cls._instance
 
     async def _initialize(self):
@@ -114,6 +123,9 @@ class RadioManager:
 
             # Initialize station manager
             await self._station_manager.initialize()
+
+            # Initialize audio player
+            await self._audio_player.initialize()
 
             # Set initial volume
             await self.set_volume(self._config.DEFAULT_VOLUME, broadcast=False)
@@ -140,7 +152,7 @@ class RadioManager:
                 config=self._config,
                 button_callback=self._handle_button_press,
                 volume_callback=self._handle_volume_change,
-                mock_mode=self._mock_mode
+                mock_mode=self._mock_mode,
             )
             await self._gpio_controller.initialize()
             logger.info("Hardware controllers initialized")
@@ -158,7 +170,9 @@ class RadioManager:
         """Get current system status."""
         # Update current station info if playing
         if self._status.current_station:
-            station = await self._station_manager.get_station(self._status.current_station)
+            station = await self._station_manager.get_station(
+                self._status.current_station
+            )
             self._status.current_station_info = station
 
         return self._status
@@ -337,7 +351,7 @@ class RadioManager:
                 message = {
                     "type": update_type,
                     "data": self._status.model_dump(),
-                    "timestamp": time.time()
+                    "timestamp": time.time(),
                 }
                 await self._status_update_callback(message)
 
@@ -374,7 +388,11 @@ class RadioManager:
             logger.warning("simulate_button_press called in non-mock mode")
             return
 
-        pin_map = {1: self._config.BUTTON_PIN_1, 2: self._config.BUTTON_PIN_2, 3: self._config.BUTTON_PIN_3}
+        pin_map = {
+            1: self._config.BUTTON_PIN_1,
+            2: self._config.BUTTON_PIN_2,
+            3: self._config.BUTTON_PIN_3,
+        }
         pin = pin_map.get(button)
 
         if pin:
@@ -398,5 +416,5 @@ class RadioManager:
             "gpio_available": self._gpio_controller is not None,
             "audio_available": self._audio_player is not None,
             "mock_mode": self._mock_mode,
-            "startup_complete": self._startup_complete
+            "startup_complete": self._startup_complete,
         }

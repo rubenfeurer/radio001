@@ -117,14 +117,32 @@ function handleMessage(message: WebSocketMessage) {
 			break;
 
 		case 'volume_update':
+			// Backend sends full SystemStatus: { volume, is_playing, current_station, ... }
 			if (message.data?.volume !== undefined) {
 				updateVolume(message.data.volume);
+			}
+			if (message.data?.is_playing !== undefined) {
+				updatePlaybackStatus({
+					is_playing: message.data.is_playing,
+					current_station: message.data.current_station_info || null,
+					current_slot: message.data.current_station || null,
+					playback_state: message.data.playback_state
+				});
 			}
 			break;
 
 		case 'playback_status':
 			if (message.data) {
-				updatePlaybackStatus(message.data);
+				// Backend sends SystemStatus shape: { is_playing, current_station (slot int), current_station_info, volume, playback_state }
+				updatePlaybackStatus({
+					is_playing: message.data.is_playing,
+					current_station: message.data.current_station_info || null,
+					current_slot: message.data.current_station || null,
+					playback_state: message.data.playback_state
+				});
+				if (message.data.volume !== undefined) {
+					updateVolume(message.data.volume);
+				}
 			}
 			break;
 
@@ -134,7 +152,7 @@ function handleMessage(message: WebSocketMessage) {
 			}
 			break;
 
-		case 'stations_list':
+		case 'stations_update':
 			if (message.data?.stations) {
 				updateStations(message.data.stations);
 			}

@@ -23,6 +23,9 @@ services:
       # Device access for WiFi management
       - /dev:/dev:rw
       - /sys/class/net:/sys/class/net:ro
+
+      # D-Bus socket for NetworkManager (nmcli) access
+      - /run/dbus:/run/dbus:ro
     environment:
       # Production settings
       - NODE_ENV=production
