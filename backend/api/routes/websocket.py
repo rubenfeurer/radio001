@@ -167,20 +167,16 @@ manager = ConnectionManager()
 
 
 # WebSocket status update callback for RadioManager
-async def websocket_status_callback(
-    update_type: str, data: Optional[Dict[str, Any]] = None
-):
+async def websocket_status_callback(message: Dict[str, Any]):
     """
     Callback function for RadioManager to broadcast status updates via WebSocket.
 
     Args:
-        update_type: Type of update (volume_update, station_change, etc.)
-        data: Optional data payload for the update
+        message: Dict with keys 'type', 'data', 'timestamp' as built by RadioManager
     """
     try:
-        message = {"type": update_type, "data": data or {}}
         await manager.broadcast(message)
-        logger.debug(f"Broadcasted WebSocket update: {update_type}")
+        logger.debug(f"Broadcasted WebSocket update: {message.get('type')}")
     except Exception as e:
         logger.error(f"Error in WebSocket status callback: {e}", exc_info=True)
 

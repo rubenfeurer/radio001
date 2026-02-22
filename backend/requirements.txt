@@ -18,7 +18,7 @@ typing-extensions>=4.8.0
 annotated-types>=0.6.0
 
 # Radio system dependencies
-pigpio==1.78                # GPIO control for Raspberry Pi (Pi only)
+lgpio                       # GPIO control via kernel gpiochip (no daemon needed)
 
 # HTTP client for URL validation
 aiohttp==3.9.1

@@ -31,9 +31,11 @@ WORKDIR /app
 
 # Create non-root user and add to netdev group for wpa_cli access
 # Use GID 104 to match host's netdev group (standard on Raspberry Pi OS)
+# Use GID 986 to match host's gpio group (for /dev/gpiochip0 access)
 RUN groupmod -g 104 netdev || groupadd -g 104 netdev && \
+    groupadd -g 986 gpio && \
     groupadd -r radio && \
-    useradd -r -g radio -G netdev,audio radio
+    useradd -r -g radio -G netdev,audio,gpio radio
 
 # Configure passwordless sudo for WiFi management commands (nmcli permissions)
 RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /bin/mkdir, /usr/bin/mkdir, /bin/touch, /usr/bin/touch, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown, /sbin/ip, /usr/sbin/ip, /bin/ip, /usr/bin/nmcli, /usr/bin/killall" > /etc/sudoers.d/radio && \

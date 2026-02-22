@@ -62,11 +62,13 @@ class GPIOController:
 
         # Rotary encoder state
         self._last_rotation_time: float = 0
-        self._rotation_debounce: float = 0.05  # 50ms debounce
+        self._rotation_debounce: float = getattr(config, "ROTARY_DEBOUNCE", 0.05)
 
-        # Hardware objects
-        self._pi = None
+        # Hardware objects (lgpio)
+        self._pi = None       # gpiochip handle
+        self._lgpio = None    # lgpio module reference
         self._callbacks: Dict[int, Any] = {}
+        self._loop: Optional[asyncio.AbstractEventLoop] = None  # captured at init for thread-safe scheduling
 
         # Mock mode simulation
         self._mock_button_states: Dict[int, bool] = {
@@ -81,6 +83,7 @@ class GPIOController:
     async def initialize(self):
         """Initialize GPIO hardware or mock interface."""
         try:
+            self._loop = asyncio.get_event_loop()
             if not self.mock_mode:
                 await self._initialize_hardware()
             else:
@@ -95,46 +98,38 @@ class GPIOController:
             await self._initialize_mock()
 
     async def _initialize_hardware(self):
-        """Initialize actual GPIO hardware (Raspberry Pi)."""
+        """Initialize actual GPIO hardware via lgpio (no daemon required)."""
         try:
-            import pigpio
+            import lgpio
+            self._lgpio = lgpio
 
-            # Connect to pigpio daemon
-            self._pi = pigpio.pi()
-            if not self._pi.connected:
-                raise RuntimeError("Failed to connect to pigpio daemon")
+            handle = lgpio.gpiochip_open(0)
+            if handle < 0:
+                raise RuntimeError(f"Failed to open gpiochip0: error {handle}")
+            self._pi = handle
 
-            logger.info("Connected to pigpio daemon")
+            logger.info("Opened gpiochip0 via lgpio")
 
-            # Setup button pins
-            for pin in [self.config.BUTTON_PIN_1, self.config.BUTTON_PIN_2, self.config.BUTTON_PIN_3, self.config.ROTARY_SW]:
-                self._pi.set_mode(pin, pigpio.INPUT)
-                self._pi.set_pull_up_down(pin, pigpio.PUD_UP)
-
-                # Setup callback for button events
-                callback = self._pi.callback(pin, pigpio.EITHER_EDGE, self._handle_button_event)
-                self._callbacks[pin] = callback
-
-                # Initialize state tracking
-                self._button_states[pin] = True  # Pulled up by default
+            # Setup button pins (alert mode = edge detection with pull-up)
+            for pin in [self.config.BUTTON_PIN_1, self.config.BUTTON_PIN_2,
+                        self.config.BUTTON_PIN_3, self.config.ROTARY_SW]:
+                lgpio.gpio_claim_alert(handle, pin, lgpio.BOTH_EDGES, lgpio.SET_PULL_UP)
+                cb = lgpio.callback(handle, pin, lgpio.BOTH_EDGES, self._handle_button_event)
+                self._callbacks[pin] = cb
+                self._button_states[pin] = True  # pulled-up = not pressed
                 self._last_press_times[pin] = 0
                 self._press_counts[pin] = 0
 
-            # Setup rotary encoder pins
-            self._pi.set_mode(self.config.ROTARY_CLK, pigpio.INPUT)
-            self._pi.set_mode(self.config.ROTARY_DT, pigpio.INPUT)
+            # Setup rotary encoder pins (DT is read-only, CLK triggers alerts)
+            lgpio.gpio_claim_input(handle, self.config.ROTARY_DT, lgpio.SET_PULL_UP)
+            lgpio.gpio_claim_alert(handle, self.config.ROTARY_CLK, lgpio.BOTH_EDGES, lgpio.SET_PULL_UP)
+            clk_cb = lgpio.callback(handle, self.config.ROTARY_CLK, lgpio.BOTH_EDGES, self._handle_rotary_event)
+            self._callbacks[self.config.ROTARY_CLK] = clk_cb
 
-            self._pi.set_pull_up_down(self.config.ROTARY_CLK, pigpio.PUD_UP)
-            self._pi.set_pull_up_down(self.config.ROTARY_DT, pigpio.PUD_UP)
-
-            # Setup rotary encoder callback
-            clk_callback = self._pi.callback(self.config.ROTARY_CLK, pigpio.EITHER_EDGE, self._handle_rotary_event)
-            self._callbacks[self.config.ROTARY_CLK] = clk_callback
-
-            logger.info("GPIO hardware initialized successfully")
+            logger.info("GPIO hardware initialized successfully via lgpio")
 
         except ImportError:
-            raise RuntimeError("pigpio library not available")
+            raise RuntimeError("lgpio library not available")
         except Exception as e:
             logger.error(f"Hardware initialization failed: {e}")
             raise
@@ -150,8 +145,8 @@ class GPIOController:
             self._last_press_times[pin] = 0
             self._press_counts[pin] = 0
 
-    def _handle_button_event(self, gpio_pin: int, level: int, tick: int):
-        """Handle GPIO button events (hardware mode)."""
+    def _handle_button_event(self, chip: int, gpio_pin: int, level: int, timestamp: int):
+        """Handle GPIO button events (hardware mode). Called by lgpio callback."""
         try:
             current_time = time.time()
             is_pressed = (level == 0)  # Active low (pulled up normally)
@@ -159,18 +154,22 @@ class GPIOController:
             if is_pressed and not self._button_states.get(gpio_pin, False):
                 # Button pressed
                 self._button_states[gpio_pin] = True
-                asyncio.create_task(self._handle_button_press(gpio_pin, current_time))
+                self._loop.call_soon_threadsafe(
+                    self._loop.create_task, self._handle_button_press(gpio_pin, current_time)
+                )
 
             elif not is_pressed and self._button_states.get(gpio_pin, False):
                 # Button released
                 self._button_states[gpio_pin] = False
-                asyncio.create_task(self._handle_button_release(gpio_pin, current_time))
+                self._loop.call_soon_threadsafe(
+                    self._loop.create_task, self._handle_button_release(gpio_pin, current_time)
+                )
 
         except Exception as e:
             logger.error(f"Error handling button event on pin {gpio_pin}: {e}", exc_info=True)
 
-    def _handle_rotary_event(self, gpio_pin: int, level: int, tick: int):
-        """Handle rotary encoder events (hardware mode)."""
+    def _handle_rotary_event(self, chip: int, gpio_pin: int, level: int, timestamp: int):
+        """Handle rotary encoder events (hardware mode). Called by lgpio callback."""
         try:
             current_time = time.time()
 
@@ -180,7 +179,7 @@ class GPIOController:
 
             if gpio_pin == self.config.ROTARY_CLK and level == 1:  # Rising edge on clock
                 # Read data pin to determine direction
-                dt_state = self._pi.read(self.config.ROTARY_DT)
+                dt_state = self._lgpio.gpio_read(self._pi, self.config.ROTARY_DT)
 
                 if dt_state == 0:
                     # Clockwise rotation
@@ -190,7 +189,9 @@ class GPIOController:
                     direction = -1 if self.config.ROTARY_CLOCKWISE_INCREASES else 1
 
                 volume_change = direction * self.config.ROTARY_VOLUME_STEP
-                asyncio.create_task(self._handle_volume_change(volume_change))
+                self._loop.call_soon_threadsafe(
+                    self._loop.create_task, self._handle_volume_change(volume_change)
+                )
 
                 self._last_rotation_time = current_time
 
@@ -408,22 +409,13 @@ class GPIOController:
 
     def get_hardware_info(self) -> Dict[str, Any]:
         """Get hardware status information."""
-        info = {
+        return {
             "mock_mode": self.mock_mode,
-            "pigpio_available": False,
-            "connected": False,
+            "driver": "lgpio" if not self.mock_mode else "mock",
+            "connected": not self.mock_mode and self._pi is not None,
             "button_count": 4,
-            "rotary_encoder": True
+            "rotary_encoder": True,
         }
-
-        if not self.mock_mode and self._pi:
-            info.update({
-                "pigpio_available": True,
-                "connected": self._pi.connected,
-                "pigpio_version": getattr(self._pi, 'get_pigpio_version', lambda: (0, 0))()
-            })
-
-        return info
 
     async def test_all_buttons(self):
         """Test all buttons (mock mode only)."""
@@ -455,17 +447,17 @@ class GPIOController:
             self._long_press_tasks.clear()
 
             # Cleanup hardware
-            if not self.mock_mode and self._pi:
-                # Remove callbacks
-                for callback in self._callbacks.values():
-                    if callback:
-                        callback.cancel()
-
+            if not self.mock_mode and self._pi is not None:
+                # Cancel callbacks
+                for cb in self._callbacks.values():
+                    if cb:
+                        cb.cancel()
                 self._callbacks.clear()
 
-                # Disconnect from pigpio
-                self._pi.stop()
+                # Close gpiochip handle
+                self._lgpio.gpiochip_close(self._pi)
                 self._pi = None
+                self._lgpio = None
 
             logger.info("GPIOController cleanup complete")
 

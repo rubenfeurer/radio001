@@ -12,6 +12,34 @@ from typing import Any
 
 import uvicorn
 
+# Load radio.conf before anything reads os.getenv().
+# In Docker the file is at /app/config/radio.conf (mounted volume).
+# In dev it falls back to ../config/radio.conf relative to this file.
+def _load_radio_conf():
+    _candidates = [
+        Path("/app/config/radio.conf"),
+        Path(__file__).parent.parent / "config" / "radio.conf",
+    ]
+    for _p in _candidates:
+        if _p.exists():
+            try:
+                with open(_p) as _f:
+                    for _line in _f:
+                        _line = _line.strip()
+                        if not _line or _line.startswith("#") or "=" not in _line:
+                            continue
+                        _key, _, _val = _line.partition("=")
+                        _key = _key.strip()
+                        _val = _val.split("#")[0].strip()  # strip inline comments
+                        if _key and _key not in os.environ:
+                            os.environ[_key] = _val
+                print(f"Loaded config from {_p}")
+            except Exception as _e:
+                print(f"WARNING: Could not load {_p}: {_e}")
+            return
+
+_load_radio_conf()
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -60,26 +88,38 @@ class Config:
     PORT = int(os.getenv("API_PORT", "8000"))
 
     # Radio Settings
-    DEFAULT_VOLUME: int = 50
-    MIN_VOLUME: int = 30
-    MAX_VOLUME: int = 100
-    NOTIFICATION_VOLUME: int = 40
+    DEFAULT_VOLUME: int = int(os.getenv("DEFAULT_VOLUME", "50"))
+    MIN_VOLUME: int = int(os.getenv("MIN_VOLUME", "30"))
+    MAX_VOLUME: int = int(os.getenv("MAX_VOLUME", "100"))
+    NOTIFICATION_VOLUME: int = int(os.getenv("NOTIFICATION_VOLUME", "40"))
 
     # Hardware Settings (GPIO pins)
-    BUTTON_PIN_1: int = 17  # GPIO17 (Pin 11) - Station 1
-    BUTTON_PIN_2: int = 16  # GPIO16 (Pin 36) - Station 2
-    BUTTON_PIN_3: int = 26  # GPIO26 (Pin 37) - Station 3
+    BUTTON_PIN_1: int = int(os.getenv("BUTTON_PIN_1", "17"))
+    BUTTON_PIN_2: int = int(os.getenv("BUTTON_PIN_2", "16"))
+    BUTTON_PIN_3: int = int(os.getenv("BUTTON_PIN_3", "26"))
 
     # Rotary Encoder Settings
-    ROTARY_CLK: int = 11  # GPIO11 (Pin 23) - Clock
-    ROTARY_DT: int = 9  # GPIO9  (Pin 21) - Data
-    ROTARY_SW: int = 10  # GPIO10 (Pin 19) - Switch/Button
-    ROTARY_CLOCKWISE_INCREASES: bool = True  # Volume direction
-    ROTARY_VOLUME_STEP: int = 5  # Volume change per step
+    ROTARY_CLK: int = int(os.getenv("ROTARY_CLK", "11"))
+    ROTARY_DT: int = int(os.getenv("ROTARY_DT", "9"))
+    ROTARY_SW: int = int(os.getenv("ROTARY_SW", "10"))
+    ROTARY_CLOCKWISE_INCREASES: bool = os.getenv("ROTARY_CLOCKWISE_INCREASES", "true").lower() == "true"
+    ROTARY_VOLUME_STEP: int = int(os.getenv("ROTARY_VOLUME_STEP", "5"))
+    ROTARY_DEBOUNCE: float = float(os.getenv("ROTARY_DEBOUNCE", "0.05"))
 
     # Button Press Settings (in seconds)
-    LONG_PRESS_DURATION: float = 3.0
-    TRIPLE_PRESS_INTERVAL: float = 0.5
+    LONG_PRESS_DURATION: float = float(os.getenv("LONG_PRESS_DURATION", "3.0"))
+    TRIPLE_PRESS_INTERVAL: float = float(os.getenv("TRIPLE_PRESS_INTERVAL", "0.5"))
+
+    # ALSA mixer control
+    ALSA_MIXER_CONTROL: str = os.getenv("ALSA_MIXER_CONTROL", "PCM")
+
+    # Default station slots
+    DEFAULT_STATION_1_NAME: str = os.getenv("DEFAULT_STATION_1_NAME", "SRF 3")
+    DEFAULT_STATION_1_URL: str = os.getenv("DEFAULT_STATION_1_URL", "https://stream.srg-ssr.ch/m/srf3/mp3_128")
+    DEFAULT_STATION_2_NAME: str = os.getenv("DEFAULT_STATION_2_NAME", "Radio Swiss Jazz")
+    DEFAULT_STATION_2_URL: str = os.getenv("DEFAULT_STATION_2_URL", "https://stream.srg-ssr.ch/m/rsj/mp3_128")
+    DEFAULT_STATION_3_NAME: str = os.getenv("DEFAULT_STATION_3_NAME", "Radio Swiss Classic")
+    DEFAULT_STATION_3_URL: str = os.getenv("DEFAULT_STATION_3_URL", "https://stream.srg-ssr.ch/m/rsc_de/mp3_128")
 
     # Audio & Data Paths
     DATA_DIR = Path("data")

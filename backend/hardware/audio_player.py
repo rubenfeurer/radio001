@@ -10,6 +10,7 @@ This module provides the AudioPlayer class which manages:
 
 import asyncio
 import logging
+import os
 from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
@@ -258,30 +259,20 @@ class AudioPlayer:
 
     async def _set_alsa_volume(self, volume: int) -> bool:
         """Set ALSA volume using amixer."""
+        mixer_control = os.getenv("ALSA_MIXER_CONTROL", "PCM")
         try:
             proc = await asyncio.create_subprocess_exec(
                 "amixer",
                 "set",
-                "PCM",
+                mixer_control,
                 f"{volume}%",
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.PIPE,
             )
             _, stderr = await proc.communicate()
             if proc.returncode != 0:
-                # PCM control might not exist, try Master
-                proc = await asyncio.create_subprocess_exec(
-                    "amixer",
-                    "set",
-                    "Master",
-                    f"{volume}%",
-                    stdout=asyncio.subprocess.DEVNULL,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                _, stderr = await proc.communicate()
-                if proc.returncode != 0:
-                    logger.warning(f"amixer failed: {stderr.decode().strip()}")
-                    return False
+                logger.warning(f"amixer failed for control '{mixer_control}': {stderr.decode().strip()}")
+                return False
             return True
         except FileNotFoundError:
             logger.warning("amixer not found")

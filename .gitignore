@@ -293,8 +293,8 @@ wpa_supplicant.conf
 hostapd.conf
 dnsmasq.conf
 
-# User configuration (keep example, ignore actual config)
-config/radio.conf
+# User configuration (tracked in repo - no secrets, hardware settings only)
+# config/radio.conf
 
 # SSL certificates
 *.pem

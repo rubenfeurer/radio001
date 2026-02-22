@@ -33,19 +33,10 @@ services:
 
       # Network configuration
       - HOSTNAME=radio
-      - WIFI_INTERFACE=wlan0
-      - ETH_INTERFACE=eth0
-
-      # Hotspot configuration
-      - HOTSPOT_SSID=Radio-Setup
-      - HOTSPOT_PASSWORD=Configure123!
-      - HOTSPOT_IP=192.168.4.1
-      - HOTSPOT_DHCP_RANGE=192.168.4.2,192.168.4.20
 
       # Boot WiFi check settings
       - WIFI_TIMEOUT=5
       - WIFI_CHECK_ENABLED=true
-      - HOTSPOT_ENABLE_FALLBACK=true
       - HOST_MODE_FILE=/etc/raspiwifi/host_mode
 
       # Security settings
@@ -55,6 +46,8 @@ services:
       # Features
       - ENABLE_CAPTIVE_PORTAL=true
       - ENABLE_AUTO_CONNECT=true
+
+      # Hardware/hotspot settings are loaded from /app/config/radio.conf (mounted volume)
     restart: unless-stopped
     privileged: true
     cap_add:
@@ -62,6 +55,7 @@ services:
       - NET_RAW
     devices:
       - /dev/net/tun
+      - /dev/gpiochip0
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
