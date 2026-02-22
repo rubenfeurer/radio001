@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { status, getStatus, isLoading, error } from '$lib/stores/wifi';
 	import { isConnected, wsClient } from '$lib/stores/websocket';
 	import {
-		stations, currentSlot, currentStation, volume, isPlaying,
+		stations, currentSlot, volume, isPlaying,
 		toggleStation, setVolume, fetchStations, fetchStatus
 	} from '$lib/stores/radio';
 
@@ -34,9 +35,17 @@
 		fetchStations();
 	});
 
-	function handleStationClick(slot: number) {
-		const station = $stations[slot];
-		if (!station) return;
+	function handleSlotClick(slot: number) {
+		toggleStation(slot);
+	}
+
+	function handleSlotSettings(e: MouseEvent, slot: number) {
+		e.stopPropagation();
+		goto(`/stations?slot=${slot}`);
+	}
+
+	function handlePlayPause(e: MouseEvent, slot: number) {
+		e.stopPropagation();
 		toggleStation(slot);
 	}
 
@@ -155,43 +164,60 @@
 				{/if}
 			</div>
 
-			<!-- Now Playing -->
-			<div class="flex items-center justify-between mb-4">
-				<div class="flex items-center space-x-2">
-					<span class="w-2 h-2 rounded-full {$isPlaying ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}"></span>
-					<span class="text-sm text-gray-700 dark:text-gray-300">
-						{#if $isPlaying && $currentStation}
-							{$currentStation.name}
-						{:else}
-							Stopped
-						{/if}
-					</span>
-				</div>
-				{#if $isPlaying && $currentStation?.location}
-					<span class="text-xs text-gray-500 dark:text-gray-400">{$currentStation.location}</span>
-				{/if}
-			</div>
-
-			<!-- Station Slot Buttons -->
-			<div class="grid grid-cols-3 gap-2 mb-4">
+			<!-- Station Slot Cards -->
+			<div class="flex flex-col gap-2 mb-4">
 				{#each [1, 2, 3] as slot}
 					{@const station = $stations[slot]}
 					{@const isActive = $isPlaying && $currentSlot === slot}
-					<button
-						on:click={() => handleStationClick(slot)}
-						disabled={!station}
-						class="flex flex-col items-center justify-center p-3 rounded-lg border-2 text-center transition-colors
+					<div
+						class="flex items-center rounded-lg border-2 transition-colors
 							{isActive
 								? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30'
-								: station
-									? 'border-gray-200 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-600'
-									: 'border-gray-100 dark:border-gray-800 opacity-50 cursor-not-allowed'}"
+								: 'border-gray-200 dark:border-gray-700'}"
 					>
-						<span class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{slot}</span>
-						<span class="text-xs truncate w-full {isActive ? 'text-primary-700 dark:text-primary-300 font-semibold' : 'text-gray-700 dark:text-gray-300'}">
-							{station?.name || '(empty)'}
-						</span>
-					</button>
+						<!-- Card body: tap to play/stop -->
+						<button
+							on:click={() => handleSlotClick(slot)}
+							disabled={!station}
+							class="flex items-center gap-3 flex-1 min-w-0 px-4 py-3 text-left disabled:cursor-default"
+						>
+							<div class="flex items-center gap-1.5 flex-shrink-0">
+								<span class="text-xs font-medium text-gray-400 dark:text-gray-500">{slot}</span>
+								{#if isActive}
+									<span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+								{/if}
+							</div>
+							<span class="text-sm truncate {isActive ? 'text-primary-700 dark:text-primary-300 font-semibold' : station ? 'text-gray-800 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500'}">
+								{station?.name || '(empty)'}
+							</span>
+						</button>
+
+						<!-- Right side buttons -->
+						<div class="flex items-center gap-1 pr-2">
+							{#if isActive}
+								<button
+									on:click={(e) => handlePlayPause(e, slot)}
+									class="w-10 h-10 flex items-center justify-center rounded-full bg-primary-100 dark:bg-primary-800 text-primary-600 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-700 active:scale-95 transition-transform"
+									aria-label="Stop playback"
+								>
+									<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+										<rect x="6" y="6" width="12" height="12" rx="1" />
+									</svg>
+								</button>
+							{/if}
+							<button
+								on:click={(e) => handleSlotSettings(e, slot)}
+								class="w-10 h-10 flex items-center justify-center rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95 transition-transform"
+								aria-label="Change station for slot {slot}"
+							>
+								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+										d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+								</svg>
+							</button>
+						</div>
+					</div>
 				{/each}
 			</div>
 
@@ -209,7 +235,7 @@
 					on:input={handleVolumeInput}
 					class="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-gray-200 dark:bg-gray-700 accent-primary-600"
 				/>
-				<span class="text-xs text-gray-500 dark:text-gray-400 w-8 text-right">{localVolume}</span>
+				<span class="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">{localVolume}%</span>
 			</div>
 		</div>
 

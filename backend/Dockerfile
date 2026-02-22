@@ -55,6 +55,9 @@ COPY --chmod=755 scripts/boot-wifi-check.sh /usr/local/bin/boot-wifi-check.sh
 # Copy application code
 COPY backend/ .
 
+# Copy station library (read-only reference data, not overwritten by config volume)
+COPY config/stations.json /app/assets/stations.json
+
 # Create necessary directories for testing
 RUN mkdir -p /app/data /app/sounds /app/logs /app/htmlcov
 

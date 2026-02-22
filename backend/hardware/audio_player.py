@@ -100,11 +100,19 @@ class AudioPlayer:
 
             logger.info(f"Starting playback: {url}")
 
+            # Resolve redirects using curl with a browser UA.
+            # radio.garden (and similar Cloudflare-protected streams) 302-redirect to a
+            # direct stream URL only for browser requests. mpg123 sends its own UA on
+            # the redirect and gets 403. We resolve once here, then hand mpg123 the
+            # direct URL.
+            resolved_url = await self._resolve_url(url)
+            logger.info(f"Resolved URL: {resolved_url}")
+
             # Spawn mpg123 subprocess
             self._process = await asyncio.create_subprocess_exec(
                 "mpg123",
                 "--quiet",
-                url,
+                resolved_url,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -218,6 +226,35 @@ class AudioPlayer:
         except Exception as e:
             logger.error(f"Error setting volume to {volume}: {e}", exc_info=True)
             return False
+
+    async def _resolve_url(self, url: str) -> str:
+        """Follow redirects with a browser User-Agent and return the final URL.
+
+        Streams behind Cloudflare (e.g. radio.garden) return 302 to a direct
+        MP3 stream URL for browser requests, but 403 for mpg123's UA. We resolve
+        the redirect here so mpg123 receives the direct stream URL.
+        Falls back to the original URL if curl is unavailable or resolution fails.
+        """
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "curl",
+                "--silent",
+                "--max-time", "5",
+                "--user-agent", "Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "--location",
+                "--output", "/dev/null",
+                "--write-out", "%{url_effective}",
+                url,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=8)
+            resolved = stdout.decode().strip()
+            if resolved and resolved.startswith("http"):
+                return resolved
+        except Exception as e:
+            logger.warning(f"URL resolution failed for {url}: {e}")
+        return url
 
     async def _set_alsa_volume(self, volume: int) -> bool:
         """Set ALSA volume using amixer."""
