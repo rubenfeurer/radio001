@@ -373,13 +373,26 @@ class RadioManager:
     async def _handle_long_press_event(self, gpio_pin: int):
         """Handle rotary encoder long-press: toggle WiFi client ↔ hotspot mode."""
         try:
+            # Guard: only ROTARY_SW should trigger WiFi toggling
+            if gpio_pin != self._config.ROTARY_SW:
+                logger.warning(f"Long press received on unexpected pin {gpio_pin}, ignoring")
+                return
+
             if not self._wifi_manager:
                 logger.warning("Long press received but no wifi_manager configured")
                 return
 
             logger.info("Long press: toggling WiFi mode")
+
+            # Stop playback first so the audio device is free for the confirmation sound
+            if self._status.is_playing:
+                await self.stop_playback()
+
             wifi_status = await self._wifi_manager.get_status()
             is_client = getattr(wifi_status, "mode", None) == "client" and getattr(wifi_status, "connected", False)
+
+            # Play confirmation sound before switching so user hears it regardless of mode change
+            await self._sound_manager.play_success_sound()
 
             if is_client:
                 self._wifi_manager.switch_to_host_mode()
@@ -387,8 +400,6 @@ class RadioManager:
             else:
                 self._wifi_manager.switch_to_client_mode()
                 logger.info("Switched to client mode")
-
-            await self._sound_manager.play_success_sound()
 
         except Exception as e:
             logger.error(f"Error handling long press WiFi toggle: {e}", exc_info=True)
@@ -466,13 +477,7 @@ class RadioManager:
         """Broadcast status update via WebSocket callback."""
         if self._status_update_callback:
             try:
-                message = {
-                    "type": update_type,
-                    "data": self._status.model_dump(),
-                    "timestamp": time.time(),
-                }
-                await self._status_update_callback(message)
-
+                await self._status_update_callback(update_type, self._status.model_dump())
             except Exception as e:
                 logger.error(f"Error broadcasting status update: {e}", exc_info=True)
 

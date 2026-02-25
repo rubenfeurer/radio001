@@ -304,6 +304,8 @@ class GPIOController:
             logger.info(f"Long press detected on pin {gpio_pin}")
             if self.long_press_callback:
                 await self.long_press_callback(gpio_pin)
+            else:
+                logger.warning(f"Long press on pin {gpio_pin} but no long_press_callback registered")
 
         except Exception as e:
             logger.error(f"Error handling long press on pin {gpio_pin}: {e}", exc_info=True)
