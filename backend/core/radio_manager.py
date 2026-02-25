@@ -80,6 +80,7 @@ class RadioManager:
         # Internal state
         self._playback_lock = asyncio.Lock()
         self._startup_complete = False
+        self._last_button_times: Dict[int, float] = {}  # debounce per slot
 
         logger.info(f"RadioManager initialized (mock_mode={mock_mode})")
 
@@ -320,6 +321,12 @@ class RadioManager:
 
             slot = pin_to_slot.get(button_pin)
             if slot:
+                # Debounce: ignore repeated presses within 500ms
+                now = time.time()
+                if now - self._last_button_times.get(slot, 0) < 0.5:
+                    return
+                self._last_button_times[slot] = now
+
                 logger.info(f"Button press detected for station {slot}")
                 await self.toggle_station(slot)
             else:

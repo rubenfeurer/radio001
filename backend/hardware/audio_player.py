@@ -95,10 +95,6 @@ class AudioPlayer:
                 logger.error("AudioPlayer not initialized")
                 return False
 
-            # Stop current playback if any
-            if self._is_playing:
-                await self.stop()
-
             logger.info(f"Starting playback: {url}")
 
             # Resolve redirects using curl with a browser UA.

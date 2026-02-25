@@ -114,6 +114,7 @@ class GPIOController:
             for pin in [self.config.BUTTON_PIN_1, self.config.BUTTON_PIN_2,
                         self.config.BUTTON_PIN_3, self.config.ROTARY_SW]:
                 lgpio.gpio_claim_alert(handle, pin, lgpio.BOTH_EDGES, lgpio.SET_PULL_UP)
+                lgpio.gpio_set_debounce_micros(handle, pin, 5000)  # 5ms hardware debounce
                 cb = lgpio.callback(handle, pin, lgpio.BOTH_EDGES, self._handle_button_event)
                 self._callbacks[pin] = cb
                 self._button_states[pin] = True  # pulled-up = not pressed
@@ -201,7 +202,15 @@ class GPIOController:
     async def _handle_button_press(self, gpio_pin: int, press_time: float):
         """Handle button press start."""
         try:
+            # Debounce: ignore presses within 50ms of last release
+            last = self._last_press_times.get(gpio_pin, 0)
+            if press_time - last < 0.05:
+                return
+
             logger.debug(f"Button press detected on pin {gpio_pin}")
+
+            # Record press time so release can compute duration
+            self._last_press_times[gpio_pin] = press_time
 
             # Start long press detection for rotary switch
             if gpio_pin == self.config.ROTARY_SW:
@@ -215,7 +224,11 @@ class GPIOController:
         """Handle button release."""
         try:
             press_time = self._last_press_times.get(gpio_pin, 0)
-            press_duration = release_time - press_time if press_time > 0 else 0
+            if press_time == 0:
+                # No recorded press (debounced away) — ignore release
+                return
+
+            press_duration = release_time - press_time
 
             # Cancel long press monitoring
             if gpio_pin in self._long_press_tasks:
@@ -230,6 +243,7 @@ class GPIOController:
             if press_duration < self.config.LONG_PRESS_DURATION:
                 await self._handle_short_press(gpio_pin)
 
+            # Record release time so next press debounce works correctly
             self._last_press_times[gpio_pin] = release_time
 
         except Exception as e:
