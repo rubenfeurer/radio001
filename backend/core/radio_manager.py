@@ -44,6 +44,7 @@ class RadioManager:
         config: Any,
         status_update_callback: Optional[Callable] = None,
         mock_mode: bool = True,
+        wifi_manager=None,
     ):
         """
         Initialize the RadioManager.
@@ -52,6 +53,7 @@ class RadioManager:
             config: Application configuration object
             status_update_callback: Optional callback for status updates (WebSocket broadcasting)
             mock_mode: Whether to run in mock mode (for development)
+            wifi_manager: Optional WiFiManager instance for hotspot mode toggling
         """
         if RadioManager._instance is not None:
             raise RuntimeError(
@@ -61,6 +63,7 @@ class RadioManager:
         self._config = config
         self._status_update_callback = status_update_callback
         self._mock_mode = mock_mode
+        self._wifi_manager = wifi_manager
 
         # Initialize core components
         self._station_manager = StationManager(config.STATIONS_FILE)
@@ -81,6 +84,7 @@ class RadioManager:
         self._playback_lock = asyncio.Lock()
         self._startup_complete = False
         self._last_button_times: Dict[int, float] = {}  # debounce per slot
+        self._state_file: Path = Path(getattr(config, "RADIO_STATE_FILE", "data/radio_state.json"))
 
         logger.info(f"RadioManager initialized (mock_mode={mock_mode})")
 
@@ -90,6 +94,7 @@ class RadioManager:
         config: Any,
         status_update_callback: Optional[Callable] = None,
         mock_mode: bool = True,
+        wifi_manager=None,
     ) -> "RadioManager":
         """
         Create and initialize the RadioManager singleton instance.
@@ -98,13 +103,14 @@ class RadioManager:
             config: Application configuration
             status_update_callback: Optional WebSocket callback
             mock_mode: Whether to use mock hardware
+            wifi_manager: Optional WiFiManager for hotspot mode toggling
 
         Returns:
             RadioManager instance
         """
         async with cls._lock:
             if cls._instance is None:
-                cls._instance = cls(config, status_update_callback, mock_mode)
+                cls._instance = cls(config, status_update_callback, mock_mode, wifi_manager)
                 await cls._instance._initialize()
             return cls._instance
 
@@ -128,6 +134,9 @@ class RadioManager:
             # Initialize audio player
             await self._audio_player.initialize()
 
+            # Initialize sound manager (generates tone files if missing)
+            await self._sound_manager.initialize()
+
             # Set initial volume
             await self.set_volume(self._config.DEFAULT_VOLUME, broadcast=False)
 
@@ -135,8 +144,28 @@ class RadioManager:
             if not self._mock_mode:
                 await self._initialize_hardware()
 
-            # Play startup sound
-            await self._sound_manager.play_startup_sound()
+            # Play WiFi-aware boot sound
+            try:
+                wifi_ok = False
+                if self._wifi_manager:
+                    wifi_status = await self._wifi_manager.get_status()
+                    wifi_ok = (
+                        getattr(wifi_status, "mode", None) == "client"
+                        and getattr(wifi_status, "connected", False)
+                    )
+                if wifi_ok:
+                    await self._sound_manager.play_startup_sound()
+                else:
+                    await self._sound_manager.play_error_sound()
+            except Exception as e:
+                logger.warning(f"Boot sound WiFi check failed, playing startup: {e}")
+                await self._sound_manager.play_startup_sound()
+
+            # Pre-cache station URLs in background so first button press is instant
+            asyncio.create_task(self._precache_station_urls())
+
+            # Restore last session (auto-play)
+            asyncio.create_task(self._restore_last_session())
 
             self._startup_complete = True
             logger.info("RadioManager initialization complete")
@@ -153,6 +182,7 @@ class RadioManager:
                 config=self._config,
                 button_callback=self._handle_button_press,
                 volume_callback=self._handle_volume_change,
+                long_press_callback=self._handle_long_press_event,
                 mock_mode=self._mock_mode,
             )
             await self._gpio_controller.initialize()
@@ -201,6 +231,10 @@ class RadioManager:
 
             logger.info(f"Volume set to {volume}%")
 
+            # Persist state when a station is active
+            if self._status.is_playing and self._status.current_station:
+                self._save_playback_state(self._status.current_station, volume)
+
             if broadcast:
                 await self._broadcast_status_update("volume_update")
 
@@ -244,6 +278,7 @@ class RadioManager:
                     self._status.is_playing = True
                     self._status.playback_state = PlaybackState.PLAYING
                     logger.info(f"Started playing {station.name} from slot {slot}")
+                    self._save_playback_state(slot, self._status.volume)
                 else:
                     self._status.is_playing = False
                     self._status.playback_state = PlaybackState.ERROR
@@ -335,6 +370,30 @@ class RadioManager:
         except Exception as e:
             logger.error(f"Error handling button press: {e}", exc_info=True)
 
+    async def _handle_long_press_event(self, gpio_pin: int):
+        """Handle rotary encoder long-press: toggle WiFi client ↔ hotspot mode."""
+        try:
+            if not self._wifi_manager:
+                logger.warning("Long press received but no wifi_manager configured")
+                return
+
+            logger.info("Long press: toggling WiFi mode")
+            wifi_status = await self._wifi_manager.get_status()
+            is_client = getattr(wifi_status, "mode", None) == "client" and getattr(wifi_status, "connected", False)
+
+            if is_client:
+                self._wifi_manager.switch_to_host_mode()
+                logger.info("Switched to hotspot mode")
+            else:
+                self._wifi_manager.switch_to_client_mode()
+                logger.info("Switched to client mode")
+
+            await self._sound_manager.play_success_sound()
+
+        except Exception as e:
+            logger.error(f"Error handling long press WiFi toggle: {e}", exc_info=True)
+            await self._sound_manager.play_error_sound()
+
     async def _handle_volume_change(self, change: int):
         """Handle rotary encoder volume changes."""
         try:
@@ -350,6 +409,58 @@ class RadioManager:
     # =============================================================================
     # Internal Methods
     # =============================================================================
+
+    async def _restore_last_session(self):
+        """Restore last-played station and volume from persisted state."""
+        try:
+            state = self._load_playback_state()
+            if state:
+                logger.info(f"Restoring last session: slot={state['slot']}, volume={state['volume']}")
+                await self.set_volume(state["volume"], broadcast=False)
+                await self.play_station(state["slot"])
+            else:
+                logger.info("No saved session state — starting stopped")
+        except Exception as e:
+            logger.warning(f"Failed to restore last session: {e}")
+
+    def _save_playback_state(self, slot: int, volume: int):
+        """Atomically persist the current slot and volume to disk."""
+        try:
+            import json
+            tmp = self._state_file.with_suffix(".tmp")
+            self._state_file.parent.mkdir(parents=True, exist_ok=True)
+            tmp.write_text(json.dumps({"slot": slot, "volume": volume}))
+            tmp.rename(self._state_file)
+            logger.debug(f"Saved playback state: slot={slot}, volume={volume}")
+        except Exception as e:
+            logger.warning(f"Failed to save playback state: {e}")
+
+    def _load_playback_state(self) -> Optional[Dict[str, int]]:
+        """Load persisted slot/volume from disk. Returns dict or None."""
+        try:
+            import json
+            if not self._state_file.exists():
+                return None
+            data = json.loads(self._state_file.read_text())
+            slot = int(data["slot"])
+            volume = int(data["volume"])
+            if 1 <= slot <= 3 and 0 <= volume <= 100:
+                return {"slot": slot, "volume": volume}
+        except Exception as e:
+            logger.warning(f"Failed to load playback state: {e}")
+        return None
+
+    async def _precache_station_urls(self):
+        """Resolve and cache redirect URLs for all configured stations in the background."""
+        try:
+            stations_dict = await self._station_manager.get_all_stations()
+            urls = [s.url for s in stations_dict.values() if s and s.url]
+            if urls:
+                logger.info(f"Pre-caching {len(urls)} station URL(s)...")
+                await self._audio_player.precache_urls(urls)
+                logger.info("Station URL pre-caching complete")
+        except Exception as e:
+            logger.warning(f"Station URL pre-caching failed: {e}")
 
     async def _broadcast_status_update(self, update_type: str = "system_status"):
         """Broadcast status update via WebSocket callback."""

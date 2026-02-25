@@ -107,7 +107,7 @@ class Config:
     ROTARY_DEBOUNCE: float = float(os.getenv("ROTARY_DEBOUNCE", "0.05"))
 
     # Button Press Settings (in seconds)
-    LONG_PRESS_DURATION: float = float(os.getenv("LONG_PRESS_DURATION", "3.0"))
+    LONG_PRESS_DURATION: float = float(os.getenv("LONG_PRESS_DURATION", "2.0"))
     TRIPLE_PRESS_INTERVAL: float = float(os.getenv("TRIPLE_PRESS_INTERVAL", "0.5"))
 
     # ALSA mixer control
@@ -126,6 +126,7 @@ class Config:
     SOUNDS_DIR = Path("assets/sounds")
     STATIONS_FILE = DATA_DIR / "stations.json"
     PREFERENCES_FILE = DATA_DIR / "preferences.json"
+    RADIO_STATE_FILE = Path(os.getenv("RADIO_STATE_FILE", "data/radio_state.json"))
 
     # Ensure paths exist
     @classmethod
@@ -194,7 +195,7 @@ async def lifespan(app: FastAPI):
     try:
         print("Initializing radio system...")
         radio_manager = await setup_radio_manager_with_websocket(
-            config=Config, mock_mode=Config.IS_DEVELOPMENT
+            config=Config, mock_mode=Config.IS_DEVELOPMENT, wifi_manager=wifi_manager
         )
         print("Radio system initialized successfully")
     except Exception as e:

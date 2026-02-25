@@ -42,6 +42,8 @@ class AudioPlayer:
         self._volume: int = 50
         self._is_playing: bool = False
         self._is_initialized: bool = False
+        self._url_cache: dict = {}
+        self._cache_lock = asyncio.Lock()
 
         logger.info(f"AudioPlayer initialized (mock_mode={mock_mode})")
 
@@ -73,6 +75,20 @@ class AudioPlayer:
             self.mock_mode = True
             self._is_initialized = True
 
+    async def precache_urls(self, urls: list) -> None:
+        """Resolve and cache redirect URLs so play() starts immediately."""
+        if self.mock_mode:
+            return
+        for url in urls:
+            if url and url not in self._url_cache:
+                try:
+                    resolved = await self._resolve_url(url)
+                    async with self._cache_lock:
+                        self._url_cache[url] = resolved
+                    logger.info(f"Pre-cached: {url} -> {resolved}")
+                except Exception as e:
+                    logger.warning(f"Pre-cache failed for {url}: {e}")
+
     async def play(self, url: str) -> bool:
         """
         Start playing an audio stream.
@@ -97,12 +113,15 @@ class AudioPlayer:
 
             logger.info(f"Starting playback: {url}")
 
-            # Resolve redirects using curl with a browser UA.
-            # radio.garden (and similar Cloudflare-protected streams) 302-redirect to a
-            # direct stream URL only for browser requests. mpg123 sends its own UA on
-            # the redirect and gets 403. We resolve once here, then hand mpg123 the
-            # direct URL.
-            resolved_url = await self._resolve_url(url)
+            # Check cache first; resolve and cache on miss.
+            async with self._cache_lock:
+                resolved_url = self._url_cache.get(url)
+            if resolved_url:
+                logger.debug(f"Cache hit: {url}")
+            else:
+                resolved_url = await self._resolve_url(url)
+                async with self._cache_lock:
+                    self._url_cache[url] = resolved_url
             logger.info(f"Resolved URL: {resolved_url}")
 
             # Spawn mpg123 subprocess

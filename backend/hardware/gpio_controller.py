@@ -39,6 +39,7 @@ class GPIOController:
                  config: Any,
                  button_callback: Optional[Callable[[int], None]] = None,
                  volume_callback: Optional[Callable[[int], None]] = None,
+                 long_press_callback: Optional[Callable[[int], None]] = None,
                  mock_mode: bool = True):
         """
         Initialize the GPIO controller.
@@ -47,11 +48,13 @@ class GPIOController:
             config: Application configuration with GPIO pin definitions
             button_callback: Callback for button press events (receives button pin)
             volume_callback: Callback for volume changes (receives change amount)
+            long_press_callback: Callback for long press events (receives gpio pin)
             mock_mode: Whether to run in mock mode (no actual GPIO)
         """
         self.config = config
         self.button_callback = button_callback
         self.volume_callback = volume_callback
+        self.long_press_callback = long_press_callback
         self.mock_mode = mock_mode
 
         # GPIO state tracking
@@ -117,7 +120,7 @@ class GPIOController:
                 lgpio.gpio_set_debounce_micros(handle, pin, 5000)  # 5ms hardware debounce
                 cb = lgpio.callback(handle, pin, lgpio.BOTH_EDGES, self._handle_button_event)
                 self._callbacks[pin] = cb
-                self._button_states[pin] = True  # pulled-up = not pressed
+                self._button_states[pin] = False  # pulled-up = not pressed
                 self._last_press_times[pin] = 0
                 self._press_counts[pin] = 0
 
@@ -156,14 +159,16 @@ class GPIOController:
                 # Button pressed
                 self._button_states[gpio_pin] = True
                 self._loop.call_soon_threadsafe(
-                    self._loop.create_task, self._handle_button_press(gpio_pin, current_time)
+                    asyncio.ensure_future,
+                    self._handle_button_press(gpio_pin, current_time),
                 )
 
             elif not is_pressed and self._button_states.get(gpio_pin, False):
                 # Button released
                 self._button_states[gpio_pin] = False
                 self._loop.call_soon_threadsafe(
-                    self._loop.create_task, self._handle_button_release(gpio_pin, current_time)
+                    asyncio.ensure_future,
+                    self._handle_button_release(gpio_pin, current_time),
                 )
 
         except Exception as e:
@@ -191,7 +196,8 @@ class GPIOController:
 
                 volume_change = direction * self.config.ROTARY_VOLUME_STEP
                 self._loop.call_soon_threadsafe(
-                    self._loop.create_task, self._handle_volume_change(volume_change)
+                    asyncio.ensure_future,
+                    self._handle_volume_change(volume_change),
                 )
 
                 self._last_rotation_time = current_time
@@ -295,10 +301,9 @@ class GPIOController:
     async def _handle_long_press(self, gpio_pin: int):
         """Handle long button press."""
         try:
-            # Long press events can trigger special functions
-            if gpio_pin == self.config.ROTARY_SW:
-                logger.info("Long press on rotary switch - triggering system function")
-                # Could trigger mode switch, settings, etc.
+            logger.info(f"Long press detected on pin {gpio_pin}")
+            if self.long_press_callback:
+                await self.long_press_callback(gpio_pin)
 
         except Exception as e:
             logger.error(f"Error handling long press on pin {gpio_pin}: {e}", exc_info=True)

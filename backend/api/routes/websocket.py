@@ -344,13 +344,14 @@ async def get_websocket_stats():
 
 
 # Helper function to set up RadioManager with WebSocket callback
-async def setup_radio_manager_with_websocket(config, mock_mode: bool = True):
+async def setup_radio_manager_with_websocket(config, mock_mode: bool = True, wifi_manager=None):
     """
     Create RadioManager instance with WebSocket status callback.
 
     Args:
         config: Application configuration
         mock_mode: Whether to run in mock mode
+        wifi_manager: Optional WiFiManager for hotspot mode toggling
 
     Returns:
         RadioManager: Configured radio manager instance
@@ -359,6 +360,7 @@ async def setup_radio_manager_with_websocket(config, mock_mode: bool = True):
         config=config,
         status_update_callback=websocket_status_callback,
         mock_mode=mock_mode,
+        wifi_manager=wifi_manager,
     )
 
 

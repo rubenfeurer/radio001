@@ -10,6 +10,9 @@ This module provides the SoundManager class which handles:
 
 import asyncio
 import logging
+import math
+import struct
+import wave
 from pathlib import Path
 from typing import Optional, Dict
 from enum import Enum
@@ -47,7 +50,6 @@ class SoundManager:
         """
         self.sounds_dir = Path(sounds_dir)
         self.mock_mode = mock_mode
-        self._sound_player = None
 
         # Sound file mappings
         self.sound_files = {
@@ -79,16 +81,21 @@ class SoundManager:
         """Initialize the sound manager and verify sound files."""
         try:
             if not self.mock_mode:
-                # Try to import MPV for actual sound playback
-                try:
-                    import mpv
-                    self._sound_player = mpv.MPV(video=False, volume=40)
-                    logger.info("MPV sound player initialized")
-                except ImportError:
-                    logger.warning("MPV not available, falling back to mock mode")
+                # Verify mpg123 is available for WAV playback
+                import asyncio as _asyncio
+                proc = await _asyncio.create_subprocess_exec(
+                    "which", "mpg123",
+                    stdout=_asyncio.subprocess.DEVNULL,
+                    stderr=_asyncio.subprocess.DEVNULL,
+                )
+                await proc.wait()
+                if proc.returncode != 0:
+                    logger.warning("mpg123 not found, sound notifications disabled")
                     self.mock_mode = True
+                else:
+                    logger.info("mpg123 available for sound playback")
 
-            # Verify sound files exist
+            # Verify sound files exist (and generate tones if needed)
             await self._verify_sound_files()
 
             logger.info("SoundManager initialization complete")
@@ -99,8 +106,11 @@ class SoundManager:
             self.mock_mode = True
 
     async def _verify_sound_files(self):
-        """Verify that required sound files exist."""
+        """Verify that required sound files exist and are real audio (not placeholders)."""
         self.sounds_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate tones for any missing or placeholder generic sound files
+        await self._ensure_tone_files()
 
         missing_files = []
         available_files = []
@@ -120,42 +130,63 @@ class SoundManager:
             logger.info(f"Available sound files: {available_files}")
 
         if missing_files:
-            logger.warning(f"Missing sound files: {missing_files}")
-            await self._create_default_sound_files()
+            logger.warning(f"Missing sound files (no fallback): {missing_files}")
 
-    async def _create_default_sound_files(self):
-        """Create placeholder sound files for development."""
-        try:
-            # Create minimal WAV file headers for silence (placeholder files)
-            # This is just for development - real sound files should be provided
+    def _generate_tone_wav(self, path: Path, notes: list[tuple[float, float]]):
+        """
+        Write a WAV file containing a sequence of pure tones using stdlib only.
 
-            # Basic WAV header for 1 second of silence at 44.1kHz, 16-bit, mono
-            wav_header = bytes([
-                0x52, 0x49, 0x46, 0x46,  # "RIFF"
-                0x2C, 0x00, 0x00, 0x00,  # File size - 8
-                0x57, 0x41, 0x56, 0x45,  # "WAVE"
-                0x66, 0x6D, 0x74, 0x20,  # "fmt "
-                0x10, 0x00, 0x00, 0x00,  # PCM header size
-                0x01, 0x00,              # PCM format
-                0x01, 0x00,              # Mono
-                0x44, 0xAC, 0x00, 0x00,  # Sample rate (44100)
-                0x88, 0x58, 0x01, 0x00,  # Byte rate
-                0x02, 0x00,              # Block align
-                0x10, 0x00,              # Bits per sample
-                0x64, 0x61, 0x74, 0x61,  # "data"
-                0x00, 0x00, 0x00, 0x00   # Data size (0 = silence)
-            ])
+        Args:
+            path: Destination file path.
+            notes: List of (frequency_hz, duration_s) pairs played in sequence.
+        """
+        sample_rate = 44100
+        amplitude = 28000  # ~85% of int16 max — audible but not distorted
 
-            # Create basic sound files
-            for sound_file in ["success.wav", "error.wav"]:
-                sound_path = self.sounds_dir / sound_file
-                if not sound_path.exists():
-                    with open(sound_path, 'wb') as f:
-                        f.write(wav_header)
-                    logger.info(f"Created placeholder sound file: {sound_file}")
+        frames = []
+        for freq, duration in notes:
+            n_samples = int(sample_rate * duration)
+            for i in range(n_samples):
+                # Sine wave with a short linear fade-in/out to avoid clicks
+                fade_len = min(int(sample_rate * 0.01), n_samples // 4)
+                t = i / sample_rate
+                sample = amplitude * math.sin(2 * math.pi * freq * t)
+                if i < fade_len:
+                    sample *= i / fade_len
+                elif i > n_samples - fade_len:
+                    sample *= (n_samples - i) / fade_len
+                frames.append(struct.pack('<h', int(sample)))
 
-        except Exception as e:
-            logger.error(f"Error creating default sound files: {e}")
+        with wave.open(str(path), 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(sample_rate)
+            wf.writeframes(b''.join(frames))
+
+    def _is_placeholder(self, path: Path) -> bool:
+        """Return True if file is missing or is a placeholder (size < 200 bytes)."""
+        if not path.exists():
+            return True
+        return path.stat().st_size < 200
+
+    async def _ensure_tone_files(self):
+        """Generate audible WAV tones for any missing or placeholder generic sound files."""
+        tone_specs = {
+            # startup.wav and success.wav: two ascending tones (C5 523 Hz → E5 659 Hz)
+            "startup.wav": [(523.25, 0.25), (659.25, 0.25)],
+            "success.wav": [(523.25, 0.25), (659.25, 0.25)],
+            # error.wav: two descending tones (A4 440 Hz → E4 330 Hz)
+            "error.wav": [(440.0, 0.25), (329.63, 0.25)],
+        }
+
+        for filename, notes in tone_specs.items():
+            path = self.sounds_dir / filename
+            if self._is_placeholder(path):
+                try:
+                    self._generate_tone_wav(path, notes)
+                    logger.info(f"Generated audible tone file: {filename}")
+                except Exception as e:
+                    logger.warning(f"Could not generate {filename}: {e}")
 
     async def play_sound(self, event: SystemEvent, volume: int = 40):
         """
@@ -177,19 +208,20 @@ class SoundManager:
                 return
 
             sound_path = self.sounds_dir / sound_file
+            if not sound_path.exists():
+                logger.warning(f"Sound file missing: {sound_path}")
+                return
 
-            if self._sound_player and sound_path.exists():
-                # Set volume and play
-                self._sound_player.volume = max(0, min(100, volume))
-                self._sound_player.play(str(sound_path))
+            logger.debug(f"Playing sound: {sound_file} for event: {event}")
 
-                logger.debug(f"Playing sound: {sound_file} for event: {event}")
-
-                # Wait for sound to start playing
-                await asyncio.sleep(0.1)
-
-            else:
-                logger.warning(f"Sound player not available or file missing: {sound_path}")
+            # Play WAV via mpg123 (non-blocking — fire and forget)
+            proc = await asyncio.create_subprocess_exec(
+                "mpg123", "--quiet", str(sound_path),
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            # Wait briefly so the sound has started before returning
+            await asyncio.sleep(0.1)
 
         except Exception as e:
             logger.error(f"Error playing sound for event {event}: {e}", exc_info=True)
@@ -263,13 +295,13 @@ class SoundManager:
         return available
 
     def get_missing_sounds(self) -> list[str]:
-        """Get list of missing sound files."""
+        """Get list of missing or placeholder sound files (no usable fallback)."""
         missing = []
         for event, filename in self.sound_files.items():
             sound_path = self.sounds_dir / filename
             fallback_path = self.sounds_dir / self.fallback_sounds[event]
 
-            if not sound_path.exists() and not fallback_path.exists():
+            if self._is_placeholder(sound_path) and self._is_placeholder(fallback_path):
                 missing.append(filename)
 
         return missing
@@ -277,10 +309,6 @@ class SoundManager:
     async def cleanup(self):
         """Cleanup sound manager resources."""
         try:
-            if self._sound_player and not self.mock_mode:
-                self._sound_player.terminate()
-                self._sound_player = None
-
             logger.info("SoundManager cleanup complete")
 
         except Exception as e:
