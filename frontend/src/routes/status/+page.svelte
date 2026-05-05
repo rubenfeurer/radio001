@@ -1,22 +1,18 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { status, getStatus, isLoading, error } from '$lib/stores/wifi';
-	import { wsClient, isConnected } from '$lib/stores/websocket';
-
-	// SvelteKit page props - explicitly define what we accept
-	export let data: any = undefined;
+	import { wifiState, getStatus } from '$lib/stores/wifi.svelte';
+	import { wsClient } from '$lib/stores/websocket.svelte';
+	import { Button } from '$lib/components/ui/button';
+	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+	import { ArrowLeft } from 'lucide-svelte';
 
 	onMount(() => {
-		// Initial fetch via REST as fallback
 		getStatus();
-
-		// Connect WebSocket for real-time updates
 		wsClient.connect();
 	});
 
 	onDestroy(() => {
-		// Disconnect WebSocket when leaving page
 		wsClient.disconnect();
 	});
 
@@ -24,7 +20,6 @@
 		const days = Math.floor(seconds / 86400);
 		const hours = Math.floor((seconds % 86400) / 3600);
 		const minutes = Math.floor((seconds % 3600) / 60);
-
 		if (days > 0) return `${days}d ${hours}h ${minutes}m`;
 		if (hours > 0) return `${hours}h ${minutes}m`;
 		return `${minutes}m`;
@@ -34,7 +29,7 @@
 		const sizes = ['B', 'KB', 'MB', 'GB'];
 		if (bytes === 0) return '0 B';
 		const i = Math.floor(Math.log(bytes) / Math.log(1024));
-		return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+		return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + ' ' + sizes[i];
 	};
 </script>
 
@@ -42,28 +37,17 @@
 	<title>Radio WiFi - System Status</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+<div class="min-h-screen bg-background">
 	<!-- Header -->
-	<header class="bg-white dark:bg-gray-800 shadow">
+	<header class="border-b bg-card">
 		<div class="max-w-md mx-auto px-4">
-			<div class="flex items-center justify-between py-4">
-				<div class="flex items-center space-x-3">
-					<button
-						on:click={() => goto('/')}
-						class="btn-secondary p-2"
-					>
-						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-						</svg>
-					</button>
-					<div>
-						<h1 class="text-xl font-bold text-gray-900 dark:text-white">
-							System Status
-						</h1>
-						<p class="text-sm text-gray-500 dark:text-gray-400">
-							Detailed system information
-						</p>
-					</div>
+			<div class="flex items-center space-x-3 py-4">
+				<Button variant="outline" size="icon" onclick={() => goto('/')}>
+					<ArrowLeft class="w-4 h-4" />
+				</Button>
+				<div>
+					<h1 class="text-xl font-bold text-foreground">System Status</h1>
+					<p class="text-sm text-muted-foreground">Detailed system information</p>
 				</div>
 			</div>
 		</div>
@@ -71,158 +55,138 @@
 
 	<!-- Main Content -->
 	<main class="max-w-md mx-auto px-4 py-6 space-y-6">
-		<!-- Error Display -->
-		{#if $error}
-			<div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-				<div class="flex items-center">
-					<svg class="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-							d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-					</svg>
-					<p class="text-red-800 dark:text-red-200 text-sm">
-						{$error}
-					</p>
-				</div>
+		{#if wifiState.error}
+			<div class="border border-destructive/50 bg-destructive/10 rounded-lg p-4">
+				<p class="text-destructive text-sm">{wifiState.error}</p>
 			</div>
 		{/if}
 
-		{#if $isLoading}
+		{#if wifiState.isLoading}
 			<div class="space-y-6">
 				{#each Array(4) as _}
-					<div class="card p-6">
-						<div class="animate-pulse">
-							<div class="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-4"></div>
-							<div class="space-y-2">
-								<div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
-								<div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+					<Card>
+						<CardContent class="pt-6">
+							<div class="animate-pulse">
+								<div class="h-6 bg-muted rounded w-1/2 mb-4"></div>
+								<div class="space-y-2">
+									<div class="h-4 bg-muted rounded w-full"></div>
+									<div class="h-4 bg-muted rounded w-3/4"></div>
+								</div>
+							</div>
+						</CardContent>
+					</Card>
+				{/each}
+			</div>
+		{:else if wifiState.status}
+			<!-- System Info -->
+			<Card>
+				<CardHeader><CardTitle>System Information</CardTitle></CardHeader>
+				<CardContent>
+					<div class="space-y-3">
+						<div class="flex justify-between items-center">
+							<span class="text-sm text-muted-foreground">Hostname:</span>
+							<span class="text-sm font-medium text-foreground">{wifiState.status.hostname}</span>
+						</div>
+						<div class="flex justify-between items-center">
+							<span class="text-sm text-muted-foreground">Uptime:</span>
+							<span class="text-sm font-medium text-foreground">{formatUptime(wifiState.status.uptime)}</span>
+						</div>
+					</div>
+				</CardContent>
+			</Card>
+
+			<!-- Network Status -->
+			<Card>
+				<CardHeader><CardTitle>Network Status</CardTitle></CardHeader>
+				<CardContent>
+					<div class="space-y-3">
+						<div class="flex justify-between items-center">
+							<span class="text-sm text-muted-foreground">WiFi Status:</span>
+							<span class="text-sm font-medium {
+								wifiState.status?.network?.wifi?.status === 'connected' ? 'text-green-600' :
+								wifiState.status?.network?.wifi?.status === 'connecting' ? 'text-yellow-600' :
+								'text-red-600'
+							}">
+								{wifiState.status?.network?.wifi?.status || 'Unknown'}
+							</span>
+						</div>
+						{#if wifiState.status?.network?.wifi?.ssid}
+							<div class="flex justify-between items-center">
+								<span class="text-sm text-muted-foreground">Network:</span>
+								<span class="text-sm font-medium text-foreground">{wifiState.status?.network?.wifi?.ssid}</span>
+							</div>
+						{/if}
+						{#if wifiState.status?.network?.wifi?.ip}
+							<div class="flex justify-between items-center">
+								<span class="text-sm text-muted-foreground">IP Address:</span>
+								<span class="text-sm font-mono text-foreground">{wifiState.status?.network?.wifi?.ip}</span>
+							</div>
+						{/if}
+						{#if wifiState.status?.network?.wifi?.signal}
+							<div class="flex justify-between items-center">
+								<span class="text-sm text-muted-foreground">Signal:</span>
+								<span class="text-sm font-medium text-foreground">{wifiState.status?.network?.wifi?.signal}%</span>
+							</div>
+						{/if}
+						<div class="flex justify-between items-center">
+							<span class="text-sm text-muted-foreground">Mode:</span>
+							<span class="text-sm font-medium text-foreground">{wifiState.status?.network?.wifi?.mode || 'Unknown'}</span>
+						</div>
+					</div>
+				</CardContent>
+			</Card>
+
+			<!-- Memory Usage -->
+			<Card>
+				<CardHeader><CardTitle>Memory Usage</CardTitle></CardHeader>
+				<CardContent>
+					<div class="space-y-3">
+						<div class="flex justify-between items-center">
+							<span class="text-sm text-muted-foreground">Total:</span>
+							<span class="text-sm font-medium text-foreground">{formatBytes(wifiState.status.memory.total)}</span>
+						</div>
+						<div class="flex justify-between items-center">
+							<span class="text-sm text-muted-foreground">Used:</span>
+							<span class="text-sm font-medium text-foreground">{formatBytes(wifiState.status.memory.used)}</span>
+						</div>
+						<div class="flex justify-between items-center">
+							<span class="text-sm text-muted-foreground">Free:</span>
+							<span class="text-sm font-medium text-foreground">{formatBytes(wifiState.status.memory.free)}</span>
+						</div>
+						<div class="mt-2">
+							<div class="flex justify-between text-xs text-muted-foreground mb-1">
+								<span>Usage</span>
+								<span>{Math.round((wifiState.status.memory.used / wifiState.status.memory.total) * 100)}%</span>
+							</div>
+							<div class="w-full bg-muted rounded-full h-2">
+								<div
+									class="bg-primary h-2 rounded-full transition-all duration-300"
+									style="width: {(wifiState.status.memory.used / wifiState.status.memory.total) * 100}%"
+								></div>
 							</div>
 						</div>
 					</div>
-				{/each}
-			</div>
-		{:else if $status}
-			<!-- System Info -->
-			<div class="card p-6">
-				<h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">System Information</h2>
-				<div class="space-y-3">
-					<div class="flex justify-between items-center">
-						<span class="text-sm text-gray-600 dark:text-gray-400">Hostname:</span>
-						<span class="text-sm font-medium text-gray-900 dark:text-white">
-							{$status.hostname}
-						</span>
-					</div>
-					<div class="flex justify-between items-center">
-						<span class="text-sm text-gray-600 dark:text-gray-400">Uptime:</span>
-						<span class="text-sm font-medium text-gray-900 dark:text-white">
-							{formatUptime($status.uptime)}
-						</span>
-					</div>
-				</div>
-			</div>
-
-			<!-- Network Status -->
-			<div class="card p-6">
-				<h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Network Status</h2>
-				<div class="space-y-3">
-					<div class="flex justify-between items-center">
-						<span class="text-sm text-gray-600 dark:text-gray-400">WiFi Status:</span>
-						<span class="text-sm font-medium"
-							class:text-green-600={$status?.network?.wifi?.status === 'connected'}
-							class:text-yellow-600={$status?.network?.wifi?.status === 'connecting'}
-							class:text-red-600={$status?.network?.wifi?.status === 'disconnected'}>
-							{$status?.network?.wifi?.status || 'Unknown'}
-						</span>
-					</div>
-					{#if $status?.network?.wifi?.ssid}
-						<div class="flex justify-between items-center">
-							<span class="text-sm text-gray-600 dark:text-gray-400">Network:</span>
-							<span class="text-sm font-medium text-gray-900 dark:text-white">
-								{$status?.network?.wifi?.ssid}
-							</span>
-						</div>
-					{/if}
-					{#if $status?.network?.wifi?.ip}
-						<div class="flex justify-between items-center">
-							<span class="text-sm text-gray-600 dark:text-gray-400">IP Address:</span>
-							<span class="text-sm font-mono text-gray-900 dark:text-white">
-								{$status?.network?.wifi?.ip}
-							</span>
-						</div>
-					{/if}
-					{#if $status?.network?.wifi?.signal}
-						<div class="flex justify-between items-center">
-							<span class="text-sm text-gray-600 dark:text-gray-400">Signal:</span>
-							<span class="text-sm font-medium text-gray-900 dark:text-white">
-								{$status?.network?.wifi?.signal}%
-							</span>
-						</div>
-					{/if}
-					<div class="flex justify-between items-center">
-						<span class="text-sm text-gray-600 dark:text-gray-400">Mode:</span>
-						<span class="text-sm font-medium text-gray-900 dark:text-white">
-							{$status?.network?.wifi?.mode || 'Unknown'}
-						</span>
-					</div>
-				</div>
-			</div>
-
-			<!-- Memory Usage -->
-			<div class="card p-6">
-				<h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Memory Usage</h2>
-				<div class="space-y-3">
-					<div class="flex justify-between items-center">
-						<span class="text-sm text-gray-600 dark:text-gray-400">Total:</span>
-						<span class="text-sm font-medium text-gray-900 dark:text-white">
-							{formatBytes($status.memory.total)}
-						</span>
-					</div>
-					<div class="flex justify-between items-center">
-						<span class="text-sm text-gray-600 dark:text-gray-400">Used:</span>
-						<span class="text-sm font-medium text-gray-900 dark:text-white">
-							{formatBytes($status.memory.used)}
-						</span>
-					</div>
-					<div class="flex justify-between items-center">
-						<span class="text-sm text-gray-600 dark:text-gray-400">Free:</span>
-						<span class="text-sm font-medium text-gray-900 dark:text-white">
-							{formatBytes($status.memory.free)}
-						</span>
-					</div>
-					<div class="mt-2">
-						<div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
-							<span>Usage</span>
-							<span>{Math.round(($status.memory.used / $status.memory.total) * 100)}%</span>
-						</div>
-						<div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-							<div
-								class="bg-primary-600 h-2 rounded-full transition-all duration-300"
-								style="width: {($status.memory.used / $status.memory.total) * 100}%"
-							></div>
-						</div>
-					</div>
-				</div>
-			</div>
+				</CardContent>
+			</Card>
 
 			<!-- CPU Information -->
-			<div class="card p-6">
-				<h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">CPU Information</h2>
-				<div class="space-y-3">
-					<div class="flex justify-between items-center">
-						<span class="text-sm text-gray-600 dark:text-gray-400">Load:</span>
-						<span class="text-sm font-medium text-gray-900 dark:text-white">
-							{$status.cpu.load.toFixed(2)}
-						</span>
-					</div>
-					{#if $status.cpu.temperature}
+			<Card>
+				<CardHeader><CardTitle>CPU Information</CardTitle></CardHeader>
+				<CardContent>
+					<div class="space-y-3">
 						<div class="flex justify-between items-center">
-							<span class="text-sm text-gray-600 dark:text-gray-400">Temperature:</span>
-							<span class="text-sm font-medium text-gray-900 dark:text-white">
-								{$status.cpu.temperature.toFixed(1)}°C
-							</span>
+							<span class="text-sm text-muted-foreground">Load:</span>
+							<span class="text-sm font-medium text-foreground">{wifiState.status.cpu.load.toFixed(2)}</span>
 						</div>
-					{/if}
-				</div>
-			</div>
+						{#if wifiState.status.cpu.temperature}
+							<div class="flex justify-between items-center">
+								<span class="text-sm text-muted-foreground">Temperature:</span>
+								<span class="text-sm font-medium text-foreground">{wifiState.status.cpu.temperature.toFixed(1)}°C</span>
+							</div>
+						{/if}
+					</div>
+				</CardContent>
+			</Card>
 		{/if}
 	</main>
 </div>

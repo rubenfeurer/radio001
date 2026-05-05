@@ -137,16 +137,36 @@ class TestWiFiManagerStatus:
             development_mode=False, host_mode_file=Path("/tmp/nonexistent")
         )
 
-        # Mock nmcli device status showing connected WiFi
+        # get_status makes multiple nmcli calls:
+        # 1. `nmcli -t -f TYPE,STATE,CONNECTION device status`
+        # 2. `nmcli -t -f IN-USE,SSID device wifi list` (to resolve SSID)
+        # 3. `nmcli -t -f IP4.ADDRESS connection show <name>` (for IP)
+        # 4. `nmcli -t -f IN-USE,SIGNAL,SSID device wifi list` (for signal)
         device_status = "wifi:connected:HomeWiFi"
+        wifi_list = "*:HomeWiFi"
 
         with patch("asyncio.create_subprocess_exec") as mock_subprocess:
-            mock_process = AsyncMock()
-            mock_process.returncode = 0
-            mock_process.communicate = AsyncMock(
+            mock_device = AsyncMock()
+            mock_device.returncode = 0
+            mock_device.communicate = AsyncMock(
                 return_value=(device_status.encode(), b"")
             )
-            mock_subprocess.return_value = mock_process
+
+            mock_wifi_list = AsyncMock()
+            mock_wifi_list.returncode = 0
+            mock_wifi_list.communicate = AsyncMock(
+                return_value=(wifi_list.encode(), b"")
+            )
+
+            mock_ip = AsyncMock()
+            mock_ip.returncode = 0
+            mock_ip.communicate = AsyncMock(return_value=(b"", b""))
+
+            mock_signal = AsyncMock()
+            mock_signal.returncode = 0
+            mock_signal.communicate = AsyncMock(return_value=(b"", b""))
+
+            mock_subprocess.side_effect = [mock_device, mock_wifi_list, mock_ip, mock_signal]
 
             status = await manager.get_status()
 
@@ -185,7 +205,7 @@ class TestWiFiManagerConnection:
 
             result = await manager.connect_network("TestNetwork", "testpass123")
 
-            assert result is True
+            assert result[0] is True
             mock_wait.assert_called_once_with("TestNetwork", timeout=40)
 
     @pytest.mark.asyncio
@@ -222,7 +242,7 @@ class TestWiFiManagerConnection:
 
             result = await manager.connect_network("TestNetwork", "newpass456")
 
-            assert result is True
+            assert result[0] is True
 
     @pytest.mark.asyncio
     async def test_connect_open_network(self):
@@ -247,22 +267,17 @@ class TestWiFiManagerConnection:
 
             result = await manager.connect_network("OpenNetwork", "")
 
-            assert result is True
+            assert result[0] is True
 
     @pytest.mark.asyncio
     async def test_connect_with_retry(self):
-        """Test connection retry logic on failure"""
+        """Test that a failed wait_for_connection returns a failure tuple"""
         manager = WiFiManager(development_mode=False)
 
         with (
             patch("asyncio.create_subprocess_exec") as mock_subprocess,
-            patch.object(manager, "wait_for_connection") as mock_wait,
-            patch("asyncio.sleep"),
-        ):  # Speed up test by mocking sleep
-            # First two attempts fail, third succeeds
-            mock_wait.side_effect = [False, False, True]
-
-            # Mock connection attempts
+            patch.object(manager, "wait_for_connection", return_value=False),
+        ):
             mock_list = AsyncMock()
             mock_list.returncode = 0
             mock_list.communicate = AsyncMock(return_value=(b"", b""))
@@ -271,13 +286,12 @@ class TestWiFiManagerConnection:
             mock_connect.returncode = 0
             mock_connect.communicate = AsyncMock(return_value=(b"", b""))
 
-            # 3 attempts × 2 calls (list + connect)
-            mock_subprocess.side_effect = [mock_list, mock_connect] * 3
+            mock_subprocess.side_effect = [mock_list, mock_connect]
 
             result = await manager.connect_network("TestNetwork", "testpass")
 
-            assert result is True
-            assert mock_wait.call_count == 3
+            assert result[0] is False
+            assert "timeout" in result[1].lower() or "incorrect" in result[1].lower()
 
 
 class TestWiFiManagerSavedNetworks:
@@ -294,16 +308,31 @@ class TestWiFiManagerSavedNetworks:
                 mode="client", connected=True, ssid="HomeWiFi"
             )
 
-            # Mock nmcli connection show
-            connection_list = "HomeWiFi:802-11-wireless:wlan0\nGuestWiFi:802-11-wireless:\nEthernet:802-3-ethernet:eth0"
+            # list_saved_networks calls `nmcli -t -f NAME,TYPE connection show`
+            # then per WiFi entry calls `nmcli -t -f 802-11-wireless.ssid connection show <name>`
+            # Format: NAME:TYPE (only two fields requested)
+            connection_list = "HomeWiFi:802-11-wireless\nGuestWiFi:802-11-wireless\nEthernet:802-3-ethernet"
 
             with patch("asyncio.create_subprocess_exec") as mock_subprocess:
-                mock_process = AsyncMock()
-                mock_process.returncode = 0
-                mock_process.communicate = AsyncMock(
+                mock_list = AsyncMock()
+                mock_list.returncode = 0
+                mock_list.communicate = AsyncMock(
                     return_value=(connection_list.encode(), b"")
                 )
-                mock_subprocess.return_value = mock_process
+
+                mock_detail_home = AsyncMock()
+                mock_detail_home.returncode = 0
+                mock_detail_home.communicate = AsyncMock(
+                    return_value=(b"802-11-wireless.ssid:HomeWiFi", b"")
+                )
+
+                mock_detail_guest = AsyncMock()
+                mock_detail_guest.returncode = 0
+                mock_detail_guest.communicate = AsyncMock(
+                    return_value=(b"802-11-wireless.ssid:GuestWiFi", b"")
+                )
+
+                mock_subprocess.side_effect = [mock_list, mock_detail_home, mock_detail_guest]
 
                 networks = await manager.list_saved_networks()
 

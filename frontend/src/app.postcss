@@ -3,29 +3,37 @@
 @tailwind utilities;
 
 @layer base {
-	html {
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	:root {
+		--background: 0 0% 100%;
+		--foreground: 0 0% 3.9%;
+		--card: 0 0% 100%;
+		--card-foreground: 0 0% 3.9%;
+		--popover: 0 0% 100%;
+		--popover-foreground: 0 0% 3.9%;
+		--primary: 0 0% 9%;
+		--primary-foreground: 0 0% 98%;
+		--secondary: 0 0% 96.1%;
+		--secondary-foreground: 0 0% 9%;
+		--muted: 0 0% 96.1%;
+		--muted-foreground: 0 0% 45.1%;
+		--accent: 0 0% 96.1%;
+		--accent-foreground: 0 0% 9%;
+		--destructive: 0 84.2% 60.2%;
+		--destructive-foreground: 0 0% 98%;
+		--border: 0 0% 89.8%;
+		--input: 0 0% 89.8%;
+		--ring: 0 0% 3.9%;
+		--radius: 0.5rem;
 	}
 }
 
-@layer components {
-	.btn {
-		@apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+@layer base {
+	* {
+		@apply border-border;
 	}
-
-	.btn-primary {
-		@apply btn text-white bg-primary-600 hover:bg-primary-700 focus:ring-primary-500;
-	}
-
-	.btn-secondary {
-		@apply btn text-gray-700 bg-white border-gray-300 hover:bg-gray-50 focus:ring-primary-500 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700;
-	}
-
-	.card {
-		@apply bg-white dark:bg-gray-800 shadow border border-gray-200 dark:border-gray-700 rounded-lg;
-	}
-
-	.input {
-		@apply block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white;
+	body {
+		@apply bg-background text-foreground;
+		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+			sans-serif;
 	}
 }

@@ -1,3 +1,4 @@
+// @ts-nocheck -- vite type mismatch between workspace root (v5) and frontend (v6)
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 

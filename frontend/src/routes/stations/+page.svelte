@@ -3,37 +3,47 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import type { RadioStation } from '$lib/types';
+	import { Button } from '$lib/components/ui/button';
+	import { ArrowLeft } from 'lucide-svelte';
 
-	let slot: number | null = null;
-	let allStations: RadioStation[] = [];
-	let query = '';
-	let loading = true;
-	let saving = false;
-	let searchInput: HTMLInputElement;
+	let slot = $state<number | null>(null);
+	let allStations = $state<RadioStation[]>([]);
+	let query = $state('');
+	let loading = $state(true);
+	let saving = $state(false);
+	let searchInput = $state<HTMLInputElement | null>(null);
 
-	$: slot = $page.url.searchParams.has('slot')
-		? parseInt($page.url.searchParams.get('slot')!, 10)
-		: null;
+	$effect(() => {
+		slot = $page.url.searchParams.has('slot')
+			? parseInt($page.url.searchParams.get('slot')!, 10)
+			: null;
+	});
 
-	$: q = query.toLowerCase().trim();
-	$: filtered = q
-		? allStations
-				.filter(
+	const q = $derived(query.toLowerCase().trim());
+
+	const filtered = $derived(
+		q
+			? allStations
+					.filter(
+						(s) =>
+							s.name.toLowerCase().includes(q) ||
+							(s.country || '').toLowerCase().includes(q) ||
+							(s.location || '').toLowerCase().includes(q)
+					)
+					.slice(0, 100)
+			: allStations.slice(0, 100)
+	);
+
+	const total = $derived(
+		q
+			? allStations.filter(
 					(s) =>
 						s.name.toLowerCase().includes(q) ||
 						(s.country || '').toLowerCase().includes(q) ||
 						(s.location || '').toLowerCase().includes(q)
-				)
-				.slice(0, 100)
-		: allStations.slice(0, 100);
-	$: total = q
-		? allStations.filter(
-				(s) =>
-					s.name.toLowerCase().includes(q) ||
-					(s.country || '').toLowerCase().includes(q) ||
-					(s.location || '').toLowerCase().includes(q)
-			).length
-		: allStations.length;
+				).length
+			: allStations.length
+	);
 
 	onMount(async () => {
 		try {
@@ -59,7 +69,6 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ name: station.name, url: station.url, slot })
 			});
-			// Auto-play after saving
 			await fetch(`/api/radio/stations/${slot}/play`, { method: 'POST' });
 		} catch (e) {
 			console.error('Failed to save/play station:', e);
@@ -72,21 +81,17 @@
 	<title>{slot !== null ? `Pick Station for Slot ${slot}` : 'Station Library'}</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+<div class="min-h-screen bg-background">
 	<!-- Header -->
-	<header class="bg-white dark:bg-gray-800 shadow sticky top-0 z-10">
+	<header class="border-b bg-card sticky top-0 z-10">
 		<div class="max-w-md mx-auto px-4">
 			<div class="flex items-center gap-3 py-4">
-				<a href="/" class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-					</svg>
-				</a>
-				<div>
-					<h1 class="text-lg font-bold text-gray-900 dark:text-white">
-						{slot !== null ? `Slot ${slot} — Pick a Station` : 'Station Library'}
-					</h1>
-				</div>
+				<Button variant="outline" size="icon" onclick={() => goto('/')}>
+					<ArrowLeft class="w-4 h-4" />
+				</Button>
+				<h1 class="text-lg font-bold text-foreground">
+					{slot !== null ? `Slot ${slot} — Pick a Station` : 'Station Library'}
+				</h1>
 			</div>
 			<!-- Search -->
 			<div class="pb-4">
@@ -96,7 +101,7 @@
 					type="search"
 					placeholder="Search by name, country, or city…"
 					disabled={loading}
-					class="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+					class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 				/>
 			</div>
 		</div>
@@ -107,15 +112,14 @@
 		{#if loading}
 			<div class="space-y-3">
 				{#each Array(8) as _}
-					<div class="animate-pulse bg-white dark:bg-gray-800 rounded-lg p-4">
-						<div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3 mb-2"></div>
-						<div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+					<div class="animate-pulse bg-card border border-border rounded-lg p-4">
+						<div class="h-4 bg-muted rounded w-2/3 mb-2"></div>
+						<div class="h-3 bg-muted rounded w-1/3"></div>
 					</div>
 				{/each}
 			</div>
 		{:else}
-			<!-- Result count -->
-			<p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+			<p class="text-xs text-muted-foreground mb-3">
 				{#if filtered.length === 0}
 					No results
 				{:else if filtered.length < total}
@@ -125,25 +129,24 @@
 				{/if}
 			</p>
 
-			<!-- Station list -->
 			<ul class="space-y-2">
 				{#each filtered as station (station.url)}
 					<li>
 						{#if slot !== null}
 							<button
-								on:click={() => selectStation(station)}
+								onclick={() => selectStation(station)}
 								disabled={saving}
-								class="w-full text-left bg-white dark:bg-gray-800 rounded-lg px-4 py-3 hover:bg-primary-50 dark:hover:bg-primary-900/20 border border-gray-100 dark:border-gray-700 transition-colors disabled:opacity-50"
+								class="w-full text-left bg-card border border-border rounded-lg px-4 py-3 hover:bg-muted/50 transition-colors disabled:opacity-50"
 							>
-								<span class="block font-medium text-gray-900 dark:text-white text-sm">{station.name}</span>
-								<span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+								<span class="block font-medium text-foreground text-sm">{station.name}</span>
+								<span class="block text-xs text-muted-foreground mt-0.5">
 									{[station.country, station.location].filter(Boolean).join(' · ')}
 								</span>
 							</button>
 						{:else}
-							<div class="bg-white dark:bg-gray-800 rounded-lg px-4 py-3 border border-gray-100 dark:border-gray-700">
-								<span class="block font-medium text-gray-900 dark:text-white text-sm">{station.name}</span>
-								<span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+							<div class="bg-card border border-border rounded-lg px-4 py-3">
+								<span class="block font-medium text-foreground text-sm">{station.name}</span>
+								<span class="block text-xs text-muted-foreground mt-0.5">
 									{[station.country, station.location].filter(Boolean).join(' · ')}
 								</span>
 							</div>
