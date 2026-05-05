@@ -8,7 +8,7 @@ fastapi==0.104.1
 uvicorn[standard]==0.24.0
 
 # Data validation and settings (Python 3.13 compatible)
-pydantic==2.5.3
+pydantic==2.13.3
 
 # Form data handling
 python-multipart==0.0.6
