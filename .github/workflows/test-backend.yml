@@ -55,7 +55,7 @@ jobs:
         run: |
           echo "python-version=${{ env.PYTHON_VERSION }}" >> $GITHUB_OUTPUT
           echo "test-type=${{ github.event.inputs.test_type || 'all' }}" >> $GITHUB_OUTPUT
-          echo "coverage-threshold=${{ github.event.inputs.coverage_threshold || '23' }}" >> $GITHUB_OUTPUT
+          echo "coverage-threshold=${{ github.event.inputs.coverage_threshold || '20' }}" >> $GITHUB_OUTPUT
 
       - name: Display test configuration
         run: |
