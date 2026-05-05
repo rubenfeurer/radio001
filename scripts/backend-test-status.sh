@@ -98,11 +98,11 @@ check_github_workflows() {
 
 # Function to check docker configuration
 check_docker_config() {
-    if file_exists "compose/docker-compose.ci.yml"; then
-        echo -e "    ${GREEN}${CHECK} CI Docker Compose${NC} (compose/docker-compose.ci.yml)"
+    if file_exists "docker/compose.ci.yml"; then
+        echo -e "    ${GREEN}${CHECK} CI Docker Compose${NC} (docker/compose.ci.yml)"
 
         # Check if it has test dependencies arg
-        if grep -q "INSTALL_TEST_DEPS" compose/docker-compose.ci.yml 2>/dev/null; then
+        if grep -q "INSTALL_TEST_DEPS" docker/compose.ci.yml 2>/dev/null; then
             echo -e "    ${GREEN}${CHECK} Test dependencies configured in Docker${NC}"
         else
             echo -e "    ${YELLOW}${WARNING} Test dependencies not configured in Docker${NC}"
@@ -291,7 +291,7 @@ show_recommendations() {
         recommendations+=("Add comprehensive testing documentation")
     fi
 
-    if ! grep -q "INSTALL_TEST_DEPS" compose/docker-compose.ci.yml 2>/dev/null; then
+    if ! grep -q "INSTALL_TEST_DEPS" docker/compose.ci.yml 2>/dev/null; then
         recommendations+=("Configure test dependencies in Docker Compose")
     fi
 
