@@ -13,7 +13,7 @@ import tempfile
 import os
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from typing import Dict, Any, Optional
 
 # Add backend to path
@@ -118,7 +118,7 @@ async def client(temp_data_dir):
     )
 
     try:
-        async with AsyncClient(app=app, base_url="http://test") as ac:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
             yield ac
     finally:
         await manager.shutdown()

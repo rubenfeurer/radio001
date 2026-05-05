@@ -131,10 +131,7 @@ jobs:
             export MOCK_HARDWARE=true
             export PYTHONPATH=/app:\$PYTHONPATH
 
-            # Install test dependencies
-            pip install -r requirements-test.txt
-
-            # Run quick test suite (unit, api, and integration tests)
+            # Run quick test suite (unit, api, and integration tests — test deps pre-installed)
             python -m pytest \
               --verbose \
               --tb=short \

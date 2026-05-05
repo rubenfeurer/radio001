@@ -44,11 +44,13 @@ RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, 
     chmod 0440 /etc/sudoers.d/radio
 
 # Copy requirements first for better caching
-COPY backend/requirements.lock .
+COPY backend/requirements.lock backend/requirements-test.txt ./
 
 # Install Python dependencies
+ARG INSTALL_TEST_DEPS=false
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir --no-deps --require-hashes -r requirements.lock
+    pip install --no-cache-dir --no-deps --require-hashes -r requirements.lock && \
+    if [ "$INSTALL_TEST_DEPS" = "true" ]; then pip install --no-cache-dir -r requirements-test.txt; fi
 
 # Install Pi-only hardware dependencies (lgpio requires liblgpio-dev from Pi OS repos)
 # Silently skipped on non-Pi platforms (dev/CI runs in mock mode anyway)
