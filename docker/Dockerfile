@@ -27,7 +27,7 @@ WORKDIR /app
 # =============================================================================
 # Node.js base stage for Nuxt frontend
 # =============================================================================
-FROM node:20 AS node-base
+FROM node:25 AS node-base
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
