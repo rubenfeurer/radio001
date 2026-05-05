@@ -8,7 +8,7 @@ fastapi==0.104.1
 uvicorn[standard]==0.24.0
 
 # Data validation and settings (Python 3.13 compatible)
-pydantic==2.5.3
+pydantic==2.13.3
 
 # Form data handling
 python-multipart==0.0.6
@@ -17,11 +17,8 @@ python-multipart==0.0.6
 typing-extensions>=4.8.0
 annotated-types>=0.6.0
 
-# Radio system dependencies
-lgpio                       # GPIO control via kernel gpiochip (no daemon needed)
-
 # HTTP client for URL validation
-aiohttp==3.9.1
+aiohttp==3.13.5
 
 # Optional: Development dependencies (install with --dev flag)
 pytest==7.4.4

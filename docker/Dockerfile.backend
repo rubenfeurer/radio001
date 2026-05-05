@@ -1,7 +1,7 @@
 # Backend Dockerfile for FastAPI development
 # Optimized for Raspberry Pi and development workflow with Apple Silicon support
 
-FROM python:3.11-slim@sha256:6d85378d88a19cd4d76079817532d62232be95757cb45945a99fec8e8084b9c2
+FROM python:3.13-slim@sha256:a0779d7c12fc20be6ec6b4ddc901a4fd7657b8a6bc9def9d3fde89ed5efe0a3d
 
 ARG VERSION=dev
 LABEL org.opencontainers.image.version=$VERSION
@@ -24,8 +24,7 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     libffi-dev \
     libssl-dev \
-    cargo \
-    rustc \
+    swig \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
@@ -49,8 +48,13 @@ COPY backend/requirements.lock .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir --upgrade setuptools-rust && \
-    CARGO_NET_GIT_FETCH_WITH_CLI=true pip install --no-cache-dir --no-deps --require-hashes -r requirements.lock
+    pip install --no-cache-dir --no-deps --require-hashes -r requirements.lock
+
+# Install Pi-only hardware dependencies (lgpio requires liblgpio-dev from Pi OS repos)
+# Silently skipped on non-Pi platforms (dev/CI runs in mock mode anyway)
+RUN apt-get update && apt-get install -y --no-install-recommends liblgpio-dev 2>/dev/null && \
+    pip install --no-cache-dir lgpio || true && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy entrypoint script
 COPY docker/entrypoint-backend.sh /entrypoint.sh
