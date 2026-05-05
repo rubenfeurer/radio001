@@ -350,6 +350,7 @@ Temporary Items
 # Development
 *.pid
 *.lock
+!backend/requirements.lock
 .development
 .test
 

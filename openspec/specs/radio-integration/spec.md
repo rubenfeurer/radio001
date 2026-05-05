@@ -64,9 +64,16 @@ The system must support physical hardware controls for radio operation without r
 #### Scenario: Rotary Encoder Long Press — WiFi Mode Toggle
 
 - **WHEN** the rotary encoder button is held for ≥ 2 seconds
-- **THEN** the system toggles between WiFi client mode and hotspot mode
-- **AND** `success.wav` is played on successful toggle
-- **AND** `error.wav` is played if the toggle fails
+- **THEN** the system SHALL stop any active radio playback first
+- **AND** play a confirmation sound (`success.wav` or `error.wav`) before executing the mode switch
+- **AND** toggle the WiFi mode between client and hotspot
+- **AND** if the triggering GPIO pin is not the rotary encoder switch (`ROTARY_SW`), the event SHALL be ignored and a warning logged
+
+#### Scenario: Long Press on Station Buttons — No Action
+
+- **WHEN** a station button (slots 1–3) is held for ≥ 2 seconds
+- **THEN** no long-press action is triggered
+- **AND** the button release is handled as a normal short press
 
 #### Scenario: Development Mode Hardware Mocking
 

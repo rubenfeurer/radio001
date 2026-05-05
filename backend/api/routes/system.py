@@ -54,7 +54,7 @@ async def get_system_metrics() -> Dict[str, Any]:
         "hostname": "radio",
         "uptime": 0,
         "memory": {"total": 0, "used": 0, "free": 0},
-        "cpu": {"load": 0.0, "temperature": None},
+        "cpu": {"load": 0.0},
         "network": {
             "wifi": {
                 "wifiInterface": "wlan0",

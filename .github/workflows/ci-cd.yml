@@ -94,7 +94,7 @@ jobs:
           cd backend
 
           # Install test dependencies
-          pip install -r requirements.txt -r requirements-test.txt
+          pip install --no-deps --require-hashes -r requirements.lock && pip install -r requirements-test.txt
 
           # Set test environment variables
           export NODE_ENV=development

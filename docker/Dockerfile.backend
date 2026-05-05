@@ -1,7 +1,10 @@
 # Backend Dockerfile for FastAPI development
 # Optimized for Raspberry Pi and development workflow with Apple Silicon support
 
-FROM python:3.11-slim
+FROM python:3.11-slim@sha256:6d85378d88a19cd4d76079817532d62232be95757cb45945a99fec8e8084b9c2
+
+ARG VERSION=dev
+LABEL org.opencontainers.image.version=$VERSION
 
 # Install system dependencies for WiFi management and build tools
 RUN apt-get update && apt-get install -y \
@@ -42,12 +45,12 @@ RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, 
     chmod 0440 /etc/sudoers.d/radio
 
 # Copy requirements first for better caching
-COPY backend/requirements.txt .
+COPY backend/requirements.lock .
 
-# Install Python dependencies with Apple Silicon compatibility
+# Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --upgrade setuptools-rust && \
-    CARGO_NET_GIT_FETCH_WITH_CLI=true pip install --no-cache-dir -r requirements.txt
+    CARGO_NET_GIT_FETCH_WITH_CLI=true pip install --no-cache-dir --no-deps --require-hashes -r requirements.lock
 
 # Copy entrypoint script
 COPY docker/entrypoint-backend.sh /entrypoint.sh
