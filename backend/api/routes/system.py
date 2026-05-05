@@ -19,6 +19,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Global WiFi manager instance (set from main.py)
+wifi_manager = None
+
+
+def set_system_wifi_manager(manager):
+    """Set the WiFi manager instance for system routes"""
+    global wifi_manager
+    wifi_manager = manager
+    logger.info("WiFi manager set in system routes")
+
 
 class SystemMetrics(BaseModel):
     """System metrics including CPU, memory, and uptime"""
@@ -44,7 +54,7 @@ async def get_system_metrics() -> Dict[str, Any]:
         "hostname": "radio",
         "uptime": 0,
         "memory": {"total": 0, "used": 0, "free": 0},
-        "cpu": {"load": 0.0, "temperature": None},
+        "cpu": {"load": 0.0},
         "network": {
             "wifi": {
                 "wifiInterface": "wlan0",
@@ -113,9 +123,19 @@ async def get_system_metrics() -> Dict[str, Any]:
 
     # Get WiFi status (import here to avoid circular dependency)
     try:
-        from main import WiFiManager
+        import os
+        from pathlib import Path
 
-        wifi_status = await WiFiManager.get_status()
+        from core.wifi_manager import WiFiManager
+
+        # Get the wifi_manager instance from main
+        # Since we can't import wifi_manager from main directly, create a temporary instance
+        wifi_mgr = WiFiManager(
+            interface=os.getenv("WIFI_INTERFACE", "wlan0"),
+            host_mode_file=Path("/etc/raspiwifi/host_mode"),
+            development_mode=os.getenv("NODE_ENV") == "development",
+        )
+        wifi_status = await wifi_mgr.get_status()
 
         metrics["network"]["wifi"] = {
             "wifiInterface": "wlan0",
@@ -158,3 +178,61 @@ async def health_check():
         Dict: Basic health status
     """
     return {"status": "healthy", "service": "radio-system"}
+
+
+class ApiResponse(BaseModel):
+    """Standard API response"""
+
+    success: bool
+    message: str
+    data: Any = None
+
+
+@router.post(
+    "/hotspot-mode", response_model=ApiResponse, summary="Switch to hotspot mode"
+)
+async def activate_hotspot_mode():
+    """
+    Reset system to hotspot mode for WiFi reconfiguration.
+
+    This will:
+    1. Create the host mode marker file
+    2. Disconnect from current WiFi network
+    3. Start hotspot via nmcli
+
+    Returns:
+        ApiResponse: Success status and message
+    """
+    global wifi_manager
+
+    if wifi_manager is None:
+        # Fallback: create temporary instance if not set
+        from pathlib import Path
+
+        from core.wifi_manager import WiFiManager
+
+        wifi_manager = WiFiManager(
+            interface=os.getenv("WIFI_INTERFACE", "wlan0"),
+            host_mode_file=Path("/etc/raspiwifi/host_mode"),
+            development_mode=os.getenv("NODE_ENV") == "development",
+            hotspot_ssid=os.getenv("HOTSPOT_SSID", "Radio-Setup"),
+            hotspot_password=os.getenv("HOTSPOT_PASSWORD", "Configure123!"),
+            hotspot_ip=os.getenv("HOTSPOT_IP", "192.168.4.1"),
+        )
+
+    try:
+        logger.info("Initiating system reset to hotspot mode...")
+        await wifi_manager.switch_to_host_mode()
+
+        return ApiResponse(
+            success=True,
+            message="Hotspot mode activated. Connect to 'Radio-Setup' WiFi network.",
+            data={
+                "action": "hotspot_activated",
+                "mode": "hotspot",
+                "instructions": "Connect to 'Radio-Setup' WiFi and navigate to http://192.168.4.1",
+            },
+        )
+    except Exception as e:
+        logger.error(f"Failed to reset to hotspot mode: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to reset system: {str(e)}")

@@ -84,20 +84,19 @@ export interface ConnectionResult {
 }
 
 export interface RadioStation {
-	id: string;
 	name: string;
 	url: string;
-	genre?: string;
-	bitrate?: number;
+	slot?: number;
 	country?: string;
-	favicon?: string;
+	location?: string;
+	genre?: string;
+	bitrate?: string;
+	language?: string;
 }
 
 export interface PlaybackStatus {
 	is_playing: boolean;
-	current_station?: RadioStation;
-	stream_title?: string;
-	bitrate?: number;
-	codec?: string;
-	error?: string;
+	current_station?: RadioStation | null;
+	current_slot?: number | null;
+	playback_state?: string;
 }

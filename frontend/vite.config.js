@@ -1,3 +1,4 @@
+// @ts-nocheck -- vite type mismatch between workspace root (v5) and frontend (v6)
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
@@ -11,6 +12,10 @@ export default defineConfig({
 				target: 'http://localhost:8000',
 				changeOrigin: true,
 				rewrite: (path) => path.replace(/^\/api/, '')
+			},
+			'/ws': {
+				target: 'http://localhost:8000',
+				ws: true
 			}
 		}
 	}

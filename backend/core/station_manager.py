@@ -12,6 +12,7 @@ This module provides the StationManager class which handles:
 import asyncio
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Dict, Optional, List
 from datetime import datetime
@@ -40,35 +41,23 @@ class StationManager:
         self._stations: Dict[int, Optional[RadioStation]] = {1: None, 2: None, 3: None}
         self._lock = asyncio.Lock()
 
-        # Default stations for empty slots
+        # Default stations for empty slots (read from config/env)
         self._default_stations = {
             1: RadioStation(
-                name="SRF 3",
-                url="https://stream.srg-ssr.ch/m/srf3/mp3_128",
+                name=os.getenv("DEFAULT_STATION_1_NAME", "SRF 3"),
+                url=os.getenv("DEFAULT_STATION_1_URL", "https://stream.srg-ssr.ch/m/srf3/mp3_128"),
                 slot=1,
-                country="Switzerland",
-                location="Bern",
-                genre="Pop/Rock",
-                language="German"
             ),
             2: RadioStation(
-                name="Radio Swiss Jazz",
-                url="https://stream.srg-ssr.ch/m/rsj/mp3_128",
+                name=os.getenv("DEFAULT_STATION_2_NAME", "Radio Swiss Jazz"),
+                url=os.getenv("DEFAULT_STATION_2_URL", "https://stream.srg-ssr.ch/m/rsj/mp3_128"),
                 slot=2,
-                country="Switzerland",
-                location="Bern",
-                genre="Jazz",
-                language="Instrumental"
             ),
             3: RadioStation(
-                name="Radio Swiss Classic",
-                url="https://stream.srg-ssr.ch/m/rsc_de/mp3_128",
+                name=os.getenv("DEFAULT_STATION_3_NAME", "Radio Swiss Classic"),
+                url=os.getenv("DEFAULT_STATION_3_URL", "https://stream.srg-ssr.ch/m/rsc_de/mp3_128"),
                 slot=3,
-                country="Switzerland",
-                location="Bern",
-                genre="Classical",
-                language="Instrumental"
-            )
+            ),
         }
 
         logger.info(f"StationManager initialized with storage: {self.stations_file}")

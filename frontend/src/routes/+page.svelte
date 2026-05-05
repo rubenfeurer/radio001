@@ -1,61 +1,73 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { status, getStatus, isLoading, error } from '$lib/stores/wifi';
+	import { goto } from '$app/navigation';
+	import { wifiState, getStatus } from '$lib/stores/wifi.svelte';
+	import { wsClient, wsState } from '$lib/stores/websocket.svelte';
+	import { radioState, toggleStation, setVolume, fetchStations, fetchStatus } from '$lib/stores/radio.svelte';
+	import { Button } from '$lib/components/ui/button';
+	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+	import { RefreshCw, Wifi, BarChart2, Settings } from 'lucide-svelte';
 
-	// SvelteKit page props - explicitly define what we accept
-	export let data: any = undefined;
-
-	let refreshing = false;
+	let refreshing = $state(false);
 
 	const refresh = async () => {
 		refreshing = true;
 		await getStatus();
+		await fetchStatus();
+		await fetchStations();
 		refreshing = false;
 	};
 
 	onMount(() => {
-		// Initial fetch via REST
 		getStatus();
+		wsClient.connect();
+		fetchStatus();
+		fetchStations();
 	});
+
+	function handleSlotClick(slot: number) {
+		toggleStation(slot);
+	}
+
+	function handleSlotSettings(e: MouseEvent, slot: number) {
+		e.stopPropagation();
+		goto(`/stations?slot=${slot}`);
+	}
+
+	function handlePlayPause(e: MouseEvent, slot: number) {
+		e.stopPropagation();
+		toggleStation(slot);
+	}
+
+	function handleVolumeInput(e: Event) {
+		const target = e.target as HTMLInputElement;
+		setVolume(parseInt(target.value, 10));
+	}
 </script>
 
 <svelte:head>
 	<title>Radio WiFi - Dashboard</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+<div class="min-h-screen bg-background">
 	<!-- Header -->
-	<header class="bg-white dark:bg-gray-800 shadow">
+	<header class="border-b bg-card">
 		<div class="max-w-md mx-auto px-4">
 			<div class="flex items-center justify-between py-4">
 				<div class="flex items-center space-x-3">
-					<div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-						<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-								d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
-						</svg>
+					<div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+						<Wifi class="w-5 h-5 text-primary-foreground" />
 					</div>
 					<div>
-						<h1 class="text-xl font-bold text-gray-900 dark:text-white">
-							Radio WiFi
-						</h1>
-						<p class="text-sm text-gray-500 dark:text-gray-400">
-							{$status?.hostname || 'radio'}.local
+						<h1 class="text-xl font-bold text-foreground">Radio WiFi</h1>
+						<p class="text-sm text-muted-foreground">
+							{wifiState.status?.hostname || 'radio'}.local
 						</p>
 					</div>
 				</div>
-				<div class="flex items-center gap-2">
-					<button
-						on:click={refresh}
-						disabled={refreshing}
-						class="btn-secondary"
-					>
-						<svg class="w-4 h-4" class:animate-spin={refreshing} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-								d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-						</svg>
-					</button>
-				</div>
+				<Button variant="outline" size="icon" onclick={refresh} disabled={refreshing}>
+					<RefreshCw class="w-4 h-4 {refreshing ? 'animate-spin' : ''}" />
+				</Button>
 			</div>
 		</div>
 	</header>
@@ -63,87 +75,153 @@
 	<!-- Main Content -->
 	<main class="max-w-md mx-auto px-4 py-6">
 		<!-- Error Display -->
-		{#if $error}
-			<div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
-				<div class="flex items-center">
-					<svg class="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-							d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-					</svg>
-					<p class="text-red-800 dark:text-red-200 text-sm">
-						{$error}
-					</p>
-				</div>
+		{#if wifiState.error}
+			<div class="border border-destructive/50 bg-destructive/10 rounded-lg p-4 mb-6">
+				<p class="text-destructive text-sm">{wifiState.error}</p>
 			</div>
 		{/if}
 
 		<!-- Status Card -->
-		<div class="card p-6 mb-6">
-			<h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">WiFi Status</h2>
-
-			{#if $isLoading}
-				<div class="animate-pulse">
-					<div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
-					<div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-				</div>
-			{:else if $status}
-				<div class="space-y-3">
-					<div class="flex justify-between items-center">
-						<span class="text-sm text-gray-600 dark:text-gray-400">Status:</span>
-						<span class="text-sm font-medium" class:text-green-600={$status?.network?.wifi?.status === 'connected'}
-							class:text-yellow-600={$status?.network?.wifi?.status === 'connecting'}
-							class:text-red-600={$status?.network?.wifi?.status === 'disconnected'}>
-							{$status?.network?.wifi?.status || 'Unknown'}
-						</span>
+		<Card class="mb-6">
+			<CardHeader>
+				<CardTitle>WiFi Status</CardTitle>
+			</CardHeader>
+			<CardContent>
+				{#if wifiState.isLoading}
+					<div class="animate-pulse space-y-2">
+						<div class="h-4 bg-muted rounded w-3/4"></div>
+						<div class="h-4 bg-muted rounded w-1/2"></div>
 					</div>
-
-					{#if $status?.network?.wifi?.ssid}
+				{:else if wifiState.status}
+					<div class="space-y-3">
 						<div class="flex justify-between items-center">
-							<span class="text-sm text-gray-600 dark:text-gray-400">Network:</span>
-							<span class="text-sm font-medium text-gray-900 dark:text-white">
-								{$status?.network?.wifi?.ssid}
+							<span class="text-sm text-muted-foreground">Status:</span>
+							<span class="text-sm font-medium {
+								wifiState.status?.network?.wifi?.status === 'connected' ? 'text-green-600' :
+								wifiState.status?.network?.wifi?.status === 'connecting' ? 'text-yellow-600' :
+								'text-red-600'
+							}">
+								{wifiState.status?.network?.wifi?.status || 'Unknown'}
 							</span>
 						</div>
-					{/if}
+						{#if wifiState.status?.network?.wifi?.ssid}
+							<div class="flex justify-between items-center">
+								<span class="text-sm text-muted-foreground">Network:</span>
+								<span class="text-sm font-medium text-foreground">
+									{wifiState.status?.network?.wifi?.ssid}
+								</span>
+							</div>
+						{/if}
+						{#if wifiState.status?.network?.wifi?.ip}
+							<div class="flex justify-between items-center">
+								<span class="text-sm text-muted-foreground">IP Address:</span>
+								<span class="text-sm font-mono text-foreground">
+									{wifiState.status?.network?.wifi?.ip}
+								</span>
+							</div>
+						{/if}
+					</div>
+				{/if}
+			</CardContent>
+		</Card>
 
-					{#if $status?.network?.wifi?.ip}
-						<div class="flex justify-between items-center">
-							<span class="text-sm text-gray-600 dark:text-gray-400">IP Address:</span>
-							<span class="text-sm font-mono text-gray-900 dark:text-white">
-								{$status?.network?.wifi?.ip}
-							</span>
-						</div>
+		<!-- Radio Card -->
+		<Card class="mb-6">
+			<CardHeader>
+				<div class="flex items-center justify-between">
+					<CardTitle>Radio</CardTitle>
+					{#if !wsState.isConnected}
+						<span class="text-xs text-yellow-600">live updates offline</span>
 					{/if}
 				</div>
-			{/if}
-		</div>
+			</CardHeader>
+			<CardContent>
+				<!-- Station Slot Cards -->
+				<div class="flex flex-col gap-2 mb-4">
+					{#each [1, 2, 3] as slot}
+						{@const station = radioState.stations[slot]}
+						{@const isActive = radioState.isPlaying && radioState.currentSlot === slot}
+						<div class="flex items-center rounded-lg border-2 transition-colors {
+							isActive ? 'border-primary bg-primary/5' : 'border-border'
+						}">
+							<button
+								onclick={() => handleSlotClick(slot)}
+								disabled={!station}
+								class="flex items-center gap-3 flex-1 min-w-0 px-4 py-3 text-left disabled:cursor-default"
+							>
+								<div class="flex items-center gap-1.5 flex-shrink-0">
+									<span class="text-xs font-medium text-muted-foreground">{slot}</span>
+									{#if isActive}
+										<span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+									{/if}
+								</div>
+								<span class="text-sm truncate {
+									isActive ? 'text-primary font-semibold' :
+									station ? 'text-foreground' : 'text-muted-foreground'
+								}">
+									{station?.name || '(empty)'}
+								</span>
+							</button>
+
+							<div class="flex items-center gap-1 pr-2">
+								{#if isActive}
+									<Button
+										variant="ghost"
+										size="icon"
+										onclick={(e: MouseEvent) => handlePlayPause(e, slot)}
+										class="rounded-full"
+									>
+										<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+											<rect x="6" y="6" width="12" height="12" rx="1" />
+										</svg>
+									</Button>
+								{/if}
+								<Button
+									variant="ghost"
+									size="icon"
+									onclick={(e: MouseEvent) => handleSlotSettings(e, slot)}
+									class="rounded-full"
+								>
+									<Settings class="w-4 h-4" />
+								</Button>
+							</div>
+						</div>
+					{/each}
+				</div>
+
+				<!-- Volume Slider -->
+				<div class="flex items-center space-x-3">
+					<svg class="w-4 h-4 text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+							d="M15.536 8.464a5 5 0 010 7.072M12 6l-4 4H4v4h4l4 4V6z" />
+					</svg>
+					<input
+						type="range"
+						min="0"
+						max="100"
+						value={radioState.volume}
+						oninput={handleVolumeInput}
+						class="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-secondary accent-primary"
+					/>
+					<span class="text-xs text-muted-foreground w-10 text-right">{radioState.volume}%</span>
+				</div>
+			</CardContent>
+		</Card>
 
 		<!-- Action Buttons -->
 		<div class="space-y-3">
-			<a href="/setup" class="btn-primary w-full justify-center">
-				<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-						d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
-				</svg>
+			<Button href="/setup" class="w-full" variant="default">
+				<Wifi class="w-4 h-4 mr-2" />
 				WiFi Manager
-			</a>
-
-			<a href="/status" class="btn-secondary w-full justify-center">
-				<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-						d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-				</svg>
+			</Button>
+			<Button href="/status" class="w-full" variant="outline">
+				<BarChart2 class="w-4 h-4 mr-2" />
 				System Status
-			</a>
-
-			<a href="/settings" class="btn-secondary w-full justify-center">
-				<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-						d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-				</svg>
+			</Button>
+			<Button href="/settings" class="w-full" variant="outline">
+				<Settings class="w-4 h-4 mr-2" />
 				Settings
-			</a>
+			</Button>
 		</div>
 	</main>
 </div>

@@ -9,18 +9,20 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies (including sudo and wpa_cli for WiFi management)
+# Install system dependencies (including NetworkManager for WiFi management)
 RUN apt-get update && apt-get install -y \
     curl \
     procps \
     net-tools \
     iputils-ping \
+    iproute2 \
     wireless-tools \
     iw \
-    wpasupplicant \
-    hostapd \
-    dnsmasq \
+    network-manager \
+    dnsmasq-base \
     sudo \
+    mpg123 \
+    alsa-utils \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -29,12 +31,14 @@ WORKDIR /app
 
 # Create non-root user and add to netdev group for wpa_cli access
 # Use GID 104 to match host's netdev group (standard on Raspberry Pi OS)
+# Use GID 986 to match host's gpio group (for /dev/gpiochip0 access)
 RUN groupmod -g 104 netdev || groupadd -g 104 netdev && \
+    groupadd -g 986 gpio && \
     groupadd -r radio && \
-    useradd -r -g radio -G netdev radio
+    useradd -r -g radio -G netdev,audio,gpio radio
 
-# Configure passwordless sudo for WiFi management commands (RaspiWiFi-style permissions)
-RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown" > /etc/sudoers.d/radio && \
+# Configure passwordless sudo for WiFi management commands (nmcli permissions)
+RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /bin/mkdir, /usr/bin/mkdir, /bin/touch, /usr/bin/touch, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown, /sbin/ip, /usr/sbin/ip, /bin/ip, /usr/bin/nmcli, /usr/bin/killall" > /etc/sudoers.d/radio && \
     chmod 0440 /etc/sudoers.d/radio
 
 # Copy requirements and install Python dependencies
@@ -47,13 +51,14 @@ RUN if [ "$INSTALL_TEST_DEPS" = "true" ]; then \
         pip install --no-cache-dir -r requirements-test.txt; \
     fi
 
-# Copy boot check script and configuration templates (from project root)
+# Copy boot check script (from project root)
 COPY --chmod=755 scripts/boot-wifi-check.sh /usr/local/bin/boot-wifi-check.sh
-COPY config/hostapd/hostapd.conf.template /etc/hostapd/hostapd.conf.template
-COPY config/dnsmasq/dnsmasq.conf.template /etc/dnsmasq.conf.template
 
 # Copy application code
 COPY backend/ .
+
+# Copy station library (read-only reference data, not overwritten by config volume)
+COPY config/stations.json /app/assets/stations.json
 
 # Create necessary directories for testing
 RUN mkdir -p /app/data /app/sounds /app/logs /app/htmlcov

@@ -1,1 +1,0 @@
-"""Hardware test module."""

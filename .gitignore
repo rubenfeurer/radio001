@@ -293,6 +293,9 @@ wpa_supplicant.conf
 hostapd.conf
 dnsmasq.conf
 
+# User configuration (tracked in repo - no secrets, hardware settings only)
+# config/radio.conf
+
 # SSL certificates
 *.pem
 *.key
@@ -347,8 +350,23 @@ Temporary Items
 # Development
 *.pid
 *.lock
+!backend/requirements.lock
 .development
 .test
+
+# OpenSpec temporary files (track specs and changes, ignore only temp files)
+.openspec/
+openspec/changes/*/temp/
+openspec/changes/*/.temp/
+*.openspec.tmp
+.opsx-cache/
+
+# OpenSpec content to track (remove from ignore)
+!openspec/
+!openspec/specs/
+!openspec/specs/**/*
+!openspec/changes/
+!openspec/changes/**/*
 
 # Monitoring and metrics
 metrics/

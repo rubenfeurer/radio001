@@ -9,35 +9,52 @@ services:
       dockerfile: docker/Dockerfile.backend
     container_name: radio-backend-dev
     hostname: radio-backend
-    ports:
-      - "8000:8000" # FastAPI port
+    network_mode: host
     volumes:
       # Source code mounting for hot reload
       - ../backend:/app:cached
+      # Configuration file
+      - ../config/radio.conf:/app/config/radio.conf:ro
       # Data directory for station storage (mounts to /app/data since workdir is /app)
       - ../data:/app/data:rw
       # Assets directory for sounds
       - ../assets:/app/assets:ro
       # Python cache
       - radio_python_cache:/root/.cache/pip
-    environment:
-      # Application settings
-      - NODE_ENV=development
-      - API_PORT=8000
-      - WIFI_INTERFACE=wlan0
-      - HOSTNAME=radio
 
-      # Hotspot configuration
-      - HOTSPOT_SSID=Radio-Setup
-      - HOTSPOT_PASSWORD=radio123
-      - HOTSPOT_IP=192.168.4.1
-      - HOTSPOT_RANGE=192.168.4.2,192.168.4.20
+      # System integration for WiFi management (NetworkManager)
+      - /etc/NetworkManager:/etc/NetworkManager:rw
+      - /var/lib/NetworkManager:/var/lib/NetworkManager:rw
+      - /run/NetworkManager:/run/NetworkManager:rw
+      - /run/dbus:/run/dbus:rw
+      - /var/run/dbus:/var/run/dbus:rw
+      - /etc/raspiwifi:/etc/raspiwifi:rw
+
+      # PolicyKit configuration for NetworkManager authorization
+      - ../config/polkit:/etc/polkit-1/localauthority/50-local.d:ro
+
+      # Device access for WiFi management
+      - /dev:/dev:rw
+      - /sys/class/net:/sys/class/net:ro
+    env_file:
+      - ../config/radio.conf
+    environment:
+      # Config file location
+      - CONFIG_FILE=/app/config/radio.conf
+
+      # Application settings (can be overridden by config file)
+      - NODE_ENV=production
+      - HOSTNAME=radio
 
       # Development flags
       - DEBUG=1
-    networks:
-      - radio-network
     restart: unless-stopped
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    devices:
+      - /dev/net/tun
     depends_on: []
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -58,13 +75,9 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
-    ports:
-      - "80:80" # HTTP
-      - "8080:8080" # Traefik dashboard
+    network_mode: host
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - radio-network
     profiles:
       - traefik
     restart: unless-stopped
@@ -86,15 +99,32 @@ services:
     depends_on:
       - radio-backend
 
+  # Development service with OpenSpec
+  radio-dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dev
+    container_name: radio-dev
+    hostname: radio-dev
+    network_mode: host
+    volumes:
+      # Mount entire project for OpenSpec access
+      - ..:/workspace/radio001:cached
+      # Node modules cache
+      - radio_node_cache:/home/dev/.npm
+    environment:
+      - NODE_ENV=development
+      - OPENSPEC_TELEMETRY=0
+    working_dir: /workspace/radio001
+    stdin_open: true
+    tty: true
+    profiles:
+      - dev
+    restart: unless-stopped
+
 # Named volumes for development
 volumes:
   radio_python_cache:
     driver: local
-
-# Custom network
-networks:
-  radio-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.25.0.0/16
+  radio_node_cache:
+    driver: local

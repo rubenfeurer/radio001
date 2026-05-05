@@ -10,7 +10,10 @@ This module provides FastAPI routes for global radio system control:
 - GET /hardware-status - Get hardware component status
 """
 
+import json
 import logging
+import os
+from pathlib import Path
 from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, status, BackgroundTasks
 from fastapi.responses import JSONResponse
@@ -345,6 +348,32 @@ async def shutdown_radio_system(background_tasks: BackgroundTasks):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to shutdown radio system"
+        )
+
+
+_LIBRARY_FILE = Path(os.environ.get("LIBRARY_FILE", "/app/assets/stations.json"))
+
+
+@router.get("/library", summary="Get station library")
+async def get_station_library():
+    """
+    Return all stations from the station library (config/stations.json).
+    Used by the frontend station search page.
+    """
+    if not _LIBRARY_FILE.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Station library not found"
+        )
+    try:
+        with open(_LIBRARY_FILE, "r", encoding="utf-8") as f:
+            stations = json.load(f)
+        return {"stations": stations}
+    except Exception as e:
+        logger.error(f"Error reading station library: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to read station library"
         )
 
 
