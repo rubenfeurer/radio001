@@ -4,7 +4,7 @@
 # =============================================================================
 # Base Python stage for FastAPI backend
 # =============================================================================
-FROM python:3.11-alpine AS python-base
+FROM python:3.14-alpine AS python-base
 
 # Install system dependencies for WiFi management
 RUN apk add --no-cache \

@@ -1,7 +1,7 @@
 # Backend Dockerfile optimized for Apple Silicon (arm64) development
 # Lightweight version that addresses pydantic-core build issues
 
-FROM --platform=linux/arm64 python:3.11-slim
+FROM --platform=linux/arm64 python:3.14-slim
 
 # Set platform environment
 ENV DOCKER_BUILDPLATFORM=linux/arm64
