@@ -6,7 +6,7 @@ services:
   radio-backend:
     build:
       context: ..
-      dockerfile: backend/Dockerfile
+      dockerfile: docker/Dockerfile.backend
       args:
         INSTALL_TEST_DEPS: "true"
     platform: linux/amd64
