@@ -2,10 +2,10 @@
 # Python 3.13 compatible versions for Apple Silicon and Raspberry Pi
 
 # Core FastAPI framework
-fastapi==0.104.1
+fastapi==0.115.5
 
 # ASGI server for production
-uvicorn[standard]==0.24.0
+uvicorn[standard]==0.32.1
 
 # Data validation and settings (Python 3.13 compatible)
 pydantic==2.13.3
