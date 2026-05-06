@@ -15,8 +15,8 @@ NC='\033[0m' # No Color
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-COMPOSE_FILE="$PROJECT_DIR/compose/docker-compose.yml"
-COMPOSE_PROD_FILE="$PROJECT_DIR/compose/docker-compose.prod.yml"
+COMPOSE_FILE="$PROJECT_DIR/docker/compose.dev.yml"
+COMPOSE_PROD_FILE="$PROJECT_DIR/docker/compose.prod.yml"
 
 # Function to print colored output
 print_info() {
@@ -53,8 +53,8 @@ if [[ "$PLATFORM" == "arm64" || "$PLATFORM" == "aarch64" ]]; then
         PLATFORM_NAME="ARM64"
     fi
 
-    if [[ -f "$PROJECT_DIR/compose/docker-compose.override.yml" ]]; then
-        COMPOSE_OVERRIDE="-f $PROJECT_DIR/compose/docker-compose.override.yml"
+    if [[ -f "$PROJECT_DIR/docker/compose.override.yml" ]]; then
+        COMPOSE_OVERRIDE="-f $PROJECT_DIR/docker/compose.override.yml"
         print_info "Detected $PLATFORM_NAME - using optimized configuration"
     else
         print_info "Detected $PLATFORM_NAME - using default configuration"

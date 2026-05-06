@@ -8,7 +8,6 @@ import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
 
 import uvicorn
 
@@ -59,7 +58,6 @@ from api.routes.websocket import (
 )
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 
 # =============================================================================
 # Configuration
@@ -142,15 +140,7 @@ class Config:
 from api.routes.wifi import router as wifi_router
 from api.routes.wifi import set_wifi_manager
 from core import WiFiManager
-
-
-# Standard API response model
-class ApiResponse(BaseModel):
-    """Standard API response"""
-
-    success: bool
-    message: str
-    data: Any = None
+from core.models import ApiResponse
 
 
 # =============================================================================

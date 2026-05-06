@@ -17,8 +17,9 @@ services:
       - ../config/radio.conf:/app/config/radio.conf:ro
       # Data directory for station storage (mounts to /app/data since workdir is /app)
       - ../data:/app/data:rw
-      # Assets directory for sounds
-      - ../assets:/app/assets:ro
+      # Station library and sounds from canonical config location
+      - ../config/stations.json:/app/assets/stations.json:ro
+      - ../config/sounds:/app/assets/sounds:ro
       # Python cache
       - radio_python_cache:/root/.cache/pip
 

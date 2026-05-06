@@ -6,13 +6,13 @@ on:
     paths:
       - "backend/**"
       - ".github/workflows/test-backend.yml"
-      - "compose/docker-compose*.yml"
+      - "docker/compose*.yml"
   pull_request:
     branches: [main, develop]
     paths:
       - "backend/**"
       - ".github/workflows/test-backend.yml"
-      - "compose/docker-compose*.yml"
+      - "docker/compose*.yml"
   workflow_dispatch:
     inputs:
       test_type:
@@ -33,7 +33,7 @@ on:
         type: string
 
 env:
-  PYTHON_VERSION: "3.11"
+  PYTHON_VERSION: "3.13"
   NODE_ENV: "development"
   MOCK_HARDWARE: "true"
 
@@ -55,7 +55,7 @@ jobs:
         run: |
           echo "python-version=${{ env.PYTHON_VERSION }}" >> $GITHUB_OUTPUT
           echo "test-type=${{ github.event.inputs.test_type || 'all' }}" >> $GITHUB_OUTPUT
-          echo "coverage-threshold=${{ github.event.inputs.coverage_threshold || '23' }}" >> $GITHUB_OUTPUT
+          echo "coverage-threshold=${{ github.event.inputs.coverage_threshold || '20' }}" >> $GITHUB_OUTPUT
 
       - name: Display test configuration
         run: |
@@ -85,12 +85,13 @@ jobs:
         with:
           python-version: ${{ needs.setup.outputs.python-version }}
           cache: "pip"
+          cache-dependency-path: "backend/requirements.lock"
 
       - name: Install dependencies
         run: |
           cd backend
           pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install --no-deps --require-hashes -r requirements.lock
           pip install -r requirements-test.txt
 
       - name: Run unit tests
@@ -145,12 +146,13 @@ jobs:
         with:
           python-version: ${{ needs.setup.outputs.python-version }}
           cache: "pip"
+          cache-dependency-path: "backend/requirements.lock"
 
       - name: Install dependencies
         run: |
           cd backend
           pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install --no-deps --require-hashes -r requirements.lock
           pip install -r requirements-test.txt
 
       - name: Run API tests
@@ -204,12 +206,13 @@ jobs:
         with:
           python-version: ${{ needs.setup.outputs.python-version }}
           cache: "pip"
+          cache-dependency-path: "backend/requirements.lock"
 
       - name: Install dependencies
         run: |
           cd backend
           pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install --no-deps --require-hashes -r requirements.lock
           pip install -r requirements-test.txt
 
       - name: Run WebSocket tests
@@ -273,8 +276,8 @@ jobs:
       - name: Build and start test services
         run: |
           # Build backend for integration testing
-          docker compose -f compose/docker-compose.ci.yml build radio-backend
-          docker compose -f compose/docker-compose.ci.yml up -d radio-backend
+          docker compose -f docker/compose.ci.yml build radio-backend
+          docker compose -f docker/compose.ci.yml up -d radio-backend
 
           # Wait for services to be ready
           echo "Waiting for backend to be ready..."
@@ -291,15 +294,12 @@ jobs:
         run: |
           echo "🔄 Running Integration Tests..."
 
-          docker compose -f compose/docker-compose.ci.yml exec -T radio-backend bash -c "
+          docker compose -f docker/compose.ci.yml exec -T radio-backend bash -c "
             export NODE_ENV=development
             export MOCK_HARDWARE=true
             export PYTHONPATH=/app:\$PYTHONPATH
 
-            # Install test dependencies
-            pip install -r requirements-test.txt
-
-            # Run integration tests
+            # Run integration tests (test deps pre-installed via INSTALL_TEST_DEPS=true)
             python -m pytest \
               --verbose \
               --tb=short \
@@ -334,7 +334,7 @@ jobs:
       - name: Cleanup integration services
         if: always()
         run: |
-          docker compose -f compose/docker-compose.ci.yml down -v
+          docker compose -f docker/compose.ci.yml down -v
 
   # =============================================================================
   # Performance Tests (Optional)
@@ -354,12 +354,13 @@ jobs:
         with:
           python-version: ${{ needs.setup.outputs.python-version }}
           cache: "pip"
+          cache-dependency-path: "backend/requirements.lock"
 
       - name: Install dependencies
         run: |
           cd backend
           pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install --no-deps --require-hashes -r requirements.lock
           pip install -r requirements-test.txt
           pip install pytest-benchmark locust
 

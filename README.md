@@ -36,7 +36,7 @@ cd radio001
 nano config/radio.conf
 
 # Start
-docker compose -f compose/docker-compose.prod.yml up -d
+docker compose -f docker/compose.prod.yml up -d
 ```
 
 Access at `http://radio.local` or `http://<pi-ip>`.
@@ -47,7 +47,7 @@ All settings live in **`config/radio.conf`** — a plain key=value file. No rebu
 
 ```bash
 # Restart after config changes
-docker compose -f compose/docker-compose.prod.yml restart radio-backend
+docker compose -f docker/compose.prod.yml restart radio-backend
 ```
 
 ### Key settings
@@ -69,22 +69,28 @@ docker compose -f compose/docker-compose.prod.yml restart radio-backend
 radio001/
 ├── config/
 │   ├── radio.conf          # Main config — edit this
-│   ├── stations.json       # Saved station state (runtime)
+│   ├── stations.json       # Station library (28k+ stations)
+│   ├── sounds/             # Notification sounds
 │   ├── avahi/              # mDNS service definition
 │   ├── polkit/             # NetworkManager permissions
 │   └── systemd/            # Boot service
 ├── backend/
-│   ├── core/               # Radio logic (station manager, radio manager)
+│   ├── core/               # Radio logic (station manager, radio manager, models)
 │   ├── hardware/           # GPIO controller, audio player
 │   ├── api/routes/         # FastAPI endpoints + WebSocket
 │   └── main.py             # App entry point, config loader
-├── frontend/               # SvelteKit UI
+├── frontend/               # SvelteKit + shadcn-svelte UI
 │   └── src/
-│       ├── routes/         # Pages: /, /radio, /setup, /settings
-│       └── lib/            # Stores, components
-├── compose/
-│   ├── docker-compose.prod.yml
-│   └── docker-compose.yml
+│       ├── routes/         # Pages: /, /setup, /stations, /status, /settings
+│       └── lib/            # Stores, components, types
+├── docker/
+│   ├── Dockerfile.backend  # Backend image (dev/CI)
+│   ├── Dockerfile.backend.arm64  # Pi build
+│   ├── compose.dev.yml     # Local development
+│   ├── compose.prod.yml    # Production (Pi)
+│   ├── compose.ci.yml      # CI pipeline
+│   └── nginx.conf          # Frontend reverse proxy
+├── data/                   # Runtime station state
 ├── openspec/               # Spec-driven development artifacts
 └── scripts/                # Helper scripts
 ```
@@ -93,7 +99,7 @@ radio001/
 
 ```bash
 # Backend (Docker)
-docker compose -f compose/docker-compose.yml up radio-backend -d
+docker compose -f docker/compose.dev.yml up radio-backend -d
 
 # Frontend (local)
 cd frontend && npm install && npm run dev

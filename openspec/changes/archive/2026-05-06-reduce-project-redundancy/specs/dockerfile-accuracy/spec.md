@@ -1,9 +1,5 @@
-# dockerfile-accuracy Specification
+## MODIFIED Requirements
 
-## Purpose
-Ensures Dockerfiles and compose files accurately reflect the project's actual dependencies, file locations, and build targets — no stale references, no duplicate files, no workaround copies.
-
-## Requirements
 ### Requirement: Dockerfile Dependency Accuracy
 
 The Dockerfile SHALL accurately reflect the actual system dependencies and SHALL NOT reference unused packages or missing files.
@@ -29,6 +25,8 @@ The Dockerfile SHALL accurately reflect the actual system dependencies and SHALL
 - **AND** legacy references SHALL be removed from the build process
 - **AND** the build artifacts SHALL match the actual runtime dependencies
 
+## ADDED Requirements
+
 ### Requirement: Docker compose mounts use canonical file locations
 Docker compose volume mounts SHALL reference the single canonical location for each file, not copies created to work around missing mounts.
 
@@ -46,4 +44,3 @@ Docker compose volume mounts SHALL reference the single canonical location for e
 - **WHEN** a Docker image is built for the backend
 - **THEN** exactly one Dockerfile SHALL exist for that target (at `docker/Dockerfile.backend`)
 - **AND** `backend/Dockerfile` SHALL not exist as a duplicate
-

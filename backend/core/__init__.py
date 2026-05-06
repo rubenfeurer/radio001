@@ -9,9 +9,8 @@ This package contains the business logic for the radio system:
 - Models: Data models for radio and WiFi functionality
 """
 
-from .models import RadioStation, SystemStatus, VolumeUpdate
+from .models import RadioStation, SystemStatus, VolumeUpdate, WiFiCredentials, WiFiNetworkModel, WiFiStatusModel
 from .wifi_manager import WiFiManager, WiFiNetwork, WiFiStatus
-from .wifi_models import WiFiCredentials, WiFiNetworkModel, WiFiStatusModel
 
 __all__ = [
     "RadioStation",
