@@ -33,9 +33,13 @@ jobs:
           pip-compile --generate-hashes \
             --output-file backend/requirements.lock.check \
             backend/requirements.in
-          if ! diff -q backend/requirements.lock backend/requirements.lock.check; then
+          # Strip comment lines before diffing: the header contains the output
+          # file path which differs between the committed file and the .check file.
+          if ! diff -q \
+              <(grep -v '^#' backend/requirements.lock) \
+              <(grep -v '^#' backend/requirements.lock.check); then
             echo "requirements.lock is out of sync with requirements.in"
-            echo "Run: pip-compile --generate-hashes backend/requirements.in -o backend/requirements.lock"
+            echo "Run: pip-compile --generate-hashes --output-file=backend/requirements.lock backend/requirements.in"
             diff backend/requirements.lock backend/requirements.lock.check || true
             exit 1
           fi
