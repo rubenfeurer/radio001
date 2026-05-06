@@ -180,6 +180,15 @@ async def health_check():
     return {"status": "healthy", "service": "radio-system"}
 
 
+@router.get("/version", summary="Get image version")
+async def get_version():
+    """Returns the running image version and registry coordinates."""
+    return {
+        "version": os.getenv("VERSION", "dev"),
+        "image": "ghcr.io/rubenfeurer/radio001",
+    }
+
+
 class ApiResponse(BaseModel):
     """Standard API response"""
 

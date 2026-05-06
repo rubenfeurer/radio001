@@ -48,8 +48,10 @@ Run both frontend and backend tests before committing.
 ## Key Details
 
 - Target: Raspberry Pi Zero 2 W (ARM64) - avoid x86-specific dependencies
-- WiFi API: `/api/wifi/`, Radio API: `/radio/`
-- Deploy: `./scripts/deploy-pi.sh` | Access: http://radio.local
+- WiFi API: `/wifi/`, Radio API: `/radio/`
+- Deploy: `scripts/install.sh` (one-command Pi installer) | Access: http://radio.local
 - PR titles: `[frontend]` or `[backend]` prefix
-- Rebuild container after dependency changes to `backend/requirements.txt`
-- Current focus: Phase 4 frontend integration (see `openspec/specs/radio-integration/spec.md`)
+- Rebuild container after dependency changes to `backend/requirements.lock`
+- Deployment & update architecture: see `docs/deployment-and-updates.md`
+- Production image: `ghcr.io/rubenfeurer/radio001:latest` (built by `release.yml` on push to main)
+- Frontend is baked into the Docker image (multi-stage build); no separate nginx service in production

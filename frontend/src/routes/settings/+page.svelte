@@ -1,8 +1,25 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { ArrowLeft, Settings } from 'lucide-svelte';
+
+	let version = $state('...');
+	let image = $state('');
+
+	onMount(async () => {
+		try {
+			const res = await fetch('/system/version');
+			if (res.ok) {
+				const data = await res.json();
+				version = data.version ?? 'dev';
+				image = data.image ?? '';
+			}
+		} catch {
+			version = 'dev';
+		}
+	});
 </script>
 
 <svelte:head>
@@ -37,5 +54,9 @@
 				<Button onclick={() => goto('/')}>Return Home</Button>
 			</CardContent>
 		</Card>
+
+		<p class="text-center text-xs text-muted-foreground mt-6">
+			Version <span class="font-mono">{version}</span>
+		</p>
 	</main>
 </div>
