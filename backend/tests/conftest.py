@@ -27,8 +27,11 @@ from core.models import RadioStation, StationRequest
 
 @pytest.fixture(scope="session")
 def event_loop():
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
+    """Session-scoped event loop. The __original_fixture_loop marker bypasses
+    a pytest-asyncio 0.24.x bug where it tries to inspect source of a synthetic
+    session loop closure (OSError: could not get source code)."""
+    loop = asyncio.new_event_loop()
+    loop.__original_fixture_loop = True
     yield loop
     loop.close()
 
@@ -374,3 +377,4 @@ async def wait_for_async_tasks(timeout: float = 1.0):
     pending = [task for task in asyncio.all_tasks() if not task.done()]
     if pending:
         await asyncio.wait(pending, timeout=timeout, return_when=asyncio.ALL_COMPLETED)
+
