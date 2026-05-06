@@ -105,3 +105,5 @@ jobs:
           exit-code: "1"
           ignore-unfixed: true
           severity: HIGH,CRITICAL
+        env:
+          TRIVY_PLATFORM: linux/arm64
