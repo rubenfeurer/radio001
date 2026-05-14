@@ -23,7 +23,7 @@ class TestStationRoutes:
 
     async def test_get_all_stations_endpoint(self, client: AsyncClient):
         """Test GET /radio/stations/ endpoint."""
-        response = await client.get("/radio/stations/")
+        response = await client.get("/api/radio/stations/")
         assert response.status_code == 200
 
         data = response.json()
@@ -40,7 +40,7 @@ class TestStationRoutes:
     async def test_get_station_by_slot_valid(self, client: AsyncClient):
         """Test GET /radio/stations/{slot} endpoint with valid slots."""
         for slot in [1, 2, 3]:
-            response = await client.get(f"/radio/stations/{slot}")
+            response = await client.get(f"/api/radio/stations/{slot}")
             assert response.status_code == 200
             # Response can be station object or None
 
@@ -48,7 +48,7 @@ class TestStationRoutes:
         """Test GET /radio/stations/{slot} endpoint with invalid slots."""
         invalid_slots = [0, 4, 5, -1, 999]
         for slot in invalid_slots:
-            response = await client.get(f"/radio/stations/{slot}")
+            response = await client.get(f"/api/radio/stations/{slot}")
             assert response.status_code == 400
             error_data = response.json()
             assert "Slot must be 1, 2, or 3" in error_data["detail"]
@@ -65,7 +65,7 @@ class TestStationRoutes:
             "language": "English"
         }
 
-        response = await client.post("/radio/stations/1", json=station_data)
+        response = await client.post("/api/radio/stations/1", json=station_data)
         assert response.status_code == 200
 
         result = response.json()
@@ -83,7 +83,7 @@ class TestStationRoutes:
             "url": "https://minimal.example.com/stream"
         }
 
-        response = await client.post("/radio/stations/2", json=minimal_station)
+        response = await client.post("/api/radio/stations/2", json=minimal_station)
         assert response.status_code == 200
 
         result = response.json()
@@ -96,7 +96,7 @@ class TestStationRoutes:
             "name": "Invalid Station",
             "url": "not-a-valid-url"
         }
-        response = await client.post("/radio/stations/1", json=invalid_station)
+        response = await client.post("/api/radio/stations/1", json=invalid_station)
         assert response.status_code == 422
 
         # Test missing required fields
@@ -107,7 +107,7 @@ class TestStationRoutes:
         ]
 
         for incomplete_station in incomplete_stations:
-            response = await client.post("/radio/stations/1", json=incomplete_station)
+            response = await client.post("/api/radio/stations/1", json=incomplete_station)
             assert response.status_code == 422
 
     async def test_save_station_invalid_slot(self, client: AsyncClient):
@@ -119,7 +119,7 @@ class TestStationRoutes:
 
         invalid_slots = [0, 4, -1]
         for slot in invalid_slots:
-            response = await client.post(f"/radio/stations/{slot}", json=station_data)
+            response = await client.post(f"/api/radio/stations/{slot}", json=station_data)
             assert response.status_code == 400
 
     async def test_save_station_url_validation(self, client: AsyncClient):
@@ -136,7 +136,7 @@ class TestStationRoutes:
                 "name": "URL Test Station",
                 "url": url
             }
-            response = await client.post("/radio/stations/1", json=station_data)
+            response = await client.post("/api/radio/stations/1", json=station_data)
             assert response.status_code == 200
 
     async def test_save_station_url_validation(self, client: AsyncClient):
@@ -154,7 +154,7 @@ class TestStationRoutes:
                 "name": "Invalid URL Station",
                 "url": url
             }
-            response = await client.post("/radio/stations/1", json=invalid_station)
+            response = await client.post("/api/radio/stations/1", json=invalid_station)
             assert response.status_code == 422
 
         # Test valid URLs (should be accepted)
@@ -169,7 +169,7 @@ class TestStationRoutes:
                 "name": "Valid URL Station",
                 "url": url
             }
-            response = await client.post("/radio/stations/1", json=valid_station)
+            response = await client.post("/api/radio/stations/1", json=valid_station)
             assert response.status_code == 200
 
     async def test_toggle_station_playback_success(self, client: AsyncClient):
@@ -179,10 +179,10 @@ class TestStationRoutes:
             "name": "Toggle Test Station",
             "url": "https://toggle-test.example.com/stream"
         }
-        await client.post("/radio/stations/2", json=station_data)
+        await client.post("/api/radio/stations/2", json=station_data)
 
         # Test toggle
-        response = await client.post("/radio/stations/2/toggle")
+        response = await client.post("/api/radio/stations/2/toggle")
         assert response.status_code == 200
 
         result = response.json()
@@ -195,10 +195,10 @@ class TestStationRoutes:
     async def test_toggle_empty_slot(self, client: AsyncClient):
         """Test toggling an empty slot."""
         # Clear slot first to ensure it's empty
-        await client.post("/radio/stations/2/clear")
+        await client.post("/api/radio/stations/2/clear")
 
         # Try to toggle empty slot
-        response = await client.post("/radio/stations/2/toggle")
+        response = await client.post("/api/radio/stations/2/toggle")
         assert response.status_code == 404
         error_data = response.json()
         assert "No station configured in slot 2" in error_data["detail"]
@@ -207,7 +207,7 @@ class TestStationRoutes:
         """Test toggling invalid slot numbers."""
         invalid_slots = [0, 4, -1]
         for slot in invalid_slots:
-            response = await client.post(f"/radio/stations/{slot}/toggle")
+            response = await client.post(f"/api/radio/stations/{slot}/toggle")
             assert response.status_code == 400
 
     async def test_play_station_success(self, client: AsyncClient):
@@ -217,10 +217,10 @@ class TestStationRoutes:
             "name": "Play Test Station",
             "url": "https://play-test.example.com/stream"
         }
-        await client.post("/radio/stations/1", json=station_data)
+        await client.post("/api/radio/stations/1", json=station_data)
 
         # Test play
-        response = await client.post("/radio/stations/1/play")
+        response = await client.post("/api/radio/stations/1/play")
         assert response.status_code == 200
 
         result = response.json()
@@ -230,9 +230,9 @@ class TestStationRoutes:
 
     async def test_play_empty_slot(self, client: AsyncClient):
         """Test playing an empty slot."""
-        await client.post("/radio/stations/3/clear")
+        await client.post("/api/radio/stations/3/clear")
 
-        response = await client.post("/radio/stations/3/play")
+        response = await client.post("/api/radio/stations/3/play")
         assert response.status_code == 404
 
     async def test_delete_station_success(self, client: AsyncClient):
@@ -242,10 +242,10 @@ class TestStationRoutes:
             "name": "Delete Test Station",
             "url": "https://delete-test.example.com/stream"
         }
-        await client.post("/radio/stations/1", json=station_data)
+        await client.post("/api/radio/stations/1", json=station_data)
 
         # Delete the station
-        response = await client.delete("/radio/stations/1")
+        response = await client.delete("/api/radio/stations/1")
         assert response.status_code == 200
 
         result = response.json()
@@ -261,14 +261,14 @@ class TestStationRoutes:
             "name": "Custom Station",
             "url": "https://custom.example.com/stream"
         }
-        await client.post("/radio/stations/1", json=custom_station)
+        await client.post("/api/radio/stations/1", json=custom_station)
 
         # Delete it
-        response = await client.delete("/radio/stations/1")
+        response = await client.delete("/api/radio/stations/1")
         assert response.status_code == 200
 
         # Check that a default was loaded
-        response = await client.get("/radio/stations/1")
+        response = await client.get("/api/radio/stations/1")
         assert response.status_code == 200
         station = response.json()
         assert station is not None  # Should have default
@@ -278,7 +278,7 @@ class TestStationRoutes:
         """Test deleting from invalid slot."""
         invalid_slots = [0, 4, -1]
         for slot in invalid_slots:
-            response = await client.delete(f"/radio/stations/{slot}")
+            response = await client.delete(f"/api/radio/stations/{slot}")
             assert response.status_code == 400
 
     async def test_clear_station_slot_success(self, client: AsyncClient):
@@ -288,10 +288,10 @@ class TestStationRoutes:
             "name": "Clear Test Station",
             "url": "https://clear-test.example.com/stream"
         }
-        await client.post("/radio/stations/3", json=station_data)
+        await client.post("/api/radio/stations/3", json=station_data)
 
         # Clear the slot
-        response = await client.post("/radio/stations/3/clear")
+        response = await client.post("/api/radio/stations/3/clear")
         assert response.status_code == 200
 
         result = response.json()
@@ -299,7 +299,7 @@ class TestStationRoutes:
         assert "cleared" in result["message"].lower()
 
         # Verify slot is empty
-        response = await client.get("/radio/stations/3")
+        response = await client.get("/api/radio/stations/3")
         assert response.status_code == 200
         assert response.json() is None
 
@@ -307,16 +307,16 @@ class TestStationRoutes:
         """Test clearing invalid slot numbers."""
         invalid_slots = [0, 4, -1]
         for slot in invalid_slots:
-            response = await client.post(f"/radio/stations/{slot}/clear")
+            response = await client.post(f"/api/radio/stations/{slot}/clear")
             assert response.status_code == 400
 
     async def test_clear_already_empty_slot(self, client: AsyncClient):
         """Test clearing an already empty slot."""
         # Ensure slot is empty
-        await client.post("/radio/stations/2/clear")
+        await client.post("/api/radio/stations/2/clear")
 
         # Clear again
-        response = await client.post("/radio/stations/2/clear")
+        response = await client.post("/api/radio/stations/2/clear")
         assert response.status_code == 200  # Should still succeed
 
     async def test_station_metadata_preservation(self, client: AsyncClient):
@@ -332,11 +332,11 @@ class TestStationRoutes:
         }
 
         # Save station
-        response = await client.post("/radio/stations/1", json=detailed_station)
+        response = await client.post("/api/radio/stations/1", json=detailed_station)
         assert response.status_code == 200
 
         # Retrieve and verify metadata
-        response = await client.get("/radio/stations/1")
+        response = await client.get("/api/radio/stations/1")
         assert response.status_code == 200
 
         station = response.json()
@@ -364,7 +364,7 @@ class TestStationRoutes:
 
         # Save stations concurrently
         save_tasks = [
-            client.post(f"/radio/stations/{i}", json=station)
+            client.post(f"/api/radio/stations/{i}", json=station)
             for i, station in enumerate(stations, 1)
         ]
 
@@ -373,7 +373,7 @@ class TestStationRoutes:
             assert result.status_code == 200
 
         # Verify all stations were saved
-        response = await client.get("/radio/stations/")
+        response = await client.get("/api/radio/stations/")
         assert response.status_code == 200
         all_stations = response.json()
         assert all_stations["total_configured"] == 3
@@ -387,36 +387,36 @@ class TestStationRoutes:
         }
 
         # 1. Save station
-        response = await client.post("/radio/stations/1", json=station_data)
+        response = await client.post("/api/radio/stations/1", json=station_data)
         assert response.status_code == 200
 
         # 2. Verify it was saved
-        response = await client.get("/radio/stations/1")
+        response = await client.get("/api/radio/stations/1")
         assert response.status_code == 200
         station = response.json()
         assert station["name"] == station_data["name"]
 
         # 3. Play station
-        response = await client.post("/radio/stations/1/play")
+        response = await client.post("/api/radio/stations/1/play")
         assert response.status_code == 200
 
         # 4. Toggle (should stop)
-        response = await client.post("/radio/stations/1/toggle")
+        response = await client.post("/api/radio/stations/1/toggle")
         assert response.status_code == 200
 
         # 5. Clear station
-        response = await client.post("/radio/stations/1/clear")
+        response = await client.post("/api/radio/stations/1/clear")
         assert response.status_code == 200
 
         # 6. Verify it's empty
-        response = await client.get("/radio/stations/1")
+        response = await client.get("/api/radio/stations/1")
         assert response.status_code == 200
         assert response.json() is None
 
     async def test_error_response_format(self, client: AsyncClient):
         """Test that error responses follow expected format."""
         # Test validation error
-        response = await client.post("/radio/stations/1", json={"invalid": "data"})
+        response = await client.post("/api/radio/stations/1", json={"invalid": "data"})
         assert response.status_code == 422
 
         # Should be FastAPI validation error format
@@ -424,15 +424,15 @@ class TestStationRoutes:
         assert "detail" in error_data
 
         # Test not found error
-        await client.post("/radio/stations/2/clear")  # Ensure empty
-        response = await client.post("/radio/stations/2/toggle")
+        await client.post("/api/radio/stations/2/clear")  # Ensure empty
+        response = await client.post("/api/radio/stations/2/toggle")
         assert response.status_code == 404
 
         error_data = response.json()
         assert "detail" in error_data
 
         # Test bad request error
-        response = await client.get("/radio/stations/0")
+        response = await client.get("/api/radio/stations/0")
         assert response.status_code == 400
 
         error_data = response.json()
@@ -449,13 +449,13 @@ class TestStationRoutes:
             "url": "https://validation.example.com/stream"
         }
 
-        response = await client.post("/radio/stations/1", json=station_data)
+        response = await client.post("/api/radio/stations/1", json=station_data)
         assert response.status_code == 200
 
         # Test when validation fails
         mock_validate.return_value = False
 
-        response = await client.post("/radio/stations/1", json=station_data)
+        response = await client.post("/api/radio/stations/1", json=station_data)
         # Should still succeed due to mock mode, but in production might fail
 
     async def test_large_station_name(self, client: AsyncClient):
@@ -467,14 +467,14 @@ class TestStationRoutes:
             "url": "https://long-name.example.com/stream"
         }
 
-        response = await client.post("/radio/stations/1", json=station_data)
+        response = await client.post("/api/radio/stations/1", json=station_data)
         assert response.status_code == 200
 
         # Test name too long (should fail validation)
         too_long_name = "A" * 101
         station_data["name"] = too_long_name
 
-        response = await client.post("/radio/stations/1", json=station_data)
+        response = await client.post("/api/radio/stations/1", json=station_data)
         assert response.status_code == 422
 
     async def test_special_characters_in_station_data(self, client: AsyncClient):
@@ -488,11 +488,11 @@ class TestStationRoutes:
             "language": "Português"
         }
 
-        response = await client.post("/radio/stations/1", json=special_station)
+        response = await client.post("/api/radio/stations/1", json=special_station)
         assert response.status_code == 200
 
         # Verify special characters are preserved
-        response = await client.get("/radio/stations/1")
+        response = await client.get("/api/radio/stations/1")
         assert response.status_code == 200
         station = response.json()
         assert station["name"] == special_station["name"]

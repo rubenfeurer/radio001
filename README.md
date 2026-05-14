@@ -85,12 +85,10 @@ radio001/
 │       ├── routes/         # Pages: /, /setup, /stations, /status, /settings
 │       └── lib/            # Stores, components, types
 ├── docker/
-│   ├── Dockerfile.backend  # Backend image (dev/CI)
-│   ├── Dockerfile.backend.arm64  # Pi build
+│   ├── Dockerfile.backend  # Production image (built by CI, runs on Pi)
 │   ├── compose.dev.yml     # Local development
 │   ├── compose.prod.yml    # Production (Pi)
-│   ├── compose.ci.yml      # CI pipeline
-│   └── nginx.conf          # Frontend reverse proxy
+│   └── compose.ci.yml      # CI pipeline
 ├── data/                   # Runtime station state
 ├── openspec/               # Spec-driven development artifacts
 └── scripts/                # Helper scripts
@@ -127,14 +125,15 @@ Interactive docs at `http://<pi-ip>:8000/docs`
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/radio/status` | Current play state, volume, active slot |
-| GET | `/radio/stations/` | All 3 station slots |
-| POST | `/radio/play/{slot}` | Play station in slot |
-| POST | `/radio/volume` | Set volume |
-| POST | `/radio/stations/{slot}` | Save station to slot |
-| GET | `/wifi/status` | WiFi connection status |
-| POST | `/wifi/connect` | Connect to network |
-| POST | `/system/hotspot-mode` | Switch to hotspot AP |
+| GET | `/api/radio/status` | Current play state, volume, active slot |
+| GET | `/api/radio/stations/` | All 3 station slots |
+| POST | `/api/radio/play/{slot}` | Play station in slot |
+| POST | `/api/radio/volume` | Set volume |
+| POST | `/api/radio/stations/{slot}` | Save station to slot |
+| GET | `/api/wifi/status` | WiFi connection status |
+| POST | `/api/wifi/connect` | Connect to network |
+| POST | `/api/system/hotspot-mode` | Switch to hotspot AP |
+| GET | `/health` | Health check |
 | WS | `/ws/` | Real-time status updates |
 
 ## Spec-Driven Development

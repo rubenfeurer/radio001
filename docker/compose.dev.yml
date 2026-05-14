@@ -9,7 +9,8 @@ services:
       dockerfile: docker/Dockerfile.backend
     container_name: radio-backend-dev
     hostname: radio-backend
-    network_mode: host
+    ports:
+      - "127.0.0.1:8000:8000"
     volumes:
       # Source code mounting for hot reload
       - ../backend:/app:cached
@@ -44,7 +45,7 @@ services:
       - CONFIG_FILE=/app/config/radio.conf
 
       # Application settings (can be overridden by config file)
-      - NODE_ENV=production
+      - NODE_ENV=development
       - HOSTNAME=radio
 
       # Development flags
@@ -59,8 +60,8 @@ services:
     depends_on: []
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
+      interval: 10s
+      timeout: 5s
       retries: 3
       start_period: 10s
 
@@ -100,32 +101,7 @@ services:
     depends_on:
       - radio-backend
 
-  # Development service with OpenSpec
-  radio-dev:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.dev
-    container_name: radio-dev
-    hostname: radio-dev
-    network_mode: host
-    volumes:
-      # Mount entire project for OpenSpec access
-      - ..:/workspace/radio001:cached
-      # Node modules cache
-      - radio_node_cache:/home/dev/.npm
-    environment:
-      - NODE_ENV=development
-      - OPENSPEC_TELEMETRY=0
-    working_dir: /workspace/radio001
-    stdin_open: true
-    tty: true
-    profiles:
-      - dev
-    restart: unless-stopped
-
 # Named volumes for development
 volumes:
   radio_python_cache:
-    driver: local
-  radio_node_cache:
     driver: local

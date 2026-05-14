@@ -47,7 +47,7 @@ Stage 2 — runtime (python:3.13-slim)
 
 API routes (registered before the StaticFiles mount) always take priority. The UI is served as a catch-all SPA fallback (`html=True`).
 
-The `VERSION` build-arg is passed by CI and baked in as `ENV VERSION=<tag>`. It is exposed at `GET /system/version`.
+The `VERSION` build-arg is passed by CI and baked in as `ENV VERSION=<tag>`. It is exposed at `GET /api/system/version`.
 
 ---
 
@@ -130,7 +130,7 @@ When no new image is available, nothing happens and the radio keeps playing.
 
 ```bash
 # From the Pi or any device on the network:
-curl http://radio.local/system/version
+curl http://radio.local/api/system/version
 # → {"version": "v1.2.3", "image": "ghcr.io/rubenfeurer/radio001"}
 ```
 

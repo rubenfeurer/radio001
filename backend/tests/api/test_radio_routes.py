@@ -26,7 +26,7 @@ class TestRadioControlRoutes:
 
     async def test_get_system_status(self, client: AsyncClient):
         """Test GET /radio/status endpoint."""
-        response = await client.get("/radio/status")
+        response = await client.get("/api/radio/status")
         assert response.status_code == 200
 
         status = response.json()
@@ -44,7 +44,7 @@ class TestRadioControlRoutes:
 
     async def test_get_volume_info(self, client: AsyncClient):
         """Test GET /radio/volume endpoint."""
-        response = await client.get("/radio/volume")
+        response = await client.get("/api/radio/volume")
         assert response.status_code == 200
 
         volume_info = response.json()
@@ -64,7 +64,7 @@ class TestRadioControlRoutes:
         valid_volumes = [0, 25, 50, 75, 100]
 
         for volume in valid_volumes:
-            response = await client.post("/radio/volume", json={"volume": volume})
+            response = await client.post("/api/radio/volume", json={"volume": volume})
             assert response.status_code == 200
 
             result = response.json()
@@ -84,7 +84,7 @@ class TestRadioControlRoutes:
         ]
 
         for invalid_request in invalid_requests:
-            response = await client.post("/radio/volume", json=invalid_request)
+            response = await client.post("/api/radio/volume", json=invalid_request)
             assert response.status_code == 422  # Validation error
 
     async def test_set_volume_boundary_clamping(self, client: AsyncClient):
@@ -93,14 +93,14 @@ class TestRadioControlRoutes:
         extreme_values = [-50, 150, 999, -1, 101]
 
         for invalid_volume in extreme_values:
-            response = await client.post("/radio/volume", json={"volume": invalid_volume})
+            response = await client.post("/api/radio/volume", json={"volume": invalid_volume})
             assert response.status_code == 422  # Should reject out-of-range values
 
         # Test boundary values (should be accepted)
         valid_boundary_values = [0, 100]
 
         for valid_volume in valid_boundary_values:
-            response = await client.post("/radio/volume", json={"volume": valid_volume})
+            response = await client.post("/api/radio/volume", json={"volume": valid_volume})
             assert response.status_code == 200
             result = response.json()
             assert result["success"] is True
@@ -109,10 +109,10 @@ class TestRadioControlRoutes:
     async def test_volume_up(self, client: AsyncClient):
         """Test POST /radio/volume/up endpoint."""
         # Set initial volume
-        await client.post("/radio/volume", json={"volume": 50})
+        await client.post("/api/radio/volume", json={"volume": 50})
 
         # Test volume up
-        response = await client.post("/radio/volume/up")
+        response = await client.post("/api/radio/volume/up")
         assert response.status_code == 200
 
         result = response.json()
@@ -123,9 +123,9 @@ class TestRadioControlRoutes:
     async def test_volume_up_at_maximum(self, client: AsyncClient):
         """Test volume up when already at maximum."""
         # Set to maximum volume first
-        await client.post("/radio/volume", json={"volume": 100})
+        await client.post("/api/radio/volume", json={"volume": 100})
 
-        response = await client.post("/radio/volume/up")
+        response = await client.post("/api/radio/volume/up")
         assert response.status_code == 200
 
         result = response.json()
@@ -135,10 +135,10 @@ class TestRadioControlRoutes:
     async def test_volume_down(self, client: AsyncClient):
         """Test POST /radio/volume/down endpoint."""
         # Set initial volume
-        await client.post("/radio/volume", json={"volume": 75})
+        await client.post("/api/radio/volume", json={"volume": 75})
 
         # Test volume down
-        response = await client.post("/radio/volume/down")
+        response = await client.post("/api/radio/volume/down")
         assert response.status_code == 200
 
         result = response.json()
@@ -150,9 +150,9 @@ class TestRadioControlRoutes:
     async def test_volume_down_at_minimum(self, client: AsyncClient):
         """Test volume down when already at minimum."""
         # Set to minimum volume first
-        await client.post("/radio/volume", json={"volume": 0})
+        await client.post("/api/radio/volume", json={"volume": 0})
 
-        response = await client.post("/radio/volume/down")
+        response = await client.post("/api/radio/volume/down")
         assert response.status_code == 200
 
         result = response.json()
@@ -166,11 +166,11 @@ class TestRadioControlRoutes:
             "name": "Stop Test Station",
             "url": "https://stop-test.example.com/stream"
         }
-        await client.post("/radio/stations/1", json=station_data)
-        await client.post("/radio/stations/1/play")
+        await client.post("/api/radio/stations/1", json=station_data)
+        await client.post("/api/radio/stations/1/play")
 
         # Now test stop
-        response = await client.post("/radio/stop")
+        response = await client.post("/api/radio/stop")
         assert response.status_code == 200
 
         result = response.json()
@@ -180,7 +180,7 @@ class TestRadioControlRoutes:
 
     async def test_stop_playback_when_not_playing(self, client: AsyncClient):
         """Test POST /radio/stop when nothing is playing."""
-        response = await client.post("/radio/stop")
+        response = await client.post("/api/radio/stop")
         assert response.status_code == 200
 
         result = response.json()
@@ -189,7 +189,7 @@ class TestRadioControlRoutes:
 
     async def test_get_playback_status(self, client: AsyncClient):
         """Test GET /radio/playback-status endpoint."""
-        response = await client.get("/radio/playback-status")
+        response = await client.get("/api/radio/playback-status")
         assert response.status_code == 200
 
         status = response.json()
@@ -204,7 +204,7 @@ class TestRadioControlRoutes:
 
     async def test_get_hardware_status(self, client: AsyncClient):
         """Test GET /radio/hardware-status endpoint."""
-        response = await client.get("/radio/hardware-status")
+        response = await client.get("/api/radio/hardware-status")
         assert response.status_code == 200
 
         hw_status = response.json()
@@ -220,7 +220,7 @@ class TestRadioControlRoutes:
 
     async def test_system_shutdown(self, client: AsyncClient):
         """Test POST /radio/shutdown endpoint."""
-        response = await client.post("/radio/shutdown")
+        response = await client.post("/api/radio/shutdown")
         assert response.status_code == 200
 
         result = response.json()
@@ -232,7 +232,7 @@ class TestRadioControlRoutes:
         valid_buttons = [1, 2, 3]
 
         for button in valid_buttons:
-            response = await client.post(f"/radio/dev/simulate-button/{button}")
+            response = await client.post(f"/api/radio/dev/simulate-button/{button}")
             assert response.status_code == 200
 
             result = response.json()
@@ -245,7 +245,7 @@ class TestRadioControlRoutes:
         invalid_buttons = [0, 4, 5, -1]
 
         for button in invalid_buttons:
-            response = await client.post(f"/radio/dev/simulate-button/{button}")
+            response = await client.post(f"/api/radio/dev/simulate-button/{button}")
             assert response.status_code == 400
 
             error_data = response.json()
@@ -256,7 +256,7 @@ class TestRadioControlRoutes:
         valid_changes = [-10, -5, 5, 10, 25]
 
         for change in valid_changes:
-            response = await client.post(f"/radio/dev/simulate-volume/{change}")
+            response = await client.post(f"/api/radio/dev/simulate-volume/{change}")
             assert response.status_code == 200
 
             result = response.json()
@@ -269,7 +269,7 @@ class TestRadioControlRoutes:
         invalid_changes = [100, -100, 999]  # Extreme values
 
         for change in invalid_changes:
-            response = await client.post(f"/radio/dev/simulate-volume/{change}")
+            response = await client.post(f"/api/radio/dev/simulate-volume/{change}")
             assert response.status_code == 400
 
             error_data = response.json()
@@ -280,17 +280,17 @@ class TestRadioControlRoutes:
         test_volume = 65
 
         # Set volume
-        response = await client.post("/radio/volume", json={"volume": test_volume})
+        response = await client.post("/api/radio/volume", json={"volume": test_volume})
         assert response.status_code == 200
 
         # Verify it persists in status
-        response = await client.get("/radio/status")
+        response = await client.get("/api/radio/status")
         assert response.status_code == 200
         status = response.json()
         assert status["volume"] == test_volume
 
         # Verify it persists in volume endpoint
-        response = await client.get("/radio/volume")
+        response = await client.get("/api/radio/volume")
         assert response.status_code == 200
         volume_info = response.json()
         assert volume_info["volume"] == test_volume
@@ -301,7 +301,7 @@ class TestRadioControlRoutes:
 
         # Test concurrent volume changes
         volume_tasks = [
-            client.post("/radio/volume", json={"volume": vol})
+            client.post("/api/radio/volume", json={"volume": vol})
             for vol in [25, 50, 75]
         ]
 
@@ -310,7 +310,7 @@ class TestRadioControlRoutes:
             assert result.status_code == 200
 
         # Final volume should be one of the set values
-        response = await client.get("/radio/volume")
+        response = await client.get("/api/radio/volume")
         assert response.status_code == 200
         final_volume = response.json()["volume"]
         assert final_volume in [25, 50, 75] or final_volume >= 30  # Hardware minimum
@@ -318,12 +318,12 @@ class TestRadioControlRoutes:
     async def test_status_consistency(self, client: AsyncClient):
         """Test consistency between different status endpoints."""
         # Get status from main endpoint
-        response1 = await client.get("/radio/status")
+        response1 = await client.get("/api/radio/status")
         assert response1.status_code == 200
         main_status = response1.json()
 
         # Get status from playback endpoint
-        response2 = await client.get("/radio/playback-status")
+        response2 = await client.get("/api/radio/playback-status")
         assert response2.status_code == 200
         playback_status = response2.json()
 
@@ -337,9 +337,9 @@ class TestRadioControlRoutes:
         """Test that error responses follow consistent format."""
         # Test various error conditions
         error_requests = [
-            ("POST", "/radio/volume", {"invalid": "data"}),
-            ("POST", "/radio/dev/simulate-button/0", {}),
-            ("POST", "/radio/dev/simulate-volume/999", {}),
+            ("POST", "/api/radio/volume", {"invalid": "data"}),
+            ("POST", "/api/radio/dev/simulate-button/0", {}),
+            ("POST", "/api/radio/dev/simulate-volume/999", {}),
         ]
 
         for method, url, data in error_requests:
@@ -359,10 +359,10 @@ class TestRadioControlRoutes:
         """Test that volume step size is configurable and consistent."""
         # Set initial volume
         initial_volume = 50
-        await client.post("/radio/volume", json={"volume": initial_volume})
+        await client.post("/api/radio/volume", json={"volume": initial_volume})
 
         # Test volume up
-        response = await client.post("/radio/volume/up")
+        response = await client.post("/api/radio/volume/up")
         assert response.status_code == 200
         result = response.json()
 
@@ -377,19 +377,19 @@ class TestRadioControlRoutes:
     async def test_mute_unmute_workflow(self, client: AsyncClient):
         """Test muting and unmuting workflow."""
         # Set non-zero volume
-        await client.post("/radio/volume", json={"volume": 60})
+        await client.post("/api/radio/volume", json={"volume": 60})
 
         # Verify not muted
-        response = await client.get("/radio/volume")
+        response = await client.get("/api/radio/volume")
         volume_info = response.json()
         assert volume_info["is_muted"] is False
 
         # Mute (set to 0)
-        response = await client.post("/radio/volume", json={"volume": 0})
+        response = await client.post("/api/radio/volume", json={"volume": 0})
         assert response.status_code == 200
 
         # Verify muted
-        response = await client.get("/radio/volume")
+        response = await client.get("/api/radio/volume")
         volume_info = response.json()
         assert volume_info["is_muted"] is True
         assert volume_info["volume"] == 0
@@ -397,12 +397,12 @@ class TestRadioControlRoutes:
     async def test_system_integration_workflow(self, client: AsyncClient):
         """Test complete system workflow integration."""
         # 1. Check initial status
-        response = await client.get("/radio/status")
+        response = await client.get("/api/radio/status")
         assert response.status_code == 200
         initial_status = response.json()
 
         # 2. Set volume
-        response = await client.post("/radio/volume", json={"volume": 70})
+        response = await client.post("/api/radio/volume", json={"volume": 70})
         assert response.status_code == 200
 
         # 3. Save and play a station
@@ -410,21 +410,21 @@ class TestRadioControlRoutes:
             "name": "Integration Test",
             "url": "https://integration.example.com/stream"
         }
-        await client.post("/radio/stations/1", json=station_data)
-        await client.post("/radio/stations/1/play")
+        await client.post("/api/radio/stations/1", json=station_data)
+        await client.post("/api/radio/stations/1/play")
 
         # 4. Check updated status
-        response = await client.get("/radio/status")
+        response = await client.get("/api/radio/status")
         assert response.status_code == 200
         updated_status = response.json()
         assert updated_status["volume"] == 70
 
         # 5. Stop playback
-        response = await client.post("/radio/stop")
+        response = await client.post("/api/radio/stop")
         assert response.status_code == 200
 
         # 6. Verify final status
-        response = await client.get("/radio/status")
+        response = await client.get("/api/radio/status")
         assert response.status_code == 200
         final_status = response.json()
         assert final_status["volume"] == 70  # Volume should persist
@@ -447,7 +447,7 @@ class TestRadioControlRoutes:
 
     async def test_hardware_status_details(self, client: AsyncClient):
         """Test detailed hardware status information."""
-        response = await client.get("/radio/hardware-status")
+        response = await client.get("/api/radio/hardware-status")
         assert response.status_code == 200
 
         hw_status = response.json()
@@ -465,10 +465,10 @@ class TestRadioControlRoutes:
         """Test that API responses follow consistent format."""
         # Test successful responses
         successful_endpoints = [
-            ("GET", "/radio/status"),
-            ("GET", "/radio/volume"),
-            ("POST", "/radio/volume", {"volume": 50}),
-            ("POST", "/radio/stop"),
+            ("GET", "/api/radio/status"),
+            ("GET", "/api/radio/volume"),
+            ("POST", "/api/radio/volume", {"volume": 50}),
+            ("POST", "/api/radio/stop"),
         ]
 
         for method, url, *data in successful_endpoints:

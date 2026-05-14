@@ -88,13 +88,14 @@ services:
       start_period: 30s
 
   watchtower:
-    image: containrrr/watchtower
+    image: containrrr/watchtower:1.7.1
     container_name: radio-watchtower
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - WATCHTOWER_CLEANUP=true
       - WATCHTOWER_SCHEDULE=0 0 3 * * *
+      - DOCKER_API_VERSION=1.40
     restart: unless-stopped
 COMPOSE_EOF
 

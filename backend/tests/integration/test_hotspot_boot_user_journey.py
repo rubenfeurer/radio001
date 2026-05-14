@@ -80,7 +80,7 @@ class TestHotspotBootUserJourney:
         """
         with patch("api.routes.wifi.wifi_manager", mock_wifi_manager):
             # Check system status - should be in hotspot mode
-            response = client.get("/wifi/status")
+            response = client.get("/api/wifi/status")
 
             assert response.status_code == 200
             data = response.json()
@@ -124,7 +124,7 @@ class TestHotspotBootUserJourney:
         """
         with patch("api.routes.wifi.wifi_manager", mock_wifi_manager):
             # User clicks "Scan for Networks" button
-            response = client.post("/wifi/scan")
+            response = client.post("/api/wifi/scan")
 
             assert response.status_code == 200
             data = response.json()
@@ -156,7 +156,7 @@ class TestHotspotBootUserJourney:
         User journey: First-time setup, no previous WiFi connections
         """
         with patch("api.routes.wifi.wifi_manager", mock_wifi_manager):
-            response = client.get("/wifi/saved")
+            response = client.get("/api/wifi/saved")
 
             assert response.status_code == 200
             data = response.json()
@@ -187,7 +187,7 @@ class TestHotspotBootUserJourney:
                 "security": "WPA2",
             }
 
-            response = client.post("/wifi/connect", json=connection_data)
+            response = client.post("/api/wifi/connect", json=connection_data)
 
             assert response.status_code == 200
             data = response.json()
@@ -251,7 +251,7 @@ class TestHotspotBootUserJourney:
 
         with patch("api.routes.wifi.wifi_manager", mock_wifi_manager):
             # User accesses system via new WiFi network
-            response = client.get("/wifi/status")
+            response = client.get("/api/wifi/status")
 
             assert response.status_code == 200
             data = response.json()
@@ -284,7 +284,7 @@ class TestHotspotBootUserJourney:
         with patch("api.routes.wifi.wifi_manager", mock_wifi_manager):
             # Step 1: Check initial hotspot mode
             print("\n[1] Checking initial system state...")
-            status_response = client.get("/wifi/status")
+            status_response = client.get("/api/wifi/status")
             assert status_response.json()["data"]["mode"] == "host"
             print("    ✓ System in hotspot mode: Radio-Setup")
 
@@ -296,7 +296,7 @@ class TestHotspotBootUserJourney:
 
             # Step 3: Scan for networks
             print("\n[3] Scanning for WiFi networks...")
-            scan_response = client.post("/wifi/scan")
+            scan_response = client.post("/api/wifi/scan")
             networks = scan_response.json()["data"]
             assert len(networks) == 3
             print(f"    ✓ Found {len(networks)} networks")
@@ -305,14 +305,14 @@ class TestHotspotBootUserJourney:
 
             # Step 4: Check saved networks
             print("\n[4] Checking saved networks...")
-            saved_response = client.get("/wifi/saved")
+            saved_response = client.get("/api/wifi/saved")
             assert len(saved_response.json()["data"]["networks"]) == 0
             print("    ✓ No saved networks (first-time setup)")
 
             # Step 5: Connect to network
             print("\n[5] Connecting to HomeWiFi...")
             connect_response = client.post(
-                "/wifi/connect",
+                "/api/wifi/connect",
                 json={
                     "ssid": "HomeWiFi",
                     "password": "mypassword123",
@@ -342,7 +342,7 @@ class TestHotspotBootUserJourney:
                 signal_strength=85,
             )
 
-            final_status = client.get("/wifi/status")
+            final_status = client.get("/api/wifi/status")
             final_data = final_status.json()["data"]
 
             assert final_data["mode"] == "client"
@@ -409,7 +409,7 @@ class TestHotspotModeFailureScenarios:
 
         with patch("api.routes.wifi.wifi_manager", mock_wifi_manager_failures):
             response = client.post(
-                "/wifi/connect",
+                "/api/wifi/connect",
                 json={
                     "ssid": "TestNetwork",
                     "password": "wrongpassword",
@@ -446,7 +446,7 @@ class TestHotspotModeFailureScenarios:
 
         with patch("api.routes.wifi.wifi_manager", mock_wifi_manager_failures):
             response = client.post(
-                "/wifi/connect",
+                "/api/wifi/connect",
                 json={
                     "ssid": "TestNetwork",
                     "password": "password123",
@@ -482,7 +482,7 @@ class TestHotspotModeFailureScenarios:
             )
 
             response1 = client.post(
-                "/wifi/connect",
+                "/api/wifi/connect",
                 json={
                     "ssid": "TestNetwork",
                     "password": "wrongpass",
@@ -497,7 +497,7 @@ class TestHotspotModeFailureScenarios:
             mock_wifi_manager_failures.connect_network.return_value = (True, "")
 
             response2 = client.post(
-                "/wifi/connect",
+                "/api/wifi/connect",
                 json={
                     "ssid": "TestNetwork",
                     "password": "correctpass",
