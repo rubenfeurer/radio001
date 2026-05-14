@@ -88,7 +88,7 @@ services:
       start_period: 30s
 
   watchtower:
-    image: containrrr/watchtower
+    image: containrrr/watchtower:1.7.1
     container_name: radio-watchtower
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
