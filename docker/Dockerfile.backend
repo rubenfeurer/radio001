@@ -69,14 +69,18 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --no-deps --require-hashes -r requirements.lock && \
     if [ "$INSTALL_TEST_DEPS" = "true" ]; then pip install --no-cache-dir -r requirements-test.txt; fi
 
-# Install lgpio on arm64 (Pi) only — liblgpio1 provides the shared lib,
-# pip lgpio wraps it via ctypes (no compilation needed)
+# Build and install lg C library from source on arm64.
+# liblgpio-dev is not in Debian trixie (only in Raspberry Pi OS repos).
+# curl and build-essential/gcc/make are already in the image.
+# Python's zipfile module extracts the zip without needing unzip.
 RUN arch=$(dpkg --print-architecture) && \
     if [ "$arch" = "arm64" ]; then \
-        apt-get update && \
-        apt-get install -y --no-install-recommends liblgpio-dev && \
-        pip install --no-cache-dir lgpio && \
-        rm -rf /var/lib/apt/lists/*; \
+        curl -fsSL http://abyz.me.uk/lg/lg.zip -o /tmp/lg.zip && \
+        python3 -c "import zipfile; zipfile.ZipFile('/tmp/lg.zip').extractall('/tmp/')" && \
+        cd /tmp/lg && make && make install && \
+        ldconfig && \
+        rm -rf /tmp/lg /tmp/lg.zip && \
+        pip install --no-cache-dir lgpio; \
     fi
 
 # Copy entrypoint script
