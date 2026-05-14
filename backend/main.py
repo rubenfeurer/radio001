@@ -241,13 +241,13 @@ app.add_middleware(
 )
 
 # Include API routes
-app.include_router(system_router, prefix="/system", tags=["System"])
-app.include_router(stations_router, prefix="/radio/stations", tags=["Radio Stations"])
-app.include_router(radio_router, prefix="/radio", tags=["Radio Control"])
+app.include_router(system_router, prefix="/api/system", tags=["System"])
+app.include_router(stations_router, prefix="/api/radio/stations", tags=["Radio Stations"])
+app.include_router(radio_router, prefix="/api/radio", tags=["Radio Control"])
 app.include_router(websocket_router, prefix="/ws", tags=["WebSocket"])
 
 
-app.include_router(wifi_router, prefix="/wifi", tags=["WiFi"])
+app.include_router(wifi_router, prefix="/api/wifi", tags=["WiFi"])
 
 # =============================================================================
 # API Routes

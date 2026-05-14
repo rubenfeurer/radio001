@@ -503,11 +503,11 @@ class TestWebSocketRoutes:
         assert response.status_code == 200
 
         # Test radio status endpoint (should trigger WebSocket updates when used)
-        response = await client.get("/radio/status")
+        response = await client.get("/api/radio/status")
         assert response.status_code == 200
 
         # Test volume change (should trigger WebSocket updates)
-        response = await client.post("/radio/volume", json={"volume": 75})
+        response = await client.post("/api/radio/volume", json={"volume": 75})
         assert response.status_code == 200
 
     def test_websocket_message_serialization(self):
