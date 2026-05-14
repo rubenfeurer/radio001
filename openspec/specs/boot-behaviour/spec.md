@@ -3,17 +3,27 @@
 ### Requirement: Auto-Start on Boot
 The system SHALL start the Docker radio stack automatically on Pi power-on via a systemd service, without requiring manual intervention.
 
-#### Scenario: Service starts on boot
-- **WHEN** the Raspberry Pi powers on
-- **THEN** systemd starts the `radio-wifi.service` unit after `docker.service` and `network-online.target`
-- **AND** `docker compose -f compose/docker-compose.prod.yml up -d` is executed
-- **AND** the radio backend becomes reachable within normal container startup time
+#### Scenario: Service starts radio from pre-built image
+- **WHEN** the `radio.service` systemd unit starts (on boot or `systemctl start radio`)
+- **THEN** it SHALL run `docker compose -f /opt/radio/docker-compose.yml up -d`
+- **AND** no `docker build` step SHALL execute
+- **AND** no local source tree SHALL be required
 
-#### Scenario: Service install script
-- **WHEN** `sudo bash scripts/install-service.sh` is executed on the Pi
-- **THEN** the script copies `config/systemd/radio-wifi.service` to `/etc/systemd/system/`
-- **AND** runs `systemctl daemon-reload && systemctl enable radio-wifi.service`
-- **AND** starts the service immediately
+#### Scenario: Service does not pull on start
+- **WHEN** the `radio.service` starts
+- **THEN** it SHALL NOT run `docker compose pull` before starting
+- **AND** image updates are delegated entirely to Watchtower on its nightly schedule
+
+#### Scenario: Service restarts on failure
+- **WHEN** the radio container exits unexpectedly
+- **THEN** systemd SHALL restart the container via `Restart=on-failure`
+- **AND** a restart delay of 10 seconds SHALL be observed before retry
+
+#### Scenario: Service install via install script
+- **WHEN** `sudo bash scripts/install.sh` is executed on the Pi
+- **THEN** the script writes `/etc/systemd/system/radio.service`
+- **AND** runs `systemctl daemon-reload && systemctl enable --now radio.service`
+- **AND** the radio backend becomes reachable within normal container startup time
 
 ### Requirement: Boot Sounds (WiFi-Aware)
 The system SHALL play an audio tone during startup to indicate whether it is ready to stream (WiFi connected) or in configuration mode (hotspot active).

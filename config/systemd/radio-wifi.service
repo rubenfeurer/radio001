@@ -7,11 +7,10 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/home/radio/radio001
-ExecStartPre=/usr/bin/docker compose -f compose/docker-compose.prod.yml pull --quiet --ignore-pull-failures
-ExecStart=/usr/bin/docker compose -f compose/docker-compose.prod.yml up -d
-ExecStop=/usr/bin/docker compose -f compose/docker-compose.prod.yml down
-ExecReload=/usr/bin/docker compose -f compose/docker-compose.prod.yml restart
+WorkingDirectory=/opt/radio
+ExecStart=/usr/bin/docker compose -f /opt/radio/docker-compose.yml up -d
+ExecStop=/usr/bin/docker compose -f /opt/radio/docker-compose.yml down
+ExecReload=/usr/bin/docker compose -f /opt/radio/docker-compose.yml restart
 
 # Restart policy
 Restart=on-failure

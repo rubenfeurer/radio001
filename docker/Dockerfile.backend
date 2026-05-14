@@ -1,10 +1,21 @@
 # Backend Dockerfile for FastAPI development
 # Optimized for Raspberry Pi and development workflow with Apple Silicon support
 
+# Stage 1: Build SvelteKit frontend
+FROM node:20-slim AS frontend-builder
+
+WORKDIR /frontend
+COPY frontend/package.json ./
+RUN npm install
+COPY frontend/ .
+RUN npm run build
+
+# Stage 2: Python backend
 FROM python:3.13-slim@sha256:a0779d7c12fc20be6ec6b4ddc901a4fd7657b8a6bc9def9d3fde89ed5efe0a3d
 
 ARG VERSION=dev
 LABEL org.opencontainers.image.version=$VERSION
+ENV VERSION=$VERSION
 
 # Install system dependencies for WiFi management and build tools
 RUN apt-get update && apt-get install -y \
@@ -60,6 +71,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends liblgpio-dev 2>
 
 # Copy entrypoint script
 COPY docker/entrypoint-backend.sh /entrypoint.sh
+
+# Copy built frontend static files
+COPY --from=frontend-builder /frontend/build /app/static
 
 # Copy application code
 COPY backend/ .

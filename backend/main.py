@@ -58,6 +58,7 @@ from api.routes.websocket import (
 )
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 # =============================================================================
 # Configuration
@@ -253,25 +254,6 @@ app.include_router(wifi_router, prefix="/wifi", tags=["WiFi"])
 # =============================================================================
 
 
-@app.get("/", response_model=ApiResponse, tags=["General"])
-async def root():
-    """Root endpoint"""
-    return ApiResponse(
-        success=True,
-        message="Radio WiFi Configuration API",
-        data={
-            "version": "2.0.0",
-            "status": "running",
-            "features": [
-                "wifi_management",
-                "radio_streaming",
-                "3_slot_stations",
-                "hardware_controls",
-            ],
-        },
-    )
-
-
 @app.get("/health", response_model=ApiResponse, tags=["General"])
 async def health_check():
     """Health check endpoint with additional diagnostic information"""
@@ -306,6 +288,12 @@ async def health_check():
         return ApiResponse(
             success=False, message=f"Health check failed: {str(e)}", data=None
         )
+
+
+# Serve frontend static files — mounted last so API routes take priority
+_static_dir = Path("/app/static")
+if _static_dir.exists():
+    app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="static")
 
 
 # =============================================================================

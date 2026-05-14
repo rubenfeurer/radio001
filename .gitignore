@@ -276,6 +276,7 @@ cython_debug/
 # Project specific
 /data/
 /logs/
+backend/data/
 /config/local.json
 /tmp/
 *.sqlite

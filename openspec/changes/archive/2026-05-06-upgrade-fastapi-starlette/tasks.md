@@ -23,6 +23,6 @@
 
 ## 5. Validate in CI
 
-- [ ] 5.1 Open PR develop → main and confirm all test suites pass in CI
-- [ ] 5.2 Merge to main and confirm release workflow completes: verify-lockfile ✓, build ✓, push ✓, Trivy ✓ (no CVEs)
-- [ ] 5.3 Confirm `ghcr.io/rubenfeurer/radio001:latest` is updated and Trivy reports zero HIGH/CRITICAL unfixed CVEs
+- [x] 5.1 Open PR develop → main and confirm all test suites pass in CI
+- [x] 5.2 Merge to main and confirm release workflow completes: verify-lockfile ✓, build ✓, push ✓, Trivy ✓ (no CVEs)
+- [x] 5.3 Confirm `ghcr.io/rubenfeurer/radio001:latest` is updated and Trivy reports zero HIGH/CRITICAL unfixed CVEs
