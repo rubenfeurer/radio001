@@ -45,6 +45,7 @@ WORKDIR /app
 
 # Create non-root user for development
 RUN groupadd -r radio && useradd -r -g radio radio && \
+    usermod -a -G audio radio && \
     mkdir -p /tmp/radio /var/log/radio /data /app/data && \
     chown -R radio:radio /tmp/radio /var/log/radio /data /app/data
 
