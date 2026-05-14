@@ -79,7 +79,7 @@ RUN arch=$(dpkg --print-architecture) && \
         python3 -c "import zipfile; zipfile.ZipFile('/tmp/lg.zip').extractall('/tmp/')" && \
         cd /tmp/lg && make && make install && \
         ldconfig && \
-        rm -rf /tmp/lg /tmp/lg.zip && \
+        cd / && rm -rf /tmp/lg /tmp/lg.zip && \
         pip install --no-cache-dir lgpio; \
     fi
 
