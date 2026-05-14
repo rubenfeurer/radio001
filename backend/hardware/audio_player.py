@@ -124,9 +124,12 @@ class AudioPlayer:
                     self._url_cache[url] = resolved_url
             logger.info(f"Resolved URL: {resolved_url}")
 
-            # Spawn mpg123 subprocess
+            # Spawn mpg123 subprocess — force ALSA output to avoid PulseAudio/JACK
+            alsa_device = os.getenv("ALSA_DEVICE", "hw:2,0")
             self._process = await asyncio.create_subprocess_exec(
                 "mpg123",
+                "-o", "alsa",
+                "-a", alsa_device,
                 "--quiet",
                 resolved_url,
                 stdout=asyncio.subprocess.DEVNULL,
