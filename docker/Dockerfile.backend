@@ -69,11 +69,13 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --no-deps --require-hashes -r requirements.lock && \
     if [ "$INSTALL_TEST_DEPS" = "true" ]; then pip install --no-cache-dir -r requirements-test.txt; fi
 
-# Install lgpio on arm64 (Pi) only — not available/needed on amd64 CI
+# Install lgpio on arm64 (Pi) only — liblgpio1 provides the shared lib,
+# pip lgpio wraps it via ctypes (no compilation needed)
 RUN arch=$(dpkg --print-architecture) && \
     if [ "$arch" = "arm64" ]; then \
         apt-get update && \
-        apt-get install -y --no-install-recommends python3-lgpio && \
+        apt-get install -y --no-install-recommends liblgpio-dev && \
+        pip install --no-cache-dir lgpio && \
         rm -rf /var/lib/apt/lists/*; \
     fi
 
