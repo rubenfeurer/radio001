@@ -81,15 +81,16 @@ Both `/opt/radio/config` and `/opt/radio/data` are bind-mounted into the contain
 
 ## Installation (Fresh Pi)
 
-Requirements: Raspberry Pi OS (64-bit), Docker installed, internet connection.
+Requirements: Raspberry Pi OS (64-bit), internet connection. Nothing else — Docker is installed automatically.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/rubenfeurer/radio001/main/scripts/install.sh | sudo bash
 ```
 
-The script (`scripts/install.sh`) is fully self-contained — no git clone or Node.js required on the Pi. It:
+The script (`scripts/install.sh`) is fully self-contained — no git clone, Node.js, or Docker pre-install required. It:
 
-1. Creates `/opt/radio/config/` and `/opt/radio/data/`
+1. Installs Docker if not already present
+2. Creates `/opt/radio/config/` and `/opt/radio/data/`
 2. Writes `/opt/radio/docker-compose.yml` (references GHCR image + Watchtower)
 3. Writes `/opt/radio/config/radio.conf` with safe defaults (skipped if file already exists)
 4. Writes `/etc/systemd/system/radio.service`

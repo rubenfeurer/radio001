@@ -4,17 +4,25 @@
 Defines requirements for distributing and installing the radio system on a Raspberry Pi without requiring development tools on the device.
 
 ### Requirement: One-Command Pi Install
-The system SHALL provide a self-contained install script that sets up a working radio on a fresh Raspberry Pi OS installation without requiring git, Node.js, or build tools.
+The system SHALL provide a self-contained install script that sets up a working radio on a fresh Raspberry Pi OS installation without requiring git, Node.js, build tools, or a pre-installed Docker.
 
-#### Scenario: Successful install on clean Pi OS
-- **WHEN** a user runs `bash install.sh` on a Pi with Docker installed and an internet connection
-- **THEN** the script SHALL create `/opt/radio/` directory structure
+#### Scenario: Successful install on clean Pi OS with no Docker
+- **WHEN** a user runs the install script on a Pi with only Raspberry Pi OS and an internet connection
+- **THEN** the script SHALL detect that Docker is not installed
+- **AND** install Docker automatically using the official convenience script
+- **AND** add the invoking user to the `docker` group
+- **AND** continue to create `/opt/radio/` directory structure
 - **AND** write `/opt/radio/docker-compose.yml` referencing the GHCR image
 - **AND** the compose file SHALL declare `/dev/snd` under `devices:` explicitly
 - **AND** write `/opt/radio/config/radio.conf` with safe defaults
 - **AND** install `/etc/systemd/system/radio.service`
 - **AND** run `systemctl enable --now radio.service`
 - **AND** the radio backend SHALL become reachable at `http://radio.local` within 2 minutes
+
+#### Scenario: Docker already installed — install step skipped
+- **WHEN** the install script runs on a Pi that already has Docker installed
+- **THEN** the script SHALL skip the Docker installation step
+- **AND** proceed directly to setting up the radio application
 
 #### Scenario: Audio device access does not depend on privileged mode
 - **WHEN** the radio container starts

@@ -28,13 +28,15 @@ A **Raspberry Pi internet radio** with WiFi configuration UI. Built with **Svelt
 
 ## Quick Start (Raspberry Pi)
 
-Requirements: Raspberry Pi OS 64-bit, Docker installed, internet connection.
+Requirements: Raspberry Pi OS 64-bit, internet connection. That's it.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/rubenfeurer/radio001/main/scripts/install.sh | sudo bash
 ```
 
-The install script is self-contained — no git clone or Node.js needed on the Pi. It pulls the pre-built image from GHCR, writes a systemd service, and starts everything. The radio is reachable at `http://radio.local` within ~2 minutes.
+The install script handles everything — Docker, the radio service, and auto-updates. The radio is reachable at `http://radio.local` within ~2 minutes.
+
+Source & releases: **https://github.com/rubenfeurer/radio001**
 
 Updates happen automatically every night at 03:00 via Watchtower (no action required).
 

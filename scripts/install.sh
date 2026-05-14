@@ -23,15 +23,21 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-for cmd in docker curl; do
-    if ! command -v "$cmd" &>/dev/null; then
-        echo "ERROR: '$cmd' is required but not installed." >&2
-        exit 1
+if ! command -v curl &>/dev/null; then
+    echo "ERROR: 'curl' is required but not installed." >&2
+    exit 1
+fi
+
+if ! command -v docker &>/dev/null; then
+    echo "Docker not found — installing Docker..."
+    curl -fsSL https://get.docker.com | sh
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        usermod -aG docker "$SUDO_USER"
     fi
-done
+fi
 
 if ! docker compose version &>/dev/null; then
-    echo "ERROR: 'docker compose' (plugin) is required." >&2
+    echo "ERROR: 'docker compose' plugin not available after install." >&2
     exit 1
 fi
 
