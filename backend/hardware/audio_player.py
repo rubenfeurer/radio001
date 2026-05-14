@@ -277,12 +277,12 @@ class AudioPlayer:
 
     async def _set_alsa_volume(self, volume: int) -> bool:
         """Set ALSA volume using amixer."""
+        mixer_card = os.getenv("ALSA_MIXER_CARD", "2")
         mixer_control = os.getenv("ALSA_MIXER_CONTROL", "PCM")
         try:
             proc = await asyncio.create_subprocess_exec(
-                "amixer",
-                "set",
-                mixer_control,
+                "amixer", "-c", mixer_card,
+                "sset", mixer_control,
                 f"{volume}%",
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.PIPE,
