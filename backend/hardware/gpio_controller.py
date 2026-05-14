@@ -95,8 +95,7 @@ class GPIOController:
             logger.info("GPIOController initialization complete")
 
         except Exception as e:
-            logger.error(f"GPIOController initialization failed: {e}", exc_info=True)
-            # Fall back to mock mode on hardware failure
+            logger.error(f"GPIO hardware init failed: {e} — falling back to mock mode")
             self.mock_mode = True
             await self._initialize_mock()
 
@@ -140,7 +139,7 @@ class GPIOController:
 
     async def _initialize_mock(self):
         """Initialize mock GPIO interface for development."""
-        logger.info("GPIO mock interface initialized")
+        logger.debug("GPIO mock interface initialized")
 
         # Initialize mock button states
         for pin in [self.config.BUTTON_PIN_1, self.config.BUTTON_PIN_2, self.config.BUTTON_PIN_3, self.config.ROTARY_SW]:

@@ -53,6 +53,9 @@ RUN groupadd -r radio && useradd -r -g radio radio && \
 RUN groupmod -g 104 netdev || groupadd -g 104 netdev && \
     usermod -a -G netdev radio
 
+# Create gpio group matching Pi OS GID (986) for /dev/gpiochip0 access
+RUN groupadd -g 986 gpio && usermod -a -G gpio radio
+
 # Configure passwordless sudo for WiFi management commands (nmcli permissions)
 RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /bin/mkdir, /usr/bin/mkdir, /bin/touch, /usr/bin/touch, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown, /sbin/ip, /usr/sbin/ip, /bin/ip, /usr/bin/nmcli, /usr/bin/killall" > /etc/sudoers.d/radio && \
     chmod 0440 /etc/sudoers.d/radio
@@ -66,11 +69,13 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --no-deps --require-hashes -r requirements.lock && \
     if [ "$INSTALL_TEST_DEPS" = "true" ]; then pip install --no-cache-dir -r requirements-test.txt; fi
 
-# Install Pi-only hardware dependencies (lgpio requires liblgpio-dev from Pi OS repos)
-# Silently skipped on non-Pi platforms (dev/CI runs in mock mode anyway)
-RUN apt-get update && apt-get install -y --no-install-recommends liblgpio-dev 2>/dev/null && \
-    pip install --no-cache-dir lgpio || true && \
-    rm -rf /var/lib/apt/lists/*
+# Install lgpio on arm64 (Pi) only — not available/needed on amd64 CI
+RUN arch=$(dpkg --print-architecture) && \
+    if [ "$arch" = "arm64" ]; then \
+        apt-get update && \
+        apt-get install -y --no-install-recommends python3-lgpio && \
+        rm -rf /var/lib/apt/lists/*; \
+    fi
 
 # Copy entrypoint script
 COPY docker/entrypoint-backend.sh /entrypoint.sh

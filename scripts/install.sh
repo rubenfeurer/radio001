@@ -72,6 +72,9 @@ services:
       - WIFI_TIMEOUT=5
       - WIFI_CHECK_ENABLED=true
       - HOST_MODE_FILE=/etc/raspiwifi/host_mode
+      - ALSA_DEVICE=hw:2,0
+    group_add:
+      - "986"
     restart: unless-stopped
     privileged: true
     cap_add:
