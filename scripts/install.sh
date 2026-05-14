@@ -145,6 +145,8 @@ ExecStop=/usr/bin/docker compose -f /opt/radio/docker-compose.yml down
 ExecReload=/usr/bin/docker compose -f /opt/radio/docker-compose.yml restart
 Restart=on-failure
 RestartSec=10s
+StartLimitIntervalSec=300
+StartLimitBurst=3
 User=root
 Environment=COMPOSE_PROJECT_NAME=radio-wifi
 Environment=NODE_ENV=production
@@ -162,9 +164,6 @@ chmod 644 "${SERVICE_FILE}"
 
 echo "Pulling latest image (${IMAGE})..."
 docker compose -f "${COMPOSE_FILE}" pull
-
-echo "Starting services..."
-docker compose -f "${COMPOSE_FILE}" up -d
 
 # ── Enable and start systemd service ─────────────────────────────────────────
 
