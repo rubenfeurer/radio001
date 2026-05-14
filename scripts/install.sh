@@ -95,6 +95,7 @@ services:
     environment:
       - WATCHTOWER_CLEANUP=true
       - WATCHTOWER_SCHEDULE=0 0 3 * * *
+      - DOCKER_API_VERSION=1.40
     restart: unless-stopped
 COMPOSE_EOF
 
