@@ -45,6 +45,7 @@ fi
 
 echo "Creating directories..."
 mkdir -p "${CONFIG_DIR}" "${DATA_DIR}" /etc/raspiwifi
+chmod 777 "${DATA_DIR}"
 
 # ── docker-compose.yml ───────────────────────────────────────────────────────
 # Always written (it is version-controlled, not user-edited).

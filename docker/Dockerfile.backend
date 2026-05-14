@@ -36,6 +36,8 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     libffi-dev \
     libssl-dev \
     swig \
+    mpg123 \
+    alsa-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory

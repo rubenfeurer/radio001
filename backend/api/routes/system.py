@@ -10,6 +10,7 @@ This module provides endpoints for system-level information including:
 
 import logging
 import os
+from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException
@@ -123,9 +124,6 @@ async def get_system_metrics() -> Dict[str, Any]:
 
     # Get WiFi status (import here to avoid circular dependency)
     try:
-        import os
-        from pathlib import Path
-
         from core.wifi_manager import WiFiManager
 
         # Get the wifi_manager instance from main
