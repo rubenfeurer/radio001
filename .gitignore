@@ -297,6 +297,9 @@ dnsmasq.conf
 # User configuration (tracked in repo - no secrets, hardware settings only)
 # config/radio.conf
 
+# Docker volume mount artifact (empty file created by Docker Desktop)
+backend/config/
+
 # SSL certificates
 *.pem
 *.key
