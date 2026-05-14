@@ -19,7 +19,7 @@ coverage[toml]==7.3.4
 
 # Test utilities
 factory-boy==3.3.0
-freezegun==1.2.2
+freezegun==1.5.5
 responses==0.26.0
 
 # Async testing utilities
