@@ -2,7 +2,7 @@
 # Optimized for Raspberry Pi and development workflow with Apple Silicon support
 
 # Stage 1: Build SvelteKit frontend
-FROM node:20-slim AS frontend-builder
+FROM node:26-slim AS frontend-builder
 
 WORKDIR /frontend
 COPY frontend/package.json ./
@@ -36,6 +36,8 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     libffi-dev \
     libssl-dev \
     swig \
+    mpg123 \
+    alsa-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
