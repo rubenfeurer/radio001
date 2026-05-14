@@ -4,7 +4,7 @@
 # Core testing framework
 pytest==8.3.5
 pytest-asyncio==0.24.0
-pytest-mock==3.14.0
+pytest-mock==3.15.1
 
 # HTTP testing for FastAPI
 httpx==0.28.1
