@@ -34,6 +34,6 @@ Root cause: `amixer` without `-c` targets card 0 (HDMI). Pi headphone output is 
 
 - [x] 6.1 Fix `audio_player.py._set_alsa_volume`: change `"set"` → `"sset"`; change default `ALSA_MIXER_CONTROL` from `"PCM Playback Volume"` → `"PCM"`
 - [x] 6.2 Update `ALSA_MIXER_CONTROL=PCM` in `docker/compose.prod.yml` and the inline compose block in `scripts/install.sh`
-- [ ] 6.3 Commit on develop, PR → main, wait for CI image build
+- [x] 6.3 Commit on develop, PR → main, wait for CI image build
 - [ ] 6.4 Pull new image on Pi and restart container
 - [ ] 6.5 Turn rotary encoder and confirm audio volume changes in output (mark 5.6 complete)
