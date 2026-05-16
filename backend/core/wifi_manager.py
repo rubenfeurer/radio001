@@ -691,6 +691,11 @@ class WiFiManager:
             return
 
         try:
+            # Stop dnsmasq before tearing down the hotspot.
+            await self._run_cmd("sudo", "systemctl", "stop", "dnsmasq", check=False)
+            await self._run_cmd("sudo", "systemctl", "mask", "dnsmasq", check=False)
+            logger.info("dnsmasq stopped")
+
             # Stop the nmcli hotspot connection
             await self._run_cmd(
                 "sudo", "nmcli", "connection", "down", "Hotspot", check=False
@@ -755,6 +760,18 @@ class WiFiManager:
             logger.info(
                 f"Hotspot mode active: SSID={self.hotspot_ssid}, IP={self.hotspot_ip}"
             )
+
+            # Start dnsmasq so radio.local resolves for hotspot clients.
+            rc_dns, _, stderr_dns = await self._run_cmd(
+                "sudo", "systemctl", "unmask", "dnsmasq", check=False
+            )
+            rc_dns, _, stderr_dns = await self._run_cmd(
+                "sudo", "systemctl", "start", "dnsmasq", check=False
+            )
+            if rc_dns != 0:
+                logger.warning(f"dnsmasq failed to start (radio.local may not resolve): {stderr_dns}")
+            else:
+                logger.info("dnsmasq started — radio.local resolves for hotspot clients")
 
         except Exception as e:
             logger.error(f"Failed to switch to host mode: {e}", exc_info=True)

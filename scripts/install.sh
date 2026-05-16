@@ -208,6 +208,45 @@ if [[ ! -S "${PULSE_SOCKET}" ]]; then
     echo "         To fix: log in as ${INSTALL_USER} and run: systemctl --user start pipewire pipewire-pulse"
 fi
 
+# ── dnsmasq — DNS resolver for hotspot mode ──────────────────────────────────
+# dnsmasq answers DNS queries for radio.local → 192.168.4.1 when the Pi is in
+# hotspot (AP) mode. It is masked at boot and only unmasked/started by the
+# wifi_manager when hotspot mode activates.
+
+echo "Installing dnsmasq..."
+apt-get update -qq && apt-get install -y --no-install-recommends dnsmasq
+
+# Disable systemd-resolved's stub listener so dnsmasq can bind port 53.
+RESOLVED_CONF="/etc/systemd/resolved.conf"
+if grep -q "^DNSStubListener=yes" "${RESOLVED_CONF}" 2>/dev/null || \
+   ! grep -q "^DNSStubListener=" "${RESOLVED_CONF}" 2>/dev/null; then
+    echo "Disabling systemd-resolved stub listener..."
+    sed -i '/^DNSStubListener=/d' "${RESOLVED_CONF}" 2>/dev/null || true
+    echo "DNSStubListener=no" >> "${RESOLVED_CONF}"
+    systemctl restart systemd-resolved 2>/dev/null || true
+fi
+
+# Determine WiFi interface from radio.conf (default wlan0).
+WIFI_IF="wlan0"
+if [[ -f "${CONF_FILE}" ]]; then
+    _wifi=$(grep -E '^WIFI_INTERFACE=' "${CONF_FILE}" | cut -d= -f2 | tr -d '[:space:]')
+    [[ -n "${_wifi}" ]] && WIFI_IF="${_wifi}"
+fi
+
+echo "Writing /etc/dnsmasq.d/radio-hotspot.conf (interface: ${WIFI_IF})..."
+mkdir -p /etc/dnsmasq.d
+cat > /etc/dnsmasq.d/radio-hotspot.conf <<EOF
+# Managed by install.sh — do not edit manually.
+interface=${WIFI_IF}
+bind-interfaces
+no-dhcp-interface=${WIFI_IF}
+address=/radio.local/192.168.4.1
+EOF
+
+# Mask dnsmasq — it is started only by wifi_manager when hotspot activates.
+systemctl mask dnsmasq 2>/dev/null || true
+echo "dnsmasq installed and masked (will start only in hotspot mode)."
+
 # ── Pull image and start ──────────────────────────────────────────────────────
 
 echo "Pulling latest image (${IMAGE})..."

@@ -326,7 +326,7 @@
 									<li>Reboot the system</li>
 								</ul>
 								<p class="text-sm text-muted-foreground mt-2">
-									After reboot, connect to "Radio-Setup" and navigate to <strong>http://radiod.local</strong>
+									After reboot, connect to "Radio-Setup" and navigate to <strong>http://radio.local</strong>
 								</p>
 							</div>
 							<div class="flex gap-3">
