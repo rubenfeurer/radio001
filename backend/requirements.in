@@ -21,7 +21,7 @@ annotated-types>=0.6.0
 aiohttp==3.13.5
 
 # Optional: Development dependencies (install with --dev flag)
-pytest==8.3.5
+pytest==9.0.3
 pytest-asyncio==1.3.0
 # black==23.11.0
 # flake8==6.1.0
