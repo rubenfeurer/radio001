@@ -14,7 +14,7 @@ services:
       - /dev:/dev:rw
       - /sys/class/net:/sys/class/net:ro
       - /run/dbus:/run/dbus:ro
-      - /run/user/1000/pulse:/run/user/1000/pulse:ro
+      - /run/user/1000/pulse/native:/run/user/1000/pulse/native:rw
     environment:
       - NODE_ENV=production
       - API_PORT=8000
