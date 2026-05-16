@@ -42,6 +42,7 @@ class AudioPlayer:
         self._volume: int = 50
         self._is_playing: bool = False
         self._is_initialized: bool = False
+        self._audio_backend: str = "alsa"
         self._url_cache: dict = {}
         self._cache_lock = asyncio.Lock()
 
@@ -64,8 +65,16 @@ class AudioPlayer:
                     self.mock_mode = True
                 else:
                     logger.info("mpg123 audio player available")
-                    # Set initial volume
-                    await self._set_alsa_volume(self._volume)
+                    # Detect PipeWire: probe for the PulseAudio socket
+                    pulse_server = os.getenv("PULSE_SERVER", "")
+                    pulse_socket = pulse_server.replace("unix:", "")
+                    if pulse_socket and os.path.exists(pulse_socket):
+                        self._audio_backend = "pulse"
+                        logger.info("AudioPlayer using PipeWire backend")
+                    else:
+                        self._audio_backend = "alsa"
+                        logger.warning("PipeWire socket not found — falling back to direct ALSA")
+                    await self._set_volume_backend(self._volume)
 
             self._is_initialized = True
             logger.info("AudioPlayer initialization complete")
@@ -124,14 +133,13 @@ class AudioPlayer:
                     self._url_cache[url] = resolved_url
             logger.info(f"Resolved URL: {resolved_url}")
 
-            # Spawn mpg123 subprocess — force ALSA output to avoid PulseAudio/JACK
-            alsa_device = os.getenv("ALSA_DEVICE", "hw:Headphones")
+            if self._audio_backend == "pulse":
+                cmd = ["mpg123", "-o", "pulse", "--quiet", resolved_url]
+            else:
+                alsa_device = os.getenv("ALSA_DEVICE", "hw:Headphones")
+                cmd = ["mpg123", "-o", "alsa", "-a", alsa_device, "--quiet", resolved_url]
             self._process = await asyncio.create_subprocess_exec(
-                "mpg123",
-                "-o", "alsa",
-                "-a", alsa_device,
-                "--quiet",
-                resolved_url,
+                *cmd,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -235,7 +243,7 @@ class AudioPlayer:
                 await self._notify_status_change()
                 return True
 
-            success = await self._set_alsa_volume(volume)
+            success = await self._set_volume_backend(volume)
             if success:
                 self._volume = volume
                 logger.debug(f"Volume set to {volume}%")
@@ -275,8 +283,31 @@ class AudioPlayer:
             logger.warning(f"URL resolution failed for {url}: {e}")
         return url
 
+    async def _set_volume_backend(self, volume: int) -> bool:
+        """Set volume via PipeWire (pactl) or ALSA (amixer) depending on backend."""
+        if self._audio_backend == "pulse":
+            return await self._set_pipewire_volume(volume)
+        return await self._set_alsa_volume(volume)
+
+    async def _set_pipewire_volume(self, volume: int) -> bool:
+        """Set volume via pactl targeting the PipeWire default sink."""
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{volume}%",
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                logger.warning(f"pactl failed: {stderr.decode().strip()}")
+                return False
+            return True
+        except FileNotFoundError:
+            logger.warning("pactl not found")
+            return False
+
     async def _set_alsa_volume(self, volume: int) -> bool:
-        """Set ALSA volume using amixer."""
+        """Set ALSA volume using amixer (fallback when PipeWire unavailable)."""
         mixer_card = os.getenv("ALSA_MIXER_CARD", "Headphones")
         mixer_control = os.getenv("ALSA_MIXER_CONTROL", "PCM")
         try:

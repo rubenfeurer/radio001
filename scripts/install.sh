@@ -65,6 +65,7 @@ services:
       - /dev:/dev:rw
       - /sys/class/net:/sys/class/net:ro
       - /run/dbus:/run/dbus:ro
+      - /run/user/1000/pulse:/run/user/1000/pulse:ro
     environment:
       - NODE_ENV=production
       - API_PORT=8000
@@ -72,6 +73,7 @@ services:
       - WIFI_TIMEOUT=5
       - WIFI_CHECK_ENABLED=true
       - HOST_MODE_FILE=/etc/raspiwifi/host_mode
+      - PULSE_SERVER=unix:/run/user/1000/pulse/native
       - ALSA_DEVICE=hw:Headphones
       - ALSA_MIXER_CARD=Headphones
       - ALSA_MIXER_CONTROL=PCM
@@ -166,6 +168,45 @@ WantedBy=multi-user.target
 SERVICE_EOF
 
 chmod 644 "${SERVICE_FILE}"
+
+# ── PipeWire prerequisites ────────────────────────────────────────────────────
+# The radio container routes audio through the host PipeWire session.
+# Ensure pipewire and pipewire-pulse are installed and the user service is running.
+
+echo "Checking PipeWire prerequisites..."
+if ! command -v pipewire &>/dev/null; then
+    echo "Installing pipewire and pipewire-pulse..."
+    apt-get update -qq && apt-get install -y --no-install-recommends pipewire pipewire-pulse wireplumber
+fi
+
+if [[ -n "${SUDO_USER:-}" ]]; then
+    INSTALL_USER="${SUDO_USER}"
+    USER_UID=$(id -u "${SUDO_USER}")
+else
+    INSTALL_USER="$(whoami)"
+    USER_UID=$(id -u)
+fi
+
+# Enable PipeWire user services
+echo "Enabling PipeWire user services for ${INSTALL_USER}..."
+systemctl --user -M "${INSTALL_USER}@" enable --now pipewire.service pipewire-pulse.service 2>/dev/null || \
+    loginctl enable-linger "${INSTALL_USER}" 2>/dev/null || true
+
+# Wait for PipeWire socket to appear (up to 15 seconds)
+PULSE_SOCKET="/run/user/${USER_UID}/pulse/native"
+echo "Waiting for PipeWire socket at ${PULSE_SOCKET}..."
+for i in $(seq 1 15); do
+    if [[ -S "${PULSE_SOCKET}" ]]; then
+        echo "PipeWire socket ready."
+        break
+    fi
+    sleep 1
+done
+if [[ ! -S "${PULSE_SOCKET}" ]]; then
+    echo "WARNING: PipeWire socket not found at ${PULSE_SOCKET}."
+    echo "         The radio will fall back to direct ALSA audio."
+    echo "         To fix: log in as ${INSTALL_USER} and run: systemctl --user start pipewire pipewire-pulse"
+fi
 
 # ── Pull image and start ──────────────────────────────────────────────────────
 

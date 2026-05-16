@@ -14,6 +14,7 @@ services:
       - /dev:/dev:rw
       - /sys/class/net:/sys/class/net:ro
       - /run/dbus:/run/dbus:ro
+      - /run/user/1000/pulse:/run/user/1000/pulse:ro
     environment:
       - NODE_ENV=production
       - API_PORT=8000
@@ -21,6 +22,7 @@ services:
       - WIFI_TIMEOUT=5
       - WIFI_CHECK_ENABLED=true
       - HOST_MODE_FILE=/etc/raspiwifi/host_mode
+      - PULSE_SERVER=unix:/run/user/1000/pulse/native
       - ALSA_DEVICE=hw:Headphones
       - ALSA_MIXER_CARD=Headphones
       - ALSA_MIXER_CONTROL=PCM
