@@ -125,7 +125,7 @@ class AudioPlayer:
             logger.info(f"Resolved URL: {resolved_url}")
 
             # Spawn mpg123 subprocess — force ALSA output to avoid PulseAudio/JACK
-            alsa_device = os.getenv("ALSA_DEVICE", "hw:2,0")
+            alsa_device = os.getenv("ALSA_DEVICE", "hw:Headphones")
             self._process = await asyncio.create_subprocess_exec(
                 "mpg123",
                 "-o", "alsa",
@@ -277,7 +277,7 @@ class AudioPlayer:
 
     async def _set_alsa_volume(self, volume: int) -> bool:
         """Set ALSA volume using amixer."""
-        mixer_card = os.getenv("ALSA_MIXER_CARD", "2")
+        mixer_card = os.getenv("ALSA_MIXER_CARD", "Headphones")
         mixer_control = os.getenv("ALSA_MIXER_CONTROL", "PCM")
         try:
             proc = await asyncio.create_subprocess_exec(
