@@ -96,6 +96,9 @@
   "workspaces": [
     "frontend"
   ],
+  "overrides": {
+    "cookie": "0.7.0"
+  },
   "config": {
     "app_name": "Radio WiFi Configuration",
     "default_hostname": "radio",
