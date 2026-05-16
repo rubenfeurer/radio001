@@ -1,5 +1,9 @@
 name: Release — Build & Publish ARM64 Image
 
+permissions:
+  contents: read
+  packages: write
+
 on:
   push:
     branches: [main]
