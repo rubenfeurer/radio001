@@ -10,7 +10,7 @@ Radio001 runs as a single Docker container on a Raspberry Pi. The container bund
 │                                                         │
 │  push to main ──► build ARM64 image ──► :latest tag     │
 │  GitHub Release ─────────────────────► :stable tag      │
-│                   (multi-stage Docker, ci-cd.yml)        │
+│                   (multi-stage Docker, release.yml)      │
 └──────────────────────────────┬──────────────────────────┘
                                │ ghcr.io/rubenfeurer/radio001
                                │
@@ -23,7 +23,7 @@ Radio001 runs as a single Docker container on a Raspberry Pi. The container bund
 │          │     ├─ FastAPI API    /system, /radio, /wifi  │
 │          │     └─ StaticFiles   /  (SvelteKit UI)       │
 │          └─► watchtower                                 │
-│                └─ pulls :latest nightly @ 03:00         │
+│                └─ pulls :stable nightly @ 03:00         │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -56,10 +56,10 @@ The `VERSION` build-arg is passed by CI and baked in as `ENV VERSION=<tag>`. It 
 
 | Trigger | Tags pushed | Pipeline |
 |---------|-------------|----------|
-| Push to `main` | `:latest`, `:main-<sha>` | `ci-cd.yml` |
-| GitHub Release (`published`) | `:stable`, `:vX.Y.Z`, `:X.Y` | `ci-cd.yml` |
+| Push to `main` | `:latest`, `:main-<sha>` | `release.yml` |
+| GitHub Release (`published`) | `:stable`, `:vX.Y.Z`, `:X.Y` | `release.yml` |
 
-`:latest` is used by Pi's Watchtower for nightly auto-updates. `:stable` is what `compose.prod.yml` (in the repo) references and is only updated on an explicit GitHub Release.
+`:stable` is tracked by Pi's Watchtower for nightly auto-updates and is only updated on an explicit GitHub Release. `:latest` is for manual verification on a test Pi before releasing.
 
 Trivy scans the filesystem on every CI run and uploads results to GitHub Security (SARIF). Known OS-level CVEs where the fix exists upstream but hasn't landed in Debian yet are listed in `.trivyignore`.
 
@@ -106,7 +106,7 @@ The script is **idempotent** — running it again preserves `radio.conf` and all
 
 ## Automatic Updates (Watchtower)
 
-Watchtower runs alongside the radio container and checks GHCR for a newer `:latest` image every night at **03:00**.
+Watchtower runs alongside the radio container and checks GHCR for a newer `:stable` image every night at **03:00**.
 
 ```yaml
 # In docker-compose.yml on the Pi:
