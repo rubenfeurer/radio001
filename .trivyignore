@@ -1,0 +1,11 @@
+# CVE-2026-4878: libcap privilege escalation via TOCTOU in cap_set_file()
+# Fixed in libcap 1:2.75-10+deb13u1 — pending Debian trixie distribution
+CVE-2026-4878
+
+# CVE-2026-29111: systemd arbitrary code execution / DoS
+# Fixed in systemd 257.13-1~deb13u1 — pending Debian trixie distribution
+CVE-2026-29111
+
+# CVE-2026-35535: sudo privilege escalation
+# Fixed in sudo 1.9.16p2-3+deb13u2 — pending Debian trixie distribution
+CVE-2026-35535
