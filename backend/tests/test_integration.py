@@ -11,6 +11,8 @@ from unittest.mock import patch
 import websockets
 from websockets.exceptions import ConnectionClosed
 
+pytestmark = pytest.mark.asyncio
+
 
 @pytest.mark.integration
 class TestRadioSystemIntegration:

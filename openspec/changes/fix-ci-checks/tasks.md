@@ -9,6 +9,9 @@
 - [x] 2.1 Add `pytest-timeout==0.5.3` (or latest) to `backend/requirements-test.txt`
 - [x] 2.2 Add `--timeout=120` to every `python -m pytest` invocation in `.github/workflows/test-backend.yml`
 
-## 3. Fix pytest-asyncio 1.x incompatibility
+## 3. Fix pytest-asyncio 1.x incompatibility (stay on latest versions)
 
-- [x] 3.1 Downgrade `pytest-asyncio==1.3.0` → `pytest-asyncio==0.23.8` in `backend/requirements-test.txt` — 1.x dropped support for `asyncio_mode = auto` ini option, causing all async tests to run in STRICT mode and fail
+- [x] 3.1 Revert `requirements-test.txt` to `pytest==9.0.3` + `pytest-asyncio==1.3.0` (0.25.x requires pytest <9, no 0.x supports pytest 9)
+- [x] 3.2 Remove `asyncio_mode = auto` and `--asyncio-mode=auto` from `backend/pytest.ini` — auto mode removed in 1.x, strict is now default
+- [x] 3.3 Add `pytestmark = pytest.mark.asyncio` to all 8 test files so async tests run under asyncio in strict mode
+- [x] 3.4 Check `asyncio_default_fixture_loop_scope = session` still works in 1.x or update to correct key

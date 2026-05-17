@@ -19,6 +19,8 @@ from core.models import RadioStation, SystemStatus, PlaybackState, VolumeUpdate
 from core.station_manager import StationManager
 from main import Config
 
+pytestmark = pytest.mark.asyncio
+
 
 @pytest.mark.unit
 class TestRadioManager:

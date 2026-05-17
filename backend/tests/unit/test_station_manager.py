@@ -19,6 +19,8 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from core.station_manager import StationManager
 from core.models import RadioStation, StationRequest
 
+pytestmark = pytest.mark.asyncio
+
 
 @pytest.mark.unit
 class TestStationManager:

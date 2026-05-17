@@ -16,6 +16,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+pytestmark = pytest.mark.asyncio
+
 from core.wifi_manager import WiFiManager, WiFiNetwork, WiFiStatus
 
 
