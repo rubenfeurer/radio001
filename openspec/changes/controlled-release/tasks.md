@@ -1,11 +1,11 @@
 ## 1. CI Workflow — add :stable tag
 
-- [ ] 1.1 In `.github/workflows/ci-cd.yml`, add `type=raw,value=stable,enable=${{ github.event_name == 'release' }}` to the `metadata-action` tags block in the `docker-build` job
+- [x] 1.1 In `.github/workflows/ci-cd.yml`, add `type=raw,value=stable,enable=${{ github.event_name == 'release' }}` to the `metadata-action` tags block in the `docker-build` job
 
 ## 2. Production compose — switch to :stable
 
-- [ ] 2.1 In `docker/compose.prod.yml`, change `image: ghcr.io/rubenfeurer/radio001:latest` to `image: ghcr.io/rubenfeurer/radio001:stable`
-- [ ] 2.2 Update the comment at the top of `compose.prod.yml` to say "Watchtower pulls :stable on GitHub Release"
+- [x] 2.1 In `docker/compose.prod.yml`, change `image: ghcr.io/rubenfeurer/radio001:latest` to `image: ghcr.io/rubenfeurer/radio001:stable`
+- [x] 2.2 Update the comment at the top of `compose.prod.yml` to say "Watchtower pulls :stable on GitHub Release"
 
 ## 3. Pi migration — push updated compose
 

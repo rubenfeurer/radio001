@@ -1,10 +1,10 @@
 # Production Docker Compose for Radio Pi
 # Frontend is baked into the backend image; no separate nginx service needed.
-# Watchtower pulls :latest nightly at 03:00.
+# Watchtower pulls :stable nightly at 03:00 — :stable is only pushed on GitHub Release.
 
 services:
   radio-backend:
-    image: ghcr.io/rubenfeurer/radio001:latest
+    image: ghcr.io/rubenfeurer/radio001:stable
     container_name: radio-backend-prod
     network_mode: host
     volumes:
