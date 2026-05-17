@@ -14,7 +14,7 @@ DATA_DIR="${INSTALL_DIR}/data"
 COMPOSE_FILE="${INSTALL_DIR}/docker-compose.yml"
 CONF_FILE="${CONFIG_DIR}/radio.conf"
 SERVICE_FILE="/etc/systemd/system/radio.service"
-IMAGE="ghcr.io/rubenfeurer/radio001:latest"
+IMAGE="ghcr.io/rubenfeurer/radio001:stable"
 
 # ── Prerequisites ────────────────────────────────────────────────────────────
 
@@ -55,7 +55,7 @@ cat > "${COMPOSE_FILE}" <<'COMPOSE_EOF'
 # Managed by install.sh — do not edit manually.
 services:
   radio-backend:
-    image: ghcr.io/rubenfeurer/radio001:latest
+    image: ghcr.io/rubenfeurer/radio001:stable
     container_name: radio-backend-prod
     network_mode: host
     volumes:
