@@ -13,10 +13,11 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   NODE_VERSION: "20"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # =============================================================================
-  # Build and Push Images (for main branch)
+  # Integration Tests
   # =============================================================================
   integration:
     name: Integration Tests
@@ -30,6 +31,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
 
       - name: Build frontend for CI
         run: |
@@ -41,37 +43,27 @@ jobs:
       - name: Build and test with Docker
         run: |
           # Build backend container
-          docker compose -f docker/compose.ci.yml build radio-backend --no-cache
+          docker compose -f docker/compose.ci.yml build radio-backend
 
           # Start services
           docker compose -f docker/compose.ci.yml up -d
 
-          # Wait for services to be ready
-          echo "Waiting for services to start..."
-          sleep 45
-
-          # Show running containers for debugging
-          docker compose -f docker/compose.ci.yml ps
-
-          # Test backend health first (frontend depends on it)
-          echo "Testing backend health..."
-          for i in {1..10}; do
-            if curl -f http://localhost:8000/health; then
+          # Wait for backend to be ready
+          echo "Waiting for backend to start..."
+          for i in {1..18}; do
+            if curl -sf http://localhost:8000/health; then
               echo "Backend health check passed"
               break
             else
-              echo "Backend health check failed (attempt $i/10)"
-              if [ $i -eq 10 ]; then
+              echo "Health check attempt $i/18 failed, retrying..."
+              if [ $i -eq 18 ]; then
                 echo "Backend logs:"
-                  docker compose -f docker/compose.ci.yml logs radio-backend
+                docker compose -f docker/compose.ci.yml logs radio-backend
                 exit 1
               fi
-              sleep 10
+              sleep 5
             fi
           done
-
-          # Frontend is now handled separately in production
-          echo "Frontend testing skipped - using static build approach"
 
           # Test API directly
           echo "Testing API directly..."
@@ -189,7 +181,7 @@ jobs:
           output: "trivy-results.sarif"
 
       - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: "trivy-results.sarif"
@@ -230,66 +222,6 @@ jobs:
             echo "📈 Coverage Analysis:"
             python3 -c "import xml.etree.ElementTree as ET; root=ET.parse('test-results/coverage.xml').getroot(); cov=float(root.attrib.get('line-rate','0'))*100; print(f'Line Coverage: {cov:.1f}%'); print('Good coverage!' if cov>=23 else 'Coverage below 23% threshold\nTarget: Increase test coverage')"
           fi
-
-      - name: Comment PR with test results
-        uses: actions/github-script@v7
-        if: github.event_name == 'pull_request'
-        with:
-          script: |
-            const fs = require('fs');
-
-            let comment = '## 🧪 Backend Test Results\n\n';
-
-            try {
-              if (fs.existsSync('test-results/test-results.xml')) {
-                const xml = fs.readFileSync('test-results/test-results.xml', 'utf8');
-                const parser = require('xml2js');
-
-                parser.parseString(xml, (err, result) => {
-                  if (!err && result.testsuite && result.testsuite.$) {
-                    const attrs = result.testsuite.$;
-                    const total = attrs.tests || '0';
-                    const failures = attrs.failures || '0';
-                    const errors = attrs.errors || '0';
-                    const passed = parseInt(total) - parseInt(failures) - parseInt(errors);
-
-                    comment += `### Test Summary\n`;
-                    comment += `- **Total Tests**: ${total}\n`;
-                    comment += `- **Passed**: ${passed} PASS\n`;
-                    comment += `- **Failed**: ${failures} ${failures > 0 ? 'FAIL' : 'PASS'}\n`;
-                    comment += `- **Errors**: ${errors} ${errors > 0 ? 'ERROR' : 'PASS'}\n`;
-                    comment += `- **Duration**: ${parseFloat(attrs.time || '0').toFixed(2)}s\n\n`;
-
-                    if (parseInt(failures) === 0 && parseInt(errors) === 0) {
-                      comment += '**All tests passed!**\n\n';
-                    } else {
-                      comment += '**Some tests failed** - Please check the logs\n\n';
-                    }
-                  }
-                });
-              }
-
-              comment += '### Test Categories\n';
-              comment += '- ✅ **Unit Tests**: Core functionality\n';
-              comment += '- ✅ **Integration Tests**: System workflows\n';
-              comment += '- ✅ **API Tests**: Endpoint validation\n';
-              comment += '- ✅ **WebSocket Tests**: Real-time communication\n\n';
-
-              comment += '### Coverage Report\n';
-              comment += 'Detailed coverage report available in test artifacts.\n\n';
-
-              comment += '_Test results generated by CI/CD pipeline_';
-
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: comment
-              });
-
-            } catch (error) {
-              console.log('Error creating comment:', error);
-            }
 
   # =============================================================================
   # Docker Build & Push
@@ -344,7 +276,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./docker/Dockerfile
+          file: ./docker/Dockerfile.backend
           platforms: ${{ matrix.platform }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -385,121 +317,3 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}-linux-arm64
 
           docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}
-
-  # =============================================================================
-  # Deployment (only on main branch)
-  # =============================================================================
-  deploy-staging:
-    name: Deploy to Staging
-    runs-on: ubuntu-latest
-    needs: [docker-build]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: staging
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy to staging environment
-        run: |
-          echo "Deployment to staging would happen here"
-          echo "This could involve:"
-          echo "- SSH to staging server"
-          echo "- Pull latest images"
-          echo "- Update docker-compose.prod.yml"
-          echo "- Restart services"
-          echo "- Run health checks"
-
-  # =============================================================================
-  # Release Deployment
-  # =============================================================================
-  deploy-production:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: [docker-build]
-    if: github.event_name == 'release'
-    environment: production
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy to production
-        run: |
-          echo "Production deployment would happen here"
-          echo "This could involve:"
-          echo "- Deploy to multiple Pi devices"
-          echo "- Rolling updates"
-          echo "- Health monitoring"
-          echo "- Rollback capability"
-
-  # =============================================================================
-  # Documentation
-  # =============================================================================
-  docs:
-    name: Build Documentation
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "18"
-
-      - name: Build documentation
-        run: |
-          echo "Documentation build would happen here"
-          echo "This could generate:"
-          echo "- API documentation from FastAPI"
-          echo "- Component documentation from Vue"
-          echo "- User guides from README"
-          echo "- Installation instructions"
-
-      - name: Deploy to GitHub Pages
-        if: success()
-        run: |
-          echo "Deploy docs to GitHub Pages"
-
-  # =============================================================================
-  # Notification
-  # =============================================================================
-  notify:
-    name: Notify Results
-    runs-on: ubuntu-latest
-    needs: [integration, security, test-analysis, docker-build]
-    if: always()
-
-    steps:
-      - name: Main Branch Summary
-        if: github.ref == 'refs/heads/main'
-        run: |
-          echo "🚀 Main Branch Deployment Summary"
-          echo "================================="
-          echo "Integration: ${{ needs.integration.result }}"
-          echo "Security: ${{ needs.security.result }}"
-          echo "Test Analysis: ${{ needs.test-analysis.result }}"
-          echo "Docker Build: ${{ needs.docker-build.result }}"
-          echo ""
-
-          if [ "${{ needs.integration.result }}" = "success" ] && \
-             [ "${{ needs.security.result }}" = "success" ] && \
-             [ "${{ needs.test-analysis.result }}" = "success" ] && \
-             [ "${{ needs.docker-build.result }}" = "success" ]; then
-            echo "✅ Main branch validation completed! Ready for deployment."
-            echo ""
-            echo "🎯 Deployment Ready Features:"
-            echo "- Radio system: ✅ 142+ tests passing"
-            echo "- Station management: ✅ 3-slot system validated"
-            echo "- Hardware integration: ✅ GPIO & audio mocked"
-            echo "- WebSocket API: ✅ Real-time communication tested"
-            echo "- Volume control: ✅ Hardware limits enforced"
-            echo "- Error handling: ✅ Robust error recovery"
-          else
-            echo "❌ Main branch validation failed!"
-            echo ""
-            echo "❌ Deployment blocked due to test failures"
-          fi
