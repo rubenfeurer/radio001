@@ -152,10 +152,10 @@ jobs:
           retention-days: 30
 
       - name: Upload Docker coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         if: success()
         with:
-          file: test-results/coverage.xml
+          files: test-results/coverage.xml
           flags: backend-docker
           name: backend-docker-coverage
 
@@ -216,32 +216,7 @@ jobs:
 
           if [ -f "test-results/test-results.xml" ]; then
             echo "📊 Test Results Summary:"
-            python3 -c "
-import xml.etree.ElementTree as ET
-import sys
-try:
-    tree = ET.parse('test-results/test-results.xml')
-    root = tree.getroot()
-    tests = root.attrib.get('tests', '0')
-    failures = root.attrib.get('failures', '0')
-    errors = root.attrib.get('errors', '0')
-    skipped = root.attrib.get('skipped', '0')
-    time = root.attrib.get('time', '0')
-    print(f'Total Tests: {tests}')
-    print(f'Passed: {int(tests) - int(failures) - int(errors) - int(skipped)}')
-    print(f'Failed: {failures}')
-    print(f'Errors: {errors}')
-    print(f'Skipped: {skipped}')
-    print(f'Duration: {float(time):.2f}s')
-    if int(failures) > 0 or int(errors) > 0:
-        print('TESTS FAILED')
-        sys.exit(1)
-    else:
-        print('ALL TESTS PASSED')
-except Exception as e:
-    print(f'Error parsing test results: {e}')
-    sys.exit(1)
-"
+            python3 -c "import xml.etree.ElementTree as ET,sys; root=ET.parse('test-results/test-results.xml').getroot(); tests=root.attrib.get('tests','0'); failures=root.attrib.get('failures','0'); errors=root.attrib.get('errors','0'); skipped=root.attrib.get('skipped','0'); t=root.attrib.get('time','0'); [print(f'Total Tests: {tests}'), print(f'Passed: {int(tests)-int(failures)-int(errors)-int(skipped)}'), print(f'Failed: {failures}'), print(f'Errors: {errors}'), print(f'Skipped: {skipped}'), print(f'Duration: {float(t):.2f}s')]; sys.exit(1 if int(failures)>0 or int(errors)>0 else 0)"
           else
             echo "No test results found"
             exit 1
@@ -250,22 +225,7 @@ except Exception as e:
           if [ -f "test-results/coverage.xml" ]; then
             echo ""
             echo "📈 Coverage Analysis:"
-            python3 -c "
-import xml.etree.ElementTree as ET
-try:
-    tree = ET.parse('test-results/coverage.xml')
-    root = tree.getroot()
-    coverage = root.attrib.get('line-rate', '0')
-    coverage_percent = float(coverage) * 100
-    print(f'Line Coverage: {coverage_percent:.1f}%')
-    if coverage_percent < 23:
-        print('Coverage below 23% threshold')
-        print('Target: Increase test coverage')
-    else:
-        print('Good coverage!')
-except Exception as e:
-    print(f'Error parsing coverage: {e}')
-"
+            python3 -c "import xml.etree.ElementTree as ET; root=ET.parse('test-results/coverage.xml').getroot(); cov=float(root.attrib.get('line-rate','0'))*100; print(f'Line Coverage: {cov:.1f}%'); print('Good coverage!' if cov>=23 else 'Coverage below 23% threshold\nTarget: Increase test coverage')"
           fi
 
       - name: Comment PR with test results
