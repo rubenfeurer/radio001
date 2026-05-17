@@ -59,7 +59,7 @@ services:
     container_name: radio-backend-prod
     network_mode: host
     volumes:
-      - /opt/radio/config:/app/config:ro
+      - /opt/radio/config:/app/config:rw
       - /opt/radio/data:/app/data
       - /etc/raspiwifi:/etc/raspiwifi:rw
       - /dev:/dev:rw

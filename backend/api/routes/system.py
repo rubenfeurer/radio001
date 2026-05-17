@@ -8,12 +8,15 @@ This module provides endpoints for system-level information including:
 - Service health checks
 """
 
+import asyncio
 import logging
 import os
+import signal
 from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -243,3 +246,19 @@ async def activate_hotspot_mode():
     except Exception as e:
         logger.error(f"Failed to reset to hotspot mode: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to reset system: {str(e)}")
+
+
+@router.post("/restart", summary="Restart the radio container")
+async def restart_container():
+    """
+    Gracefully terminate the process so systemd restarts the container.
+    Responds 200 before exiting so the client receives confirmation.
+    """
+    logger.info("Restart requested via API — sending SIGTERM in 1s")
+
+    async def _delayed_exit():
+        await asyncio.sleep(1)
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    asyncio.create_task(_delayed_exit())
+    return JSONResponse({"success": True, "message": "Restarting…"})
