@@ -397,31 +397,21 @@ class WiFiManager:
         logger.info(f"Attempting to connect to {ssid}")
 
         try:
-            # Check if connection already exists
-            check_process = await asyncio.create_subprocess_exec(
-                "nmcli",
-                "-t",
-                "-f",
-                "NAME",
-                "connection",
-                "show",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            check_stdout, _ = await check_process.communicate()
+            # Resolve exact NM connection name for this SSID (avoids substring-match false positives)
+            saved = await self.list_saved_networks()
+            existing = next((n for n in saved if n["ssid"] == ssid), None)
 
-            connection_exists = ssid in check_stdout.decode()
-
-            if connection_exists:
-                logger.info(f"Existing connection found for {ssid}, modifying...")
-                # Modify existing connection
+            if existing:
+                connection_name = existing["connection_name"]
+                logger.info(f"Existing NM profile found for {ssid!r}: {connection_name!r}")
+                # Optionally update the stored password
                 if password:
                     process = await asyncio.create_subprocess_exec(
                         "sudo",
                         "nmcli",
                         "connection",
                         "modify",
-                        ssid,
+                        connection_name,
                         "wifi-sec.key-mgmt",
                         "wpa-psk",
                         "wifi-sec.psk",
@@ -431,13 +421,13 @@ class WiFiManager:
                     )
                     await process.communicate()
 
-                # Bring up the connection
+                # Bring up the connection using the exact NM profile name
                 process = await asyncio.create_subprocess_exec(
                     "sudo",
                     "nmcli",
                     "connection",
                     "up",
-                    ssid,
+                    connection_name,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
@@ -654,19 +644,29 @@ class WiFiManager:
 
             target_network = saved_networks[network_id]
             ssid = target_network["ssid"]
+            connection_name = target_network["connection_name"]
 
-            # Don't allow forgetting currently connected network
+            # Disconnect first if this is the currently active connection
             if target_network.get("current", False):
-                logger.error("Cannot forget currently connected network")
-                return False
+                logger.info(f"Disconnecting from active network {ssid!r} before deleting profile")
+                disc_process = await asyncio.create_subprocess_exec(
+                    "sudo",
+                    "nmcli",
+                    "device",
+                    "disconnect",
+                    self.interface,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await disc_process.communicate()
 
-            # Delete the connection
+            # Delete the connection profile using the exact NM connection name
             process = await asyncio.create_subprocess_exec(
                 "sudo",
                 "nmcli",
                 "connection",
                 "delete",
-                ssid,
+                connection_name,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -676,7 +676,7 @@ class WiFiManager:
                 logger.error(f"Failed to delete connection: {stderr.decode()}")
                 return False
 
-            logger.info(f"Successfully removed network: {ssid}")
+            logger.info(f"Successfully removed network: {ssid} (profile: {connection_name!r})")
             return True
 
         except Exception as e:

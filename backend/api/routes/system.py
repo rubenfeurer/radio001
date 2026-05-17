@@ -12,6 +12,7 @@ import asyncio
 import logging
 import os
 import signal
+import subprocess
 from pathlib import Path
 from typing import Any, Dict
 
@@ -246,6 +247,26 @@ async def activate_hotspot_mode():
     except Exception as e:
         logger.error(f"Failed to reset to hotspot mode: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to reset system: {str(e)}")
+
+
+@router.post("/reboot", summary="Reboot the Pi host")
+async def reboot_host():
+    """
+    Reboot the Raspberry Pi host machine.
+    In development mode, returns success without actually rebooting.
+    """
+    if os.getenv("NODE_ENV") == "development":
+        logger.info("Reboot requested — skipped in development mode")
+        return JSONResponse({"success": True, "message": "Reboot skipped in development mode"})
+
+    logger.warning("Reboot requested via API — rebooting host in 1s")
+
+    async def _delayed_reboot():
+        await asyncio.sleep(1)
+        subprocess.run(["reboot"], check=False)
+
+    asyncio.create_task(_delayed_reboot())
+    return JSONResponse({"success": True, "message": "Rebooting…"})
 
 
 @router.post("/restart", summary="Restart the radio container")

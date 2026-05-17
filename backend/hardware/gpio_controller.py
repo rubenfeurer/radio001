@@ -40,6 +40,7 @@ class GPIOController:
                  button_callback: Optional[Callable[[int], None]] = None,
                  volume_callback: Optional[Callable[[int], None]] = None,
                  long_press_callback: Optional[Callable[[int], None]] = None,
+                 triple_press_callback: Optional[Callable[[int], None]] = None,
                  mock_mode: bool = True):
         """
         Initialize the GPIO controller.
@@ -55,6 +56,7 @@ class GPIOController:
         self.button_callback = button_callback
         self.volume_callback = volume_callback
         self.long_press_callback = long_press_callback
+        self.triple_press_callback = triple_press_callback
         self.mock_mode = mock_mode
 
         # GPIO state tracking
@@ -313,8 +315,13 @@ class GPIOController:
         """Handle triple button press."""
         try:
             if gpio_pin == self.config.ROTARY_SW:
-                logger.warning("Triple press detected - system reset sequence")
-                # Could trigger system reset/reboot
+                logger.warning("Triple press detected on rotary switch — invoking triple_press_callback")
+                if self.triple_press_callback:
+                    result = self.triple_press_callback(gpio_pin)
+                    if asyncio.iscoroutine(result):
+                        await result
+                else:
+                    logger.warning("Triple press on rotary switch but no triple_press_callback registered")
 
         except Exception as e:
             logger.error(f"Error handling triple press on pin {gpio_pin}: {e}", exc_info=True)
@@ -392,6 +399,34 @@ class GPIOController:
 
         except Exception as e:
             logger.error(f"Error simulating volume change: {e}", exc_info=True)
+
+    async def simulate_triple_press(self, button: int = 4):
+        """
+        Simulate triple press on rotary switch (mock mode only).
+
+        Args:
+            button: Button number (default 4 = rotary switch)
+        """
+        if not self.mock_mode:
+            logger.warning("simulate_triple_press called in non-mock mode")
+            return
+
+        pin_map = {1: self.config.BUTTON_PIN_1, 2: self.config.BUTTON_PIN_2,
+                  3: self.config.BUTTON_PIN_3, 4: self.config.ROTARY_SW}
+        gpio_pin = pin_map.get(button, self.config.ROTARY_SW)
+
+        try:
+            logger.info(f"Simulating triple press on button {button}")
+            interval = self.config.TRIPLE_PRESS_INTERVAL * 0.4
+            for _ in range(3):
+                current_time = time.time()
+                await self._handle_button_press(gpio_pin, current_time)
+                await asyncio.sleep(0.05)
+                await self._handle_button_release(gpio_pin, time.time())
+                await asyncio.sleep(interval)
+
+        except Exception as e:
+            logger.error(f"Error simulating triple press: {e}", exc_info=True)
 
     async def simulate_long_press(self, button: int = 4):
         """

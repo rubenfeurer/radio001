@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { wifiState, getStatus } from '$lib/stores/wifi.svelte';
+	import { radioState, setVolume, fetchStatus } from '$lib/stores/radio.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { Input } from '$lib/components/ui/input';
@@ -103,7 +105,30 @@
 		showBanner = false;
 	}
 
+	const formatUptime = (seconds: number) => {
+		const days = Math.floor(seconds / 86400);
+		const hours = Math.floor((seconds % 86400) / 3600);
+		const minutes = Math.floor((seconds % 3600) / 60);
+		if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+		if (hours > 0) return `${hours}h ${minutes}m`;
+		return `${minutes}m`;
+	};
+
+	const formatBytes = (bytes: number) => {
+		const sizes = ['B', 'KB', 'MB', 'GB'];
+		if (bytes === 0) return '0 B';
+		const i = Math.floor(Math.log(bytes) / Math.log(1024));
+		return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + ' ' + sizes[i];
+	};
+
+	function handleVolumeInput(e: Event) {
+		const target = e.target as HTMLInputElement;
+		setVolume(parseInt(target.value, 10));
+	}
+
 	onMount(async () => {
+		getStatus();
+		fetchStatus();
 		const s = await loadSettings();
 		if (s) populate(s);
 	});
@@ -170,6 +195,102 @@
 			{#if validationErrors._global}
 				<p class="text-center text-sm text-destructive">{validationErrors._global}</p>
 			{/if}
+
+			<!-- Volume -->
+			<Card>
+				<CardContent class="pt-5">
+					<h2 class="font-semibold text-foreground mb-3">Volume</h2>
+					<div class="flex items-center space-x-3">
+						<svg class="w-4 h-4 text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+								d="M15.536 8.464a5 5 0 010 7.072M12 6l-4 4H4v4h4l4 4V6z" />
+						</svg>
+						<input
+							type="range"
+							min="0"
+							max="100"
+							value={radioState.volume}
+							oninput={handleVolumeInput}
+							class="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-secondary accent-primary"
+						/>
+						<span class="text-xs text-muted-foreground w-10 text-right flex-shrink-0">{radioState.volume}%</span>
+					</div>
+				</CardContent>
+			</Card>
+
+			<!-- WiFi Connection -->
+			<Card>
+				<CardContent class="pt-5 space-y-3">
+					<h2 class="font-semibold text-foreground">Wifi Connection</h2>
+					{#if wifiState.isLoading}
+						<div class="animate-pulse space-y-2">
+							<div class="h-4 bg-muted rounded w-3/4"></div>
+							<div class="h-4 bg-muted rounded w-1/2"></div>
+						</div>
+					{:else if wifiState.status}
+						<div class="flex justify-between items-center">
+							<span class="text-sm text-muted-foreground">Status</span>
+							<span class="text-sm font-medium {
+								wifiState.status?.network?.wifi?.status === 'connected' ? 'text-green-600' :
+								wifiState.status?.network?.wifi?.status === 'connecting' ? 'text-yellow-600' :
+								'text-red-600'
+							}">
+								{wifiState.status?.network?.wifi?.status || 'Unknown'}
+							</span>
+						</div>
+						{#if wifiState.status?.network?.wifi?.ssid}
+							<div class="flex justify-between items-center">
+								<span class="text-sm text-muted-foreground">Network</span>
+								<span class="text-sm font-medium text-foreground">{wifiState.status.network.wifi.ssid}</span>
+							</div>
+						{/if}
+						{#if wifiState.status?.network?.wifi?.ip}
+							<div class="flex justify-between items-center">
+								<span class="text-sm text-muted-foreground">IP Address</span>
+								<span class="text-sm font-mono text-foreground">{wifiState.status.network.wifi.ip}</span>
+							</div>
+						{/if}
+					{/if}
+				</CardContent>
+			</Card>
+
+			<!-- System Status -->
+			<Card>
+				<CardContent class="pt-5 space-y-3">
+					<h2 class="font-semibold text-foreground">System Status</h2>
+					{#if wifiState.isLoading}
+						<div class="animate-pulse space-y-2">
+							<div class="h-4 bg-muted rounded w-3/4"></div>
+							<div class="h-4 bg-muted rounded w-1/2"></div>
+						</div>
+					{:else if wifiState.status}
+						<div class="flex justify-between items-center">
+							<span class="text-sm text-muted-foreground">Hostname</span>
+							<span class="text-sm font-medium text-foreground">{wifiState.status.hostname}</span>
+						</div>
+						<div class="flex justify-between items-center">
+							<span class="text-sm text-muted-foreground">Uptime</span>
+							<span class="text-sm font-medium text-foreground">{formatUptime(wifiState.status.uptime)}</span>
+						</div>
+						<div class="flex justify-between items-center">
+							<span class="text-sm text-muted-foreground">CPU Load</span>
+							<span class="text-sm font-medium text-foreground">{wifiState.status.cpu.load.toFixed(1)}%</span>
+						</div>
+						{#if wifiState.status.cpu.temperature}
+							<div class="flex justify-between items-center">
+								<span class="text-sm text-muted-foreground">CPU Temp</span>
+								<span class="text-sm font-medium text-foreground">{wifiState.status.cpu.temperature.toFixed(1)}°C</span>
+							</div>
+						{/if}
+						<div class="flex justify-between items-center">
+							<span class="text-sm text-muted-foreground">Memory</span>
+							<span class="text-sm font-medium text-foreground">
+								{formatBytes(wifiState.status.memory.used)} / {formatBytes(wifiState.status.memory.total)}
+							</span>
+						</div>
+					{/if}
+				</CardContent>
+			</Card>
 
 			<!-- How to use -->
 			<Card>

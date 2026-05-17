@@ -147,13 +147,6 @@ async def forget_saved_network(network_id: int):
                 status_code=404, detail=f"Network ID {network_id} not found"
             )
 
-        # Don't allow forgetting currently connected network
-        if network.get("current", False):
-            raise HTTPException(
-                status_code=400,
-                detail="Cannot forget currently connected network. Connect to another network first.",
-            )
-
         # Remove network
         success = await wifi_manager.forget_network(network_id)
 
