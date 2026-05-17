@@ -33,7 +33,7 @@
 
 ## 6. Deploy and verify
 
-- [ ] 6.1 Commit all changes on `develop`, open PR to `main`, wait for CI and ARM64 image build
+- [x] 6.1 Commit all changes on `develop`, open PR to `main`, wait for CI and ARM64 image build
 - [ ] 6.2 Update `/opt/radio/docker-compose.yml` on Pi with `:rw` mount (scp + alpine trick)
 - [ ] 6.3 Pull new image and restart container on Pi
 - [ ] 6.4 Navigate to `/settings`, verify all fields load with current conf values

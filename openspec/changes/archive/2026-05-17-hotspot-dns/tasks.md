@@ -28,7 +28,7 @@
 
 ## 5. Deploy and verify
 
-- [ ] 5.1 Commit all changes on `develop`, open PR to `main`, wait for CI and ARM64 image build
+- [x] 5.1 Commit all changes on `develop`, open PR to `main`, wait for CI and ARM64 image build
 - [ ] 5.2 SSH to Pi and re-run `install.sh` (or manually apply steps 1.1–1.4) to install dnsmasq
 - [ ] 5.3 Trigger hotspot mode via the UI (`POST /api/system/hotspot-mode`) and verify dnsmasq starts: `systemctl is-active dnsmasq`
 - [ ] 5.4 Connect a phone to the "Radio-Setup" hotspot and navigate to `http://radio.local` — confirm the radio UI loads
