@@ -25,16 +25,6 @@ from api.routes.websocket import setup_radio_manager_with_websocket
 from core.models import RadioStation, StationRequest
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Session-scoped event loop. The __original_fixture_loop marker bypasses
-    a pytest-asyncio 0.24.x bug where it tries to inspect source of a synthetic
-    session loop closure (OSError: could not get source code)."""
-    loop = asyncio.new_event_loop()
-    loop.__original_fixture_loop = True
-    yield loop
-    loop.close()
-
 
 @pytest.fixture
 def temp_data_dir():

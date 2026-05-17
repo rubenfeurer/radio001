@@ -1,5 +1,8 @@
 name: Backend Test Suite - Comprehensive Testing
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main, develop]
@@ -107,6 +110,7 @@ jobs:
             --verbose \
             --tb=short \
             --maxfail=10 \
+            --timeout=120 \
             -m "unit" \
             --cov=core \
             --cov=hardware \
@@ -168,6 +172,7 @@ jobs:
             --verbose \
             --tb=short \
             --maxfail=10 \
+            --timeout=120 \
             -m "api" \
             --cov=api \
             --cov-report=term-missing \
@@ -228,6 +233,7 @@ jobs:
             --verbose \
             --tb=short \
             --maxfail=10 \
+            --timeout=120 \
             -m "websocket" \
             --cov=api.routes.websocket \
             --cov-report=term-missing \
@@ -304,6 +310,7 @@ jobs:
               --verbose \
               --tb=short \
               --maxfail=5 \
+              --timeout=300 \
               -m 'integration' \
               --cov=core \
               --cov=api \

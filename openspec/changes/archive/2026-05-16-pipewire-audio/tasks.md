@@ -19,10 +19,10 @@
 
 ## 4. Deploy and verify
 
-- [ ] 4.1 Commit all changes on develop, PR to main, wait for CI to build and push arm64 image
-- [ ] 4.2 Hot-patch Pi: update `/opt/radio/docker-compose.yml` with socket mount and `PULSE_SERVER` (use `docker run alpine` trick), restart container
-- [ ] 4.3 Verify backend selection log: `docker logs radio-backend-prod | grep -i 'pipewire\|backend'`
-- [ ] 4.4 Verify music plays
-- [ ] 4.5 Move OS volume slider — confirm audio output changes
-- [ ] 4.6 Turn rotary encoder — confirm audio output changes
-- [ ] 4.7 Confirm OS slider and rotary encoder reflect each other (unified control)
+- [x] 4.1 Commit all changes on develop, PR to main, wait for CI to build and push arm64 image
+- [x] 4.2 Hot-patch Pi: update `/opt/radio/docker-compose.yml` with socket mount and `PULSE_SERVER` (use `docker run alpine` trick), restart container
+- [x] 4.3 Verify backend selection log: `docker logs radio-backend-prod | grep -i 'pipewire\|backend'`
+- [x] 4.4 Verify music plays
+- [x] 4.5 Move OS volume slider — confirm audio output changes
+- [x] 4.6 Turn rotary encoder — confirm audio output changes
+- [x] 4.7 Confirm OS slider and rotary encoder reflect each other (unified control)

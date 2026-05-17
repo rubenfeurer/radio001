@@ -120,6 +120,13 @@ activate_hotspot_mode() {
         return 1
     fi
 
+    # Start dnsmasq so radio.local resolves for hotspot clients.
+    if systemctl unmask dnsmasq 2>/dev/null && systemctl start dnsmasq 2>/dev/null; then
+        log "dnsmasq started — radio.local resolves for hotspot clients"
+    else
+        log "WARNING: dnsmasq failed to start — radio.local may not resolve (use 192.168.4.1 directly)"
+    fi
+
     log "========================================="
     log "HOTSPOT mode active"
     log "SSID: $HOTSPOT_SSID"
@@ -133,6 +140,10 @@ activate_client_mode() {
     log "========================================="
     log "Activating CLIENT mode"
     log "========================================="
+
+    # Stop dnsmasq (only needed in hotspot mode).
+    systemctl stop dnsmasq 2>/dev/null || true
+    systemctl mask dnsmasq 2>/dev/null || true
 
     # Stop hotspot connection if active
     nmcli connection down Hotspot 2>/dev/null || true

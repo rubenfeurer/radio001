@@ -19,6 +19,8 @@ import pytest
 from httpx import AsyncClient
 from unittest.mock import patch, AsyncMock
 
+pytestmark = pytest.mark.asyncio
+
 
 @pytest.mark.api
 class TestRadioControlRoutes:

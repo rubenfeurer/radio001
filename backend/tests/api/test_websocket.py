@@ -19,6 +19,8 @@ import websockets
 from httpx import AsyncClient
 from websockets.exceptions import ConnectionClosed
 
+pytestmark = pytest.mark.asyncio
+
 
 @pytest.mark.websocket
 class TestWebSocketRoutes:

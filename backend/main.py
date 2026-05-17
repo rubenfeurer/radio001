@@ -50,6 +50,7 @@ from api.routes.radio import router as radio_router
 from api.routes.stations import router as stations_router
 from api.routes.system import router as system_router
 from api.routes.system import set_system_wifi_manager
+from api.routes.settings import router as settings_router
 from api.routes.websocket import router as websocket_router
 from api.routes.websocket import (
     setup_radio_manager_with_websocket,
@@ -242,6 +243,7 @@ app.add_middleware(
 
 # Include API routes
 app.include_router(system_router, prefix="/api/system", tags=["System"])
+app.include_router(settings_router, prefix="/api/system", tags=["Settings"])
 app.include_router(stations_router, prefix="/api/radio/stations", tags=["Radio Stations"])
 app.include_router(radio_router, prefix="/api/radio", tags=["Radio Control"])
 app.include_router(websocket_router, prefix="/ws", tags=["WebSocket"])

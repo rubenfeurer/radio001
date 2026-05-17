@@ -26,7 +26,7 @@
 - [x] 5.3 Verify lgpio importable: `docker exec radio-backend-prod python3 -c "import lgpio; print('ok')"`
 - [x] 5.4 Verify startup log shows `GPIO hardware initialized successfully via lgpio` (not mock)
 - [x] 5.5 Press each of the 3 station buttons and confirm station changes
-- [ ] 5.6 Turn rotary encoder and confirm volume changes in UI and audio output
+- [x] 5.6 Turn rotary encoder and confirm volume changes in UI and audio output
 
 ## 6. Fix ALSA volume control
 
@@ -35,5 +35,5 @@ Root cause: `amixer` without `-c` targets card 0 (HDMI). Pi headphone output is 
 - [x] 6.1 Fix `audio_player.py._set_alsa_volume`: change `"set"` → `"sset"`; change default `ALSA_MIXER_CONTROL` from `"PCM Playback Volume"` → `"PCM"`
 - [x] 6.2 Update `ALSA_MIXER_CONTROL=PCM` in `docker/compose.prod.yml` and the inline compose block in `scripts/install.sh`
 - [x] 6.3 Commit on develop, PR → main, wait for CI image build
-- [ ] 6.4 Pull new image on Pi and restart container
-- [ ] 6.5 Turn rotary encoder and confirm audio volume changes in output (mark 5.6 complete)
+- [x] 6.4 Pull new image on Pi and restart container
+- [x] 6.5 Turn rotary encoder and confirm audio volume changes in output (mark 5.6 complete)

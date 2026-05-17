@@ -100,3 +100,22 @@ export interface PlaybackStatus {
 	current_slot?: number | null;
 	playback_state?: string;
 }
+
+export interface RadioSettings {
+	HOTSPOT_SSID?: string;
+	HOTSPOT_PASSWORD?: string;
+	DEFAULT_VOLUME?: number;
+	MIN_VOLUME?: number;
+	MAX_VOLUME?: number;
+	NOTIFICATION_VOLUME?: number;
+	ROTARY_CLOCKWISE_INCREASES?: boolean;
+	ROTARY_VOLUME_STEP?: number;
+	ROTARY_DEBOUNCE?: number;
+	LONG_PRESS_DURATION?: number;
+	TRIPLE_PRESS_INTERVAL?: number;
+}
+
+export interface SettingsSaveResponse {
+	changed: string[];
+	restart_required: string[];
+}

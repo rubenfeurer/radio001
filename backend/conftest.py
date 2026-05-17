@@ -8,6 +8,7 @@ and proper pytest-asyncio configuration to ensure all async tests run correctly.
 import os
 import sys
 import pytest
+import pytest_asyncio
 import asyncio
 import tempfile
 from pathlib import Path
@@ -21,38 +22,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from core.models import RadioStation, StationRequest
 from core.radio_manager import RadioManager
 from main import Config
-
-# Configure pytest-asyncio
-pytest_plugins = ['pytest_asyncio']
-
-
-@pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    """
-    Create an instance of the default event loop for the test session.
-
-    This fixture ensures all async tests run in the same event loop,
-    preventing asyncio warnings and test failures.
-    """
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    yield loop
-
-    # Clean up
-    try:
-        # Cancel any pending tasks
-        pending = asyncio.all_tasks(loop)
-        for task in pending:
-            task.cancel()
-
-        # Wait for tasks to complete cancellation
-        if pending:
-            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-
-        loop.close()
-    except Exception:
-        pass  # Ignore cleanup errors
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -288,7 +257,7 @@ def test_preferences():
 
 
 # Async test client fixtures for API testing
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client():
     """Create async test client for FastAPI."""
     from httpx import AsyncClient
@@ -332,16 +301,22 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.websocket)
 
 
-@pytest.fixture(autouse=True)
+@pytest_asyncio.fixture(autouse=True)
 async def cleanup_tasks():
     """Clean up any running asyncio tasks after each test."""
     yield
 
-    # Cancel any tasks that might be hanging around
-    tasks = [task for task in asyncio.all_tasks() if not task.done()]
+    current = asyncio.current_task()
+    tasks = [t for t in asyncio.all_tasks() if not t.done() and t is not current]
     for task in tasks:
         if not task.cancelled():
             task.cancel()
 
     if tasks:
-        await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True),
+                timeout=5.0
+            )
+        except asyncio.TimeoutError:
+            pass
