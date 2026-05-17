@@ -19,7 +19,9 @@ Internet radio player running on a Raspberry Pi inside a Docker container. FastA
 - Compose (Pi): `/opt/radio/docker-compose.yml` (written by install.sh, do not edit manually)
 
 ### Production image
-`ghcr.io/rubenfeurer/radio001:latest` — built by `release.yml` on push to `main`. Frontend static files served by FastAPI `StaticFiles`. No nginx, no separate frontend service.
+- `:latest` — pushed by `ci-cd.yml` on every push to `main`; Pi's Watchtower tracks this tag
+- `:stable` — pushed by `ci-cd.yml` on GitHub Release (`published` event); `compose.prod.yml` in the repo references `:stable`
+- Frontend static files served by FastAPI `StaticFiles`. No nginx, no separate frontend service.
 
 ### Audio stack
 - mpg123 routes through host PipeWire (`-o pulse`) via socket at `/run/user/1000/pulse/native`
@@ -45,9 +47,9 @@ docker compose -f docker/compose.dev.yml up
 - `NODE_ENV=development` enables mock mode for GPIO/WiFi (required on Mac)
 
 ### Python dependencies
-`backend/requirements.lock` uses `--require-hashes`. After any dependency change:
+`backend/requirements.lock` uses `--require-hashes`. After any dependency change, run from the **project root** (not from inside `backend/`) so CI path comments match:
 ```bash
-cd backend && pip-compile --generate-hashes requirements.in -o requirements.lock
+pip-compile --generate-hashes --output-file=backend/requirements.lock backend/requirements.in
 ```
 CI fails if lock file is out of sync.
 

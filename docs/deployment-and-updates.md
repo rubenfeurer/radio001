@@ -8,10 +8,11 @@ Radio001 runs as a single Docker container on a Raspberry Pi. The container bund
 ┌─────────────────────────────────────────────────────────┐
 │                  GitHub Actions (CI)                    │
 │                                                         │
-│  push to main ──► build ARM64 image ──► push to GHCR   │
-│                   (multi-stage Docker)    :latest tag   │
+│  push to main ──► build ARM64 image ──► :latest tag     │
+│  GitHub Release ─────────────────────► :stable tag      │
+│                   (multi-stage Docker, ci-cd.yml)        │
 └──────────────────────────────┬──────────────────────────┘
-                               │ ghcr.io/rubenfeurer/radio001:latest
+                               │ ghcr.io/rubenfeurer/radio001
                                │
 ┌──────────────────────────────▼──────────────────────────┐
 │                 Raspberry Pi                            │
@@ -53,12 +54,14 @@ The `VERSION` build-arg is passed by CI and baked in as `ENV VERSION=<tag>`. It 
 
 ## Release Pipeline
 
-| Trigger | What happens |
-|---------|-------------|
-| Push to `main` | CI builds ARM64 image, pushes `:latest` to GHCR, scans with Trivy |
-| Git tag `v*.*.*` | Same build, also pushes `:vX.Y.Z` semver tag |
+| Trigger | Tags pushed | Pipeline |
+|---------|-------------|----------|
+| Push to `main` | `:latest`, `:main-<sha>` | `ci-cd.yml` |
+| GitHub Release (`published`) | `:stable`, `:vX.Y.Z`, `:X.Y` | `ci-cd.yml` |
 
-The pipeline (`release.yml`) fails if Trivy finds unfixed HIGH or CRITICAL CVEs, blocking the release before `:latest` is updated.
+`:latest` is used by Pi's Watchtower for nightly auto-updates. `:stable` is what `compose.prod.yml` (in the repo) references and is only updated on an explicit GitHub Release.
+
+Trivy scans the filesystem on every CI run and uploads results to GitHub Security (SARIF). Known OS-level CVEs where the fix exists upstream but hasn't landed in Debian yet are listed in `.trivyignore`.
 
 ---
 
@@ -172,6 +175,6 @@ The container declares these devices explicitly so audio and hardware access sur
 
 ## Security
 
-- The release pipeline blocks on any unfixed HIGH or CRITICAL CVE (Trivy scan with `exit-code: 1`)
+- Trivy scans the codebase on every CI run; results are uploaded to GitHub Security (SARIF). Known CVEs pending Debian package distribution are listed in `.trivyignore`.
 - Dependencies are pinned with hashes in `backend/requirements.lock`; CI verifies the lock file is in sync with `requirements.in` before building
 - The radio container runs as a non-root `radio` user inside the image
