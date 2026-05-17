@@ -171,6 +171,28 @@
 				<p class="text-center text-sm text-destructive">{validationErrors._global}</p>
 			{/if}
 
+			<!-- How to use -->
+			<Card>
+				<CardContent class="pt-5 space-y-3">
+					<h2 class="font-semibold text-foreground">How to use</h2>
+
+					<div class="space-y-2 text-sm text-muted-foreground">
+						<div class="flex gap-3">
+							<span class="shrink-0 font-medium text-foreground w-28">Button 1 / 2 / 3</span>
+							<span>Press to play or stop the assigned station</span>
+						</div>
+						<div class="flex gap-3">
+							<span class="shrink-0 font-medium text-foreground w-28">Encoder turn</span>
+							<span>Rotate to adjust volume</span>
+						</div>
+						<div class="flex gap-3">
+							<span class="shrink-0 font-medium text-foreground w-28">Encoder hold</span>
+							<span>Hold 2 s to toggle between WiFi and hotspot mode</span>
+						</div>
+					</div>
+				</CardContent>
+			</Card>
+
 			<!-- Hotspot -->
 			<Card>
 				<CardContent class="pt-5 space-y-4">
