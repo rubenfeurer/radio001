@@ -306,11 +306,17 @@ async def cleanup_tasks():
     """Clean up any running asyncio tasks after each test."""
     yield
 
-    # Cancel any tasks that might be hanging around
-    tasks = [task for task in asyncio.all_tasks() if not task.done()]
+    current = asyncio.current_task()
+    tasks = [t for t in asyncio.all_tasks() if not t.done() and t is not current]
     for task in tasks:
         if not task.cancelled():
             task.cancel()
 
     if tasks:
-        await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True),
+                timeout=5.0
+            )
+        except asyncio.TimeoutError:
+            pass

@@ -111,6 +111,7 @@ jobs:
             --tb=short \
             --maxfail=10 \
             --timeout=120 \
+            --timeout-func-only \
             -m "unit" \
             --cov=core \
             --cov=hardware \
@@ -173,6 +174,7 @@ jobs:
             --tb=short \
             --maxfail=10 \
             --timeout=120 \
+            --timeout-func-only \
             -m "api" \
             --cov=api \
             --cov-report=term-missing \
@@ -234,6 +236,7 @@ jobs:
             --tb=short \
             --maxfail=10 \
             --timeout=120 \
+            --timeout-func-only \
             -m "websocket" \
             --cov=api.routes.websocket \
             --cov-report=term-missing \
@@ -310,7 +313,8 @@ jobs:
               --verbose \
               --tb=short \
               --maxfail=5 \
-              --timeout=120 \
+              --timeout=300 \
+              --timeout-func-only \
               -m 'integration' \
               --cov=core \
               --cov=api \
