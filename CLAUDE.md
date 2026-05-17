@@ -19,8 +19,8 @@ Internet radio player running on a Raspberry Pi inside a Docker container. FastA
 - Compose (Pi): `/opt/radio/docker-compose.yml` (written by install.sh, do not edit manually)
 
 ### Production image
-- `:latest` — pushed by `ci-cd.yml` on every push to `main`; Pi's Watchtower tracks this tag
-- `:stable` — pushed by `ci-cd.yml` on GitHub Release (`published` event); `compose.prod.yml` in the repo references `:stable`
+- `:latest` — pushed by `release.yml` on every push to `main`; for manual test Pi verification only
+- `:stable` — pushed by `release.yml` on GitHub Release (tag push `v*.*.*`); production Pis' Watchtower tracks this tag; `compose.prod.yml` references `:stable`
 - Frontend static files served by FastAPI `StaticFiles`. No nginx, no separate frontend service.
 
 ### Audio stack
@@ -91,7 +91,7 @@ ssh radio-d "docker exec radio-backend-prod amixer -c Headphones sset PCM 70%"
 ```
 
 ### Watchtower
-Auto-pulls `:latest` nightly at 03:00. Requires `DOCKER_API_VERSION=1.40` (Docker Engine 29.x incompatibility with default watchtower API version).
+Auto-pulls `:stable` nightly at 03:00. Requires `DOCKER_API_VERSION=1.40` (Docker Engine 29.x incompatibility with default watchtower API version).
 
 ## Security & Dependabot
 
