@@ -202,8 +202,7 @@
 											<Badge variant="secondary">Saved</Badge>
 										{/if}
 									</div>
-									<p class="text-xs text-muted-foreground">{network.security}</p>
-								</div>
+									</div>
 								<div class="flex items-center gap-1.5">
 									<span class="text-sm {getSignalColor(network.signal)}">{network.signal}%</span>
 									<Wifi class="w-4 h-4 {getSignalColor(network.signal)}" />
@@ -239,26 +238,38 @@
 									<CheckCircle class="w-5 h-5" />
 									<span class="text-sm font-medium">Currently connected</span>
 								</div>
-								<div class="flex gap-3">
-									<Button variant="outline" class="flex-1" onclick={closeDialog}>Close</Button>
-									<Button variant="outline" class="flex-1" onclick={() => (confirmingForget = true)}>Forget Network</Button>
-								</div>
+								<Button variant="outline" class="w-full" onclick={() => (confirmingForget = true)}>Forget Network</Button>
 							</div>
 						{/if}
 					{:else if selectedNetwork.isSaved}
-						<div class="space-y-4">
-							<p class="text-sm text-muted-foreground">Saved network. Connect using the saved password.</p>
-							<div class="flex gap-3">
-								<Button variant="outline" class="flex-1" onclick={closeDialog}>Cancel</Button>
-								<Button class="flex-1" onclick={handleConnect} disabled={wifiState.isConnecting}>
-									{#if wifiState.isConnecting}
-										<Loader2 class="w-4 h-4 animate-spin mr-2" />Connecting...
-									{:else}
-										Connect
-									{/if}
+						{#if confirmingForget}
+							<div class="space-y-4">
+								<p class="text-sm text-muted-foreground">
+									Are you sure you want to forget this network? You'll need to re-enter the password to connect again.
+								</p>
+								<div class="flex gap-3">
+									<Button variant="outline" class="flex-1" onclick={() => (confirmingForget = false)}>Cancel</Button>
+									<Button variant="destructive" class="flex-1" onclick={handleForget}>Forget Network</Button>
+								</div>
+							</div>
+						{:else}
+							<div class="space-y-4">
+								<p class="text-sm text-muted-foreground">Saved network. Connect using the saved password.</p>
+								<div class="flex gap-3">
+									<Button variant="outline" class="flex-1" onclick={closeDialog}>Cancel</Button>
+									<Button class="flex-1" onclick={handleConnect} disabled={wifiState.isConnecting}>
+										{#if wifiState.isConnecting}
+											<Loader2 class="w-4 h-4 animate-spin mr-2" />Connecting...
+										{:else}
+											Connect
+										{/if}
+									</Button>
+								</div>
+								<Button variant="outline" class="w-full" onclick={() => (confirmingForget = true)}>
+									Forget Network
 								</Button>
 							</div>
-						</div>
+						{/if}
 					{:else}
 						{#if requiresPassword(selectedNetwork)}
 							<div class="mb-4">
@@ -319,7 +330,7 @@
 					<CardContent class="pt-6">
 						<div class="space-y-4">
 							<div>
-								<h3 class="text-sm font-medium text-foreground mb-2">Reset to Hotspot Mode?</h3>
+								<h3 class="text-sm font-medium text-foreground mb-2">Change to Hotspot Mode?</h3>
 								<ul class="text-sm text-muted-foreground space-y-1 list-disc list-inside">
 									<li>Disconnect from current WiFi</li>
 									<li>Enable hotspot mode (SSID: Radio-Setup)</li>
@@ -339,7 +350,7 @@
 			{:else}
 				<Button variant="outline" class="w-full" onclick={() => (confirmingReset = true)}>
 					<Wifi class="w-4 h-4 mr-2" />
-					Reset to Hotspot Mode
+					Change to Hotspot Mode
 				</Button>
 			{/if}
 		</div>

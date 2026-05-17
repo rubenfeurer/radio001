@@ -14,6 +14,8 @@ The RadioManager follows a singleton pattern and integrates with:
 
 import asyncio
 import logging
+import os
+import subprocess
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
@@ -183,6 +185,7 @@ class RadioManager:
                 button_callback=self._handle_button_press,
                 volume_callback=self._handle_volume_change,
                 long_press_callback=self._handle_long_press_event,
+                triple_press_callback=self._handle_triple_press_event,
                 mock_mode=self._mock_mode,
             )
             await self._gpio_controller.initialize()
@@ -404,6 +407,23 @@ class RadioManager:
         except Exception as e:
             logger.error(f"Error handling long press WiFi toggle: {e}", exc_info=True)
             await self._sound_manager.play_error_sound()
+
+    async def _handle_triple_press_event(self, gpio_pin: int):
+        """Handle rotary encoder triple-press: reboot the Pi host."""
+        try:
+            if gpio_pin != self._config.ROTARY_SW:
+                logger.warning(f"Triple press received on unexpected pin {gpio_pin}, ignoring")
+                return
+
+            if self._mock_mode:
+                logger.warning("Triple press reboot requested — skipped in mock/development mode")
+                return
+
+            logger.warning("Triple press: rebooting Pi host")
+            subprocess.run(["reboot"], check=False)
+
+        except Exception as e:
+            logger.error(f"Error handling triple press reboot: {e}", exc_info=True)
 
     async def _handle_volume_change(self, change: int):
         """Handle rotary encoder volume changes."""
