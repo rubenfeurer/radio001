@@ -27,7 +27,7 @@ responses==0.26.0
 aiofiles==23.2.1
 
 # Mock data generation
-faker==20.1.0
+faker==40.18.0
 
 # Testing FastAPI applications
 fastapi[testing]==0.136.1
