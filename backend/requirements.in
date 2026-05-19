@@ -5,7 +5,7 @@
 fastapi==0.136.1
 
 # ASGI server for production
-uvicorn[standard]==0.46.0
+uvicorn[standard]==0.47.0
 
 # Data validation and settings (Python 3.13 compatible)
 pydantic==2.13.3
