@@ -135,13 +135,12 @@ async def save_station(slot: int, station_request: StationRequest):
 
 
 @router.post("/{slot}/toggle", response_model=ApiResponse, summary="Toggle station playback")
-async def toggle_station(slot: int, background_tasks: BackgroundTasks):
+async def toggle_station(slot: int):
     """
     Toggle playback for a station slot (play if stopped, stop if playing).
 
     Args:
         slot: Station slot number (1-3)
-        background_tasks: FastAPI background tasks for async operations
 
     Returns:
         ApiResponse: Success/failure status with playback action taken
@@ -163,14 +162,22 @@ async def toggle_station(slot: int, background_tasks: BackgroundTasks):
                 detail=f"No station configured in slot {slot}"
             )
 
-        # Toggle playback in background
-        background_tasks.add_task(radio_manager.toggle_station, slot)
+        # Await the toggle so the response reports the actual outcome
+        # (a background task plus post-scheduling status read could describe
+        # the opposite action, or claim success for a dead stream URL)
+        pre_status = await radio_manager.get_status()
+        intended_stop = pre_status.current_station == slot and pre_status.is_playing
 
-        # Determine action for response
-        current_status = await radio_manager.get_status()
-        action = "stopping" if (current_status.current_station == slot and current_status.is_playing) else "starting"
+        is_playing = await radio_manager.toggle_station(slot)
 
-        logger.info(f"Toggling station {slot}: {action} playback")
+        if not intended_stop and not is_playing:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to start playback for '{station.name}'"
+            )
+
+        action = "started" if is_playing else "stopped"
+        logger.info(f"Toggled station {slot}: {action} playback")
 
         return ApiResponse(
             success=True,
@@ -178,7 +185,8 @@ async def toggle_station(slot: int, background_tasks: BackgroundTasks):
             data={
                 "slot": slot,
                 "station_name": station.name,
-                "action": action
+                "action": action,
+                "is_playing": is_playing
             }
         )
 
@@ -193,13 +201,12 @@ async def toggle_station(slot: int, background_tasks: BackgroundTasks):
 
 
 @router.post("/{slot}/play", response_model=ApiResponse, summary="Play specific station")
-async def play_station(slot: int, background_tasks: BackgroundTasks):
+async def play_station(slot: int):
     """
     Play a specific station slot.
 
     Args:
         slot: Station slot number (1-3)
-        background_tasks: FastAPI background tasks for async operations
 
     Returns:
         ApiResponse: Success/failure status
@@ -221,10 +228,15 @@ async def play_station(slot: int, background_tasks: BackgroundTasks):
                 detail=f"No station configured in slot {slot}"
             )
 
-        # Play station in background
-        background_tasks.add_task(radio_manager.play_station, slot)
+        # Await playback start so the response reports the actual outcome
+        ok = await radio_manager.play_station(slot)
+        if not ok:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to start playback for '{station.name}'"
+            )
 
-        logger.info(f"Starting playback for station {slot}: {station.name}")
+        logger.info(f"Started playback for station {slot}: {station.name}")
 
         return ApiResponse(
             success=True,

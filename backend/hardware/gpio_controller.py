@@ -62,6 +62,7 @@ class GPIOController:
         # GPIO state tracking
         self._button_states: Dict[int, bool] = {}
         self._last_press_times: Dict[int, float] = {}
+        self._last_release_times: Dict[int, float] = {}
         self._press_counts: Dict[int, int] = {}
         self._long_press_tasks: Dict[int, asyncio.Task] = {}
 
@@ -123,6 +124,7 @@ class GPIOController:
                 self._callbacks[pin] = cb
                 self._button_states[pin] = False  # pulled-up = not pressed
                 self._last_press_times[pin] = 0
+                self._last_release_times[pin] = 0
                 self._press_counts[pin] = 0
 
             # Setup rotary encoder pins (DT is read-only, CLK triggers alerts)
@@ -148,6 +150,7 @@ class GPIOController:
             self._mock_button_states[pin] = False
             self._button_states[pin] = False
             self._last_press_times[pin] = 0
+            self._last_release_times[pin] = 0
             self._press_counts[pin] = 0
 
     def _handle_button_event(self, chip: int, gpio_pin: int, level: int, timestamp: int):
@@ -272,20 +275,26 @@ class GPIOController:
         except Exception as e:
             logger.error(f"Error monitoring long press on pin {gpio_pin}: {e}", exc_info=True)
 
-    async def _check_triple_press(self, gpio_pin: int, press_time: float):
-        """Check for triple press sequence."""
+    async def _check_triple_press(self, gpio_pin: int, release_time: float):
+        """Check for triple press sequence.
+
+        Counts presses in the current fast chain: a press belongs to the chain
+        when its release is within TRIPLE_PRESS_INTERVAL of the previous
+        press's release; any larger gap starts a new chain at count 1.
+        """
         try:
-            last_press = self._last_press_times.get(gpio_pin, 0)
+            last_release = self._last_release_times.get(gpio_pin, 0)
+            self._last_release_times[gpio_pin] = release_time
 
-            if press_time - last_press < self.config.TRIPLE_PRESS_INTERVAL:
+            if last_release and release_time - last_release < self.config.TRIPLE_PRESS_INTERVAL:
                 self._press_counts[gpio_pin] += 1
-
-                if self._press_counts[gpio_pin] >= 2:  # Third press
-                    logger.info(f"Triple press detected on pin {gpio_pin}")
-                    await self._handle_triple_press(gpio_pin)
-                    self._press_counts[gpio_pin] = 0
             else:
                 self._press_counts[gpio_pin] = 1
+
+            if self._press_counts[gpio_pin] >= 3:
+                logger.info(f"Triple press detected on pin {gpio_pin}")
+                self._press_counts[gpio_pin] = 0
+                await self._handle_triple_press(gpio_pin)
 
         except Exception as e:
             logger.error(f"Error checking triple press on pin {gpio_pin}: {e}", exc_info=True)

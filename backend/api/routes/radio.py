@@ -76,13 +76,12 @@ async def get_volume():
 
 
 @router.post("/volume", response_model=ApiResponse, summary="Set volume level")
-async def set_volume(volume_update: VolumeUpdate, background_tasks: BackgroundTasks):
+async def set_volume(volume_update: VolumeUpdate):
     """
     Set system volume level.
 
     Args:
         volume_update: Volume update request with new volume level
-        background_tasks: FastAPI background tasks for async operations
 
     Returns:
         ApiResponse: Success/failure status with new volume level
@@ -110,8 +109,13 @@ async def set_volume(volume_update: VolumeUpdate, background_tasks: BackgroundTa
         else:
             actual_volume = volume_update.volume
 
-        # Set volume in background
-        background_tasks.add_task(radio_manager.set_volume, actual_volume)
+        # Await the action so the response reports what actually happened
+        ok = await radio_manager.set_volume(actual_volume)
+        if not ok:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to set volume"
+            )
 
         logger.info(f"Volume set to {actual_volume}")
 
@@ -357,7 +361,7 @@ _LIBRARY_FILE = Path(os.environ.get("LIBRARY_FILE", "/app/assets/stations.json")
 @router.get("/library", summary="Get station library")
 async def get_station_library():
     """
-    Return all stations from the station library (config/stations.json).
+    Return all stations from the station library (backend/assets/stations.json).
     Used by the frontend station search page.
     """
     if not _LIBRARY_FILE.exists():

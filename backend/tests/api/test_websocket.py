@@ -179,18 +179,6 @@ class TestWebSocketRoutes:
         assert minimal_message.type == "ping"
         assert minimal_message.data is None
 
-    async def test_websocket_message_timestamps(self):
-        """Test that WebSocket messages include timestamps."""
-        from core.models import WSStationChange, WSVolumeUpdate
-
-        # Test volume update message
-        volume_msg = WSVolumeUpdate(data={"volume": 75})
-        assert volume_msg.type == "volume_update"
-
-        # Test station change message
-        station_msg = WSStationChange(data={"slot": 1, "action": "playing"})
-        assert station_msg.type == "station_change"
-
     @patch("api.routes.websocket.RadioManager")
     @patch("api.routes.system.get_system_metrics")
     @patch("api.routes.websocket.manager")
@@ -568,3 +556,55 @@ class TestWebSocketRoutes:
         # Should not accumulate connection info
         stats = manager.get_connection_stats()
         assert stats["active_connections"] == 0
+
+
+@pytest.mark.api
+class TestBroadcastRobustness:
+    """One stalled client must not block or break broadcast for others."""
+
+    @pytest.mark.asyncio
+    async def test_stalled_client_dropped_others_still_receive(self, monkeypatch):
+        from api.routes import websocket as ws_module
+        from unittest.mock import AsyncMock
+
+        manager = ws_module.ConnectionManager()
+        monkeypatch.setattr(ws_module, "SEND_TIMEOUT", 0.05)
+
+        async def never_completes(_text):
+            await asyncio.sleep(3600)
+
+        stalled = AsyncMock()
+        stalled.send_text = never_completes
+        healthy = AsyncMock()
+        healthy.send_text = AsyncMock()
+
+        manager.active_connections.update({stalled, healthy})
+        manager.connection_info[stalled] = {"message_count": 0}
+        manager.connection_info[healthy] = {"message_count": 0}
+
+        import time as _time
+        start = _time.monotonic()
+        await manager.broadcast({"type": "test"})
+        elapsed = _time.monotonic() - start
+
+        # Healthy client got the message; stalled one was dropped quickly
+        healthy.send_text.assert_awaited_once()
+        assert stalled not in manager.active_connections
+        assert healthy in manager.active_connections
+        assert elapsed < 1.0, f"broadcast blocked for {elapsed:.1f}s on a stalled client"
+        assert manager.connection_info[healthy]["message_count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_broadcast_with_failing_send_does_not_raise(self):
+        from api.routes import websocket as ws_module
+        from unittest.mock import AsyncMock
+
+        manager = ws_module.ConnectionManager()
+        failing = AsyncMock()
+        failing.send_text = AsyncMock(side_effect=RuntimeError("socket closed"))
+        manager.active_connections.add(failing)
+        manager.connection_info[failing] = {"message_count": 0}
+
+        await manager.broadcast({"type": "test"})
+
+        assert failing not in manager.active_connections

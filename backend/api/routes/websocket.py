@@ -24,6 +24,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Per-client send budget: a stalled client is dropped rather than allowed to
+# block broadcasts (its own reconnect logic restores it with fresh state)
+SEND_TIMEOUT = 1.0
+
 
 class ConnectionManager:
     """
@@ -88,49 +92,70 @@ class ConnectionManager:
             message: Message data to send
             websocket: Target WebSocket connection
         """
-        if websocket in self.active_connections:
-            try:
-                message_with_timestamp = {**message, "timestamp": time.time()}
-                await websocket.send_text(json.dumps(message_with_timestamp))
+        async with self._lock:
+            is_active = websocket in self.active_connections
+        if not is_active:
+            return
 
-                # Update message count
+        try:
+            message_with_timestamp = {**message, "timestamp": time.time()}
+            await asyncio.wait_for(
+                websocket.send_text(json.dumps(message_with_timestamp)),
+                timeout=SEND_TIMEOUT,
+            )
+
+            async with self._lock:
                 if websocket in self.connection_info:
                     self.connection_info[websocket]["message_count"] += 1
 
-            except Exception as e:
-                logger.error(f"Error sending personal message: {e}")
-                await self.disconnect(websocket)
+        except Exception as e:
+            logger.error(f"Error sending personal message: {e}")
+            await self.disconnect(websocket)
 
     async def broadcast(self, message: Dict[str, Any]):
         """
         Broadcast a message to all connected WebSocket clients.
 
+        Sends run concurrently with a per-send timeout so one stalled client
+        (full TCP buffer, phone asleep) cannot block delivery to the others
+        or stall the RadioManager callback that awaits this broadcast.
+
         Args:
             message: Message data to broadcast
         """
-        if not self.active_connections:
+        # Snapshot under the lock; never hold the lock across an awaited send
+        async with self._lock:
+            connections = list(self.active_connections)
+
+        if not connections:
             return
 
         message_with_timestamp = {**message, "timestamp": time.time()}
-
         message_text = json.dumps(message_with_timestamp)
-        disconnected_connections = set()
 
-        # Send to all connections
-        for connection in self.active_connections.copy():
+        async def send_one(connection) -> bool:
             try:
-                await connection.send_text(message_text)
-
-                # Update message count
-                if connection in self.connection_info:
-                    self.connection_info[connection]["message_count"] += 1
-
+                await asyncio.wait_for(
+                    connection.send_text(message_text), timeout=SEND_TIMEOUT
+                )
+                return True
+            except asyncio.TimeoutError:
+                logger.warning("WebSocket send timed out — dropping client")
+                return False
             except Exception as e:
                 logger.error(f"Error broadcasting to connection: {e}")
-                disconnected_connections.add(connection)
+                return False
 
-        # Clean up failed connections
+        results = await asyncio.gather(*(send_one(c) for c in connections))
+        disconnected_connections = {
+            c for c, ok in zip(connections, results) if not ok
+        }
+
+        # Update message counts and clean up failed connections under the lock
         async with self._lock:
+            for connection in connections:
+                if connection not in disconnected_connections and connection in self.connection_info:
+                    self.connection_info[connection]["message_count"] += 1
             for connection in disconnected_connections:
                 self.active_connections.discard(connection)
                 self.connection_info.pop(connection, None)

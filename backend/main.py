@@ -15,6 +15,8 @@ import uvicorn
 # In Docker the file is at /app/config/radio.conf (mounted volume).
 # In dev it falls back to ../config/radio.conf relative to this file.
 def _load_radio_conf():
+    from core.config import parse_conf_file
+
     _candidates = [
         Path("/app/config/radio.conf"),
         Path(__file__).parent.parent / "config" / "radio.conf",
@@ -22,16 +24,9 @@ def _load_radio_conf():
     for _p in _candidates:
         if _p.exists():
             try:
-                with open(_p) as _f:
-                    for _line in _f:
-                        _line = _line.strip()
-                        if not _line or _line.startswith("#") or "=" not in _line:
-                            continue
-                        _key, _, _val = _line.partition("=")
-                        _key = _key.strip()
-                        _val = _val.split("#")[0].strip()  # strip inline comments
-                        if _key and _key not in os.environ:
-                            os.environ[_key] = _val
+                for _key, _val in parse_conf_file(_p, strip_inline_comments=True).items():
+                    if _key not in os.environ:
+                        os.environ[_key] = _val
                 print(f"Loaded config from {_p}")
             except Exception as _e:
                 print(f"WARNING: Could not load {_p}: {_e}")
@@ -173,7 +168,7 @@ async def lifespan(app: FastAPI):
             host_mode_file=Config.HOST_MODE_FILE,
             development_mode=Config.IS_DEVELOPMENT,
             hotspot_ssid=os.getenv("HOTSPOT_SSID", "Radio-Setup"),
-            hotspot_password=os.getenv("HOTSPOT_PASSWORD", "Configure123!"),
+            hotspot_password=os.getenv("HOTSPOT_PASSWORD", "radio123"),
             hotspot_ip=os.getenv("HOTSPOT_IP", "192.168.4.1"),
         )
         set_wifi_manager(wifi_manager)

@@ -243,26 +243,6 @@ class WSMessage(BaseModel):
         }
 
 
-class WSVolumeUpdate(WSMessage):
-    """WebSocket volume update message"""
-    type: Literal["volume_update"] = "volume_update"
-
-
-class WSStationChange(WSMessage):
-    """WebSocket station change message"""
-    type: Literal["station_change"] = "station_change"
-
-
-class WSPlaybackStatus(WSMessage):
-    """WebSocket playback status message"""
-    type: Literal["playback_status"] = "playback_status"
-
-
-class WSSystemStatus(WSMessage):
-    """WebSocket system status message"""
-    type: Literal["system_status"] = "system_status"
-
-
 # WiFi models (merged from wifi_models.py)
 
 class WiFiNetworkModel(BaseModel):

@@ -11,6 +11,7 @@ This module provides the SoundManager class which handles:
 import asyncio
 import logging
 import math
+import os
 import struct
 import wave
 from pathlib import Path
@@ -50,6 +51,9 @@ class SoundManager:
         """
         self.sounds_dir = Path(sounds_dir)
         self.mock_mode = mock_mode
+        # WAV-capable player, selected at initialize(): paplay (PipeWire) or aplay (ALSA)
+        self._audio_backend: str = "alsa"
+        self._player_cmd: str = "aplay"
 
         # Sound file mappings
         self.sound_files = {
@@ -81,19 +85,33 @@ class SoundManager:
         """Initialize the sound manager and verify sound files."""
         try:
             if not self.mock_mode:
-                # Verify mpg123 is available for WAV playback
-                import asyncio as _asyncio
-                proc = await _asyncio.create_subprocess_exec(
-                    "which", "mpg123",
-                    stdout=_asyncio.subprocess.DEVNULL,
-                    stderr=_asyncio.subprocess.DEVNULL,
+                # Chimes are WAV files: mpg123 (MPEG-only) cannot decode them.
+                # Pick a WAV-capable player matching the audio backend.
+                pulse_server = os.getenv("PULSE_SERVER", "")
+                pulse_socket = pulse_server.replace("unix:", "")
+                if pulse_socket and os.path.exists(pulse_socket):
+                    self._audio_backend = "pulse"
+                    self._player_cmd = "paplay"
+                else:
+                    self._audio_backend = "alsa"
+                    self._player_cmd = "aplay"
+
+                proc = await asyncio.create_subprocess_exec(
+                    "which", self._player_cmd,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL,
                 )
                 await proc.wait()
                 if proc.returncode != 0:
-                    logger.warning("mpg123 not found, sound notifications disabled")
+                    logger.warning(
+                        f"{self._player_cmd} not found, sound notifications disabled"
+                    )
                     self.mock_mode = True
                 else:
-                    logger.info("mpg123 available for sound playback")
+                    logger.info(
+                        f"{self._player_cmd} available for sound playback "
+                        f"({self._audio_backend} backend)"
+                    )
 
             # Verify sound files exist (and generate tones if needed)
             await self._verify_sound_files()
@@ -214,9 +232,18 @@ class SoundManager:
 
             logger.debug(f"Playing sound: {sound_file} for event: {event}")
 
-            # Play WAV via mpg123 (non-blocking — fire and forget)
+            # Play WAV via a WAV-capable player (non-blocking — fire and forget).
+            # paplay honors per-invocation volume (0..65536); aplay has no such
+            # flag, so on the ALSA fallback the device volume governs.
+            if self._audio_backend == "pulse":
+                pa_volume = int(max(0, min(100, volume)) / 100 * 65536)
+                cmd = ["paplay", f"--volume={pa_volume}", str(sound_path)]
+            else:
+                alsa_device = os.getenv("ALSA_DEVICE", "hw:Headphones")
+                cmd = ["aplay", "-q", "-D", alsa_device, str(sound_path)]
+
             proc = await asyncio.create_subprocess_exec(
-                "mpg123", "--quiet", str(sound_path),
+                *cmd,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
             )
