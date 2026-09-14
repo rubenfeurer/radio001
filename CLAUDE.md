@@ -16,7 +16,7 @@ Internet radio player running on a Raspberry Pi inside a Docker container. FastA
 - Station library: `backend/assets/stations.json` (baked into image via `COPY backend/ .`)
 - Config (Pi): `/opt/radio/config/radio.conf`
 - Data (Pi): `/opt/radio/data/`
-- Compose (Pi): `/opt/radio/docker-compose.yml` (written by install.sh, do not edit manually)
+- Compose (Pi): `/opt/radio/docker-compose.yml` (downloaded from `docker/compose.prod.yml` by install.sh — that file is the single source of truth, do not edit the Pi copy manually)
 
 ### Production image
 - `:latest` — pushed by `release.yml` on every push to `main`; for manual test Pi verification only
@@ -47,11 +47,11 @@ docker compose -f docker/compose.dev.yml up
 - `NODE_ENV=development` enables mock mode for GPIO/WiFi (required on Mac)
 
 ### Python dependencies
-`backend/requirements.lock` uses `--require-hashes`. After any dependency change, run from the **project root** (not from inside `backend/`) so CI path comments match:
+`backend/requirements.lock` uses `--require-hashes`. After any dependency change, run from the **project root** (not from inside `backend/`) so CI path comments match, and **always with `--upgrade`**:
 ```bash
-pip-compile --generate-hashes --output-file=backend/requirements.lock backend/requirements.in
+pip-compile --upgrade --generate-hashes --output-file=backend/requirements.lock backend/requirements.in
 ```
-CI fails if lock file is out of sync.
+CI's release gate (`release.yml` → Verify requirements.lock) compiles **fresh from scratch** and diffs against the committed lock. Without `--upgrade`, pip-compile preserves your existing transitive pins, so the lock drifts from a fresh resolution and the release gate fails even though the file "looks" regenerated.
 
 ### Branches
 - `develop` — active development, runs quick CI (lint, type check)
