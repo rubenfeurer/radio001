@@ -8,6 +8,7 @@ import logging
 from typing import Any
 
 from core import WiFiCredentials, WiFiManager
+from core.models import ApiResponse
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -25,13 +26,6 @@ def set_wifi_manager(manager: WiFiManager):
     wifi_manager = manager
     logger.info("WiFi manager set in routes")
 
-
-class ApiResponse(BaseModel):
-    """Standard API response"""
-
-    success: bool
-    message: str
-    data: Any = None
 
 
 @router.get("/status", response_model=ApiResponse, tags=["WiFi"])
@@ -102,7 +96,7 @@ async def connect_wifi(credentials: WiFiCredentials):
             message=f"Connected to '{credentials.ssid}' successfully.",
             data={
                 "ssid": credentials.ssid,
-                "instructions": "Connected to WiFi. Access via http://radio.local",
+                "instructions": "Connected to WiFi. Access via http://radio.local:8000",
             },
         )
     except Exception as e:
@@ -129,26 +123,34 @@ async def get_saved_networks():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/saved/{network_id}", response_model=ApiResponse, tags=["WiFi"])
-async def forget_saved_network(network_id: int):
+@router.delete("/saved/{connection_name:path}", response_model=ApiResponse, tags=["WiFi"])
+async def forget_saved_network(connection_name: str):
     """
     Forget/remove a saved WiFi network.
 
+    Keyed by the stable NetworkManager connection name (URL-encoded by the
+    client) — a positional id resolves to the wrong profile if the list
+    changes between enumeration and deletion.
+
     Args:
-        network_id: Network ID from saved networks list
+        connection_name: NM connection name from the saved networks list
     """
     try:
-        # Check if network exists
+        # Check if network exists (single enumeration in the manager would
+        # suffice, but a 404 needs distinguishing from a delete failure)
         saved_networks = await wifi_manager.list_saved_networks()
-        network = next((n for n in saved_networks if n["id"] == network_id), None)
+        network = next(
+            (n for n in saved_networks if n["connection_name"] == connection_name),
+            None,
+        )
 
         if not network:
             raise HTTPException(
-                status_code=404, detail=f"Network ID {network_id} not found"
+                status_code=404, detail=f"No saved network named {connection_name!r}"
             )
 
         # Remove network
-        success = await wifi_manager.forget_network(network_id)
+        success = await wifi_manager.forget_network(connection_name)
 
         if success:
             return ApiResponse(
@@ -160,5 +162,5 @@ async def forget_saved_network(network_id: int):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error forgetting network {network_id}: {e}")
+        logger.error(f"Error forgetting network {connection_name!r}: {e}")
         raise HTTPException(status_code=500, detail=str(e))

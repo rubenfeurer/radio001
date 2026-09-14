@@ -456,18 +456,12 @@ class TestNewWorkflow:
 
 The backend tests are integrated into multiple workflows:
 
-#### 1. Main CI/CD (`ci-cd.yml`)
-- **Triggers**: Push to main, PRs to main
-- **Tests**: Full test suite with coverage
-- **Coverage**: Upload to Codecov
-- **Artifacts**: Test results, coverage reports
-
-#### 2. Develop CI (`develop-ci.yml`)
+#### 1. Develop CI (`develop-ci.yml`)
 - **Triggers**: Push/PR to develop
 - **Tests**: Quick validation (unit + API)
 - **Focus**: Fast feedback for development
 
-#### 3. Backend Test Suite (`test-backend.yml`)
+#### 2. Backend Test Suite (`test-backend.yml`)
 - **Triggers**: Backend changes, manual dispatch
 - **Tests**: Comprehensive testing by category
 - **Reports**: Detailed analysis and PR comments
@@ -605,9 +599,9 @@ tail -f logs/radio.log  # If logging to file
 - `run_tests.sh` - Local test runner script
 
 ### CI/CD Files
-- `.github/workflows/ci-cd.yml` - Main CI/CD pipeline
 - `.github/workflows/develop-ci.yml` - Development validation
-- `.github/workflows/test-backend.yml` - Comprehensive testing
+- `.github/workflows/test-backend.yml` - Comprehensive testing + security scan (main)
+- `.github/workflows/release.yml` - Image build, scan gate, and publish
 - `compose/docker-compose.ci.yml` - CI Docker configuration
 
 ## 🎯 Best Practices

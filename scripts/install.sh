@@ -4,7 +4,8 @@
 # Usage (on the Pi, as root):
 #   curl -fsSL https://raw.githubusercontent.com/rubenfeurer/radio001/main/scripts/install.sh | sudo bash
 #
-# Idempotent: re-running preserves existing radio.conf and station data.
+# Idempotent: re-running preserves existing radio.conf (including the
+# generated hotspot password) and station data.
 
 set -euo pipefail
 
@@ -15,8 +16,14 @@ COMPOSE_FILE="${INSTALL_DIR}/docker-compose.yml"
 CONF_FILE="${CONFIG_DIR}/radio.conf"
 SERVICE_FILE="/etc/systemd/system/radio.service"
 IMAGE="ghcr.io/rubenfeurer/radio001:stable"
+REPO_RAW="https://raw.githubusercontent.com/rubenfeurer/radio001/main"
+
+CURRENT_STEP="starting"
+trap 'echo ""; echo "ERROR: install failed during: ${CURRENT_STEP}" >&2; echo "Re-running this script is safe — it is idempotent and will not overwrite radio.conf or station data." >&2' ERR
 
 # ── Prerequisites ────────────────────────────────────────────────────────────
+
+CURRENT_STEP="prerequisite checks"
 
 if [[ $EUID -ne 0 ]]; then
     echo "ERROR: Run as root:  sudo bash scripts/install.sh" >&2
@@ -29,6 +36,7 @@ if ! command -v curl &>/dev/null; then
 fi
 
 if ! command -v docker &>/dev/null; then
+    CURRENT_STEP="Docker installation"
     echo "Docker not found — installing Docker..."
     curl -fsSL https://get.docker.com | sh
     if [[ -n "${SUDO_USER:-}" ]]; then
@@ -43,82 +51,51 @@ fi
 
 # ── Directory layout ─────────────────────────────────────────────────────────
 
+CURRENT_STEP="creating directories"
 echo "Creating directories..."
 mkdir -p "${CONFIG_DIR}" "${DATA_DIR}" /etc/raspiwifi
-chmod 777 "${DATA_DIR}"
+chmod 755 "${DATA_DIR}"
 
 # ── docker-compose.yml ───────────────────────────────────────────────────────
-# Always written (it is version-controlled, not user-edited).
+# Downloaded from the repo — docker/compose.prod.yml is the single source of
+# truth (an embedded copy here drifted from it in the past). Atomic: a failed
+# download leaves any existing compose file untouched.
 
-echo "Writing ${COMPOSE_FILE}..."
-cat > "${COMPOSE_FILE}" <<'COMPOSE_EOF'
-# Managed by install.sh — do not edit manually.
-services:
-  radio-backend:
-    image: ghcr.io/rubenfeurer/radio001:stable
-    container_name: radio-backend-prod
-    network_mode: host
-    volumes:
-      - /opt/radio/config:/app/config:rw
-      - /opt/radio/data:/app/data
-      - /etc/raspiwifi:/etc/raspiwifi:rw
-      - /dev:/dev:rw
-      - /sys/class/net:/sys/class/net:ro
-      - /run/dbus:/run/dbus:ro
-      - /run/user/1000/pulse/native:/run/user/1000/pulse/native:rw
-    environment:
-      - NODE_ENV=production
-      - API_PORT=8000
-      - HOSTNAME=radio
-      - WIFI_TIMEOUT=5
-      - WIFI_CHECK_ENABLED=true
-      - HOST_MODE_FILE=/etc/raspiwifi/host_mode
-      - PULSE_SERVER=unix:/run/user/1000/pulse/native
-      - ALSA_DEVICE=hw:Headphones
-      - ALSA_MIXER_CARD=Headphones
-      - ALSA_MIXER_CONTROL=PCM
-    group_add:
-      - "986"
-    restart: unless-stopped
-    privileged: true
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-    devices:
-      - /dev/net/tun
-      - /dev/gpiochip0
-      - /dev/snd
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  watchtower:
-    image: containrrr/watchtower:1.7.1
-    container_name: radio-watchtower
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_SCHEDULE=0 0 3 * * *
-      - DOCKER_API_VERSION=1.40
-    restart: unless-stopped
-COMPOSE_EOF
+CURRENT_STEP="downloading docker-compose.yml"
+echo "Downloading ${COMPOSE_FILE} from ${REPO_RAW}/docker/compose.prod.yml..."
+COMPOSE_TMP=$(mktemp)
+curl -fsSL "${REPO_RAW}/docker/compose.prod.yml" -o "${COMPOSE_TMP}"
+if [[ ! -s "${COMPOSE_TMP}" ]]; then
+    echo "ERROR: downloaded compose file is empty." >&2
+    rm -f "${COMPOSE_TMP}"
+    exit 1
+fi
+if ! docker compose -f "${COMPOSE_TMP}" config -q; then
+    echo "ERROR: downloaded compose file failed validation." >&2
+    rm -f "${COMPOSE_TMP}"
+    exit 1
+fi
+mv "${COMPOSE_TMP}" "${COMPOSE_FILE}"
+chmod 644 "${COMPOSE_FILE}"
 
 # ── radio.conf (idempotent — skip if already exists) ─────────────────────────
 
 if [[ -f "${CONF_FILE}" ]]; then
     echo "Skipping ${CONF_FILE} (already exists, preserving user config)."
+    HOTSPOT_PASSWORD=$(grep -E '^HOTSPOT_PASSWORD=' "${CONF_FILE}" | cut -d= -f2- || echo "(see ${CONF_FILE})")
 else
+    CURRENT_STEP="writing radio.conf"
     echo "Writing default ${CONF_FILE}..."
-    cat > "${CONF_FILE}" <<'CONF_EOF'
+    # Per-device random hotspot password (12 alphanumerics ≥ WPA2 minimum);
+    # a fixed published default would let anyone join the setup hotspot
+    HOTSPOT_PASSWORD=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 12)
+    CONF_TMP=$(mktemp)
+    cat > "${CONF_TMP}" <<CONF_EOF
 # Radio Pi configuration
 # Edit this file to customise your radio. Changes take effect on next restart.
 
 HOTSPOT_SSID=Radio-Setup
-HOTSPOT_PASSWORD=radio123
+HOTSPOT_PASSWORD=${HOTSPOT_PASSWORD}
 HOTSPOT_IP=192.168.4.1
 WIFI_INTERFACE=wlan0
 
@@ -133,12 +110,19 @@ DEFAULT_STATION_2_URL=https://stream.srg-ssr.ch/m/rsj/mp3_128
 DEFAULT_STATION_3_NAME=Radio Swiss Classic
 DEFAULT_STATION_3_URL=https://stream.srg-ssr.ch/m/rsc_de/mp3_128
 CONF_EOF
+    chmod 600 "${CONF_TMP}"
+    mv "${CONF_TMP}" "${CONF_FILE}"
 fi
 
 # ── systemd service ───────────────────────────────────────────────────────────
+# Type=oneshot + RemainAfterExit runs `docker compose up -d` once; the actual
+# container is supervised by dockerd (restart: unless-stopped), so no
+# Restart= here (invalid for oneshot on current systemd anyway).
 
+CURRENT_STEP="writing radio.service"
 echo "Writing ${SERVICE_FILE}..."
-cat > "${SERVICE_FILE}" <<'SERVICE_EOF'
+SERVICE_TMP=$(mktemp)
+cat > "${SERVICE_TMP}" <<'SERVICE_EOF'
 [Unit]
 Description=Radio WiFi Configuration Service
 Requires=docker.service
@@ -152,10 +136,6 @@ WorkingDirectory=/opt/radio
 ExecStart=/usr/bin/docker compose -f /opt/radio/docker-compose.yml up -d
 ExecStop=/usr/bin/docker compose -f /opt/radio/docker-compose.yml down
 ExecReload=/usr/bin/docker compose -f /opt/radio/docker-compose.yml restart
-Restart=on-failure
-RestartSec=10s
-StartLimitIntervalSec=300
-StartLimitBurst=3
 User=root
 Environment=COMPOSE_PROJECT_NAME=radio-wifi
 Environment=NODE_ENV=production
@@ -166,13 +146,14 @@ SyslogIdentifier=radio-wifi
 [Install]
 WantedBy=multi-user.target
 SERVICE_EOF
-
-chmod 644 "${SERVICE_FILE}"
+chmod 644 "${SERVICE_TMP}"
+mv "${SERVICE_TMP}" "${SERVICE_FILE}"
 
 # ── PipeWire prerequisites ────────────────────────────────────────────────────
 # The radio container routes audio through the host PipeWire session.
 # Ensure pipewire and pipewire-pulse are installed and the user service is running.
 
+CURRENT_STEP="PipeWire setup"
 echo "Checking PipeWire prerequisites..."
 if ! command -v pipewire &>/dev/null; then
     echo "Installing pipewire and pipewire-pulse..."
@@ -208,63 +189,41 @@ if [[ ! -S "${PULSE_SOCKET}" ]]; then
     echo "         To fix: log in as ${INSTALL_USER} and run: systemctl --user start pipewire pipewire-pulse"
 fi
 
-# ── dnsmasq — DNS resolver for hotspot mode ──────────────────────────────────
-# dnsmasq answers DNS queries for radio.local → 192.168.4.1 when the Pi is in
-# hotspot (AP) mode. It is masked at boot and only unmasked/started by the
-# wifi_manager when hotspot mode activates.
+# ── Pull image and fix data ownership ────────────────────────────────────────
 
-echo "Installing dnsmasq..."
-apt-get update -qq && apt-get install -y --no-install-recommends dnsmasq
-
-# Disable systemd-resolved's stub listener so dnsmasq can bind port 53.
-RESOLVED_CONF="/etc/systemd/resolved.conf"
-if grep -q "^DNSStubListener=yes" "${RESOLVED_CONF}" 2>/dev/null || \
-   ! grep -q "^DNSStubListener=" "${RESOLVED_CONF}" 2>/dev/null; then
-    echo "Disabling systemd-resolved stub listener..."
-    sed -i '/^DNSStubListener=/d' "${RESOLVED_CONF}" 2>/dev/null || true
-    echo "DNSStubListener=no" >> "${RESOLVED_CONF}"
-    systemctl restart systemd-resolved 2>/dev/null || true
-fi
-
-# Determine WiFi interface from radio.conf (default wlan0).
-WIFI_IF="wlan0"
-if [[ -f "${CONF_FILE}" ]]; then
-    _wifi=$(grep -E '^WIFI_INTERFACE=' "${CONF_FILE}" | cut -d= -f2 | tr -d '[:space:]')
-    [[ -n "${_wifi}" ]] && WIFI_IF="${_wifi}"
-fi
-
-echo "Writing /etc/dnsmasq.d/radio-hotspot.conf (interface: ${WIFI_IF})..."
-mkdir -p /etc/dnsmasq.d
-cat > /etc/dnsmasq.d/radio-hotspot.conf <<EOF
-# Managed by install.sh — do not edit manually.
-interface=${WIFI_IF}
-bind-interfaces
-no-dhcp-interface=${WIFI_IF}
-address=/radio.local/192.168.4.1
-EOF
-
-# Mask dnsmasq — it is started only by wifi_manager when hotspot activates.
-systemctl mask dnsmasq 2>/dev/null || true
-echo "dnsmasq installed and masked (will start only in hotspot mode)."
-
-# ── Pull image and start ──────────────────────────────────────────────────────
-
+CURRENT_STEP="pulling image"
 echo "Pulling latest image (${IMAGE})..."
 docker compose -f "${COMPOSE_FILE}" pull
 
+# The container app user (not root, not world) owns the data dir — resolve
+# its UID/GID from the image rather than hard-coding it
+CURRENT_STEP="setting data dir ownership"
+RADIO_UID=$(docker run --rm --entrypoint "" "${IMAGE}" id -u radio 2>/dev/null || echo "")
+RADIO_GID=$(docker run --rm --entrypoint "" "${IMAGE}" id -g radio 2>/dev/null || echo "")
+if [[ -n "${RADIO_UID}" && -n "${RADIO_GID}" ]]; then
+    echo "Setting ${DATA_DIR} ownership to container user ${RADIO_UID}:${RADIO_GID}..."
+    chown -R "${RADIO_UID}:${RADIO_GID}" "${DATA_DIR}" "${CONFIG_DIR}"
+    chmod 755 "${DATA_DIR}"
+else
+    echo "WARNING: could not resolve container user — leaving ${DATA_DIR} root-owned (755)."
+fi
+
 # ── Enable and start systemd service ─────────────────────────────────────────
 
+CURRENT_STEP="enabling radio.service"
 echo "Enabling radio.service..."
 systemctl daemon-reload
 systemctl enable --now radio.service
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 
+PI_IP=$(hostname -I | awk '{print $1}')
 echo ""
 echo "Installation complete!"
-echo "  Radio UI:     http://radio.local  (or http://$(hostname -I | awk '{print $1}'))"
-echo "  API:          http://radio.local:8000"
-echo "  Config:       ${CONF_FILE}"
+echo "  Radio UI:         http://${PI_IP}:8000  (or http://radio.local:8000 on the LAN)"
+echo "  Config:           ${CONF_FILE}"
+echo "  Hotspot (setup):  SSID 'Radio-Setup', password: ${HOTSPOT_PASSWORD}"
+echo "                    When in hotspot mode, the UI is at http://192.168.4.1:8000"
 echo ""
 echo "Service status:"
 systemctl status radio.service --no-pager || true

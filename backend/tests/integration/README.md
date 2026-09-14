@@ -304,5 +304,4 @@ async def test_step8_your_new_step(self, client, mock_wifi_manager):
 
 - [Backend Testing Guide](../TESTING.md)
 - [WiFi Manager Documentation](../../core/wifi_manager.py)
-- [Boot WiFi Check Script](../../../scripts/boot-wifi-check.sh)
 - [Configuration Guide](../../../CONFIGURATION.md)

@@ -2,11 +2,11 @@
 # Optimized for Raspberry Pi and development workflow with Apple Silicon support
 
 # Stage 1: Build SvelteKit frontend
-FROM node:26-slim AS frontend-builder
+FROM node:26-slim@sha256:14bf3eac4bf209d906d3c41256597d3ab1f926b2e93a79e9bdfe1efd32454239 AS frontend-builder
 
 WORKDIR /frontend
-COPY frontend/package.json ./
-RUN npm install
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
 COPY frontend/ .
 RUN npm run build
 
@@ -18,7 +18,7 @@ LABEL org.opencontainers.image.version=$VERSION
 ENV VERSION=$VERSION
 
 # Install system dependencies for WiFi management and build tools
-RUN apt-get update && apt-get upgrade -y && apt-get install -y \
+RUN apt-get update && apt-get install -y \
     wireless-tools \
     iw \
     network-manager \
@@ -57,9 +57,17 @@ RUN groupmod -g 104 netdev || groupadd -g 104 netdev && \
 # Create gpio group matching Pi OS GID (986) for /dev/gpiochip0 access
 RUN groupadd -g 986 gpio && usermod -a -G gpio radio
 
-# Configure passwordless sudo for WiFi management commands (nmcli permissions)
-RUN echo "radio ALL=(ALL) NOPASSWD: /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/rm, /usr/bin/rm, /bin/chmod, /usr/bin/chmod, /bin/mkdir, /usr/bin/mkdir, /bin/touch, /usr/bin/touch, /sbin/reboot, /usr/sbin/reboot, /sbin/shutdown, /usr/sbin/shutdown, /sbin/ip, /usr/sbin/ip, /bin/ip, /usr/bin/nmcli, /usr/bin/killall" > /etc/sudoers.d/radio && \
-    chmod 0440 /etc/sudoers.d/radio
+# Passwordless sudo restricted to what the backend actually invokes:
+# nmcli (WiFi management, any args) and the exact host-mode marker commands.
+# Unrestricted cp/mv/rm/chmod would be a trivial root escalation.
+RUN { \
+      echo "radio ALL=(ALL) NOPASSWD: /usr/bin/nmcli"; \
+      echo "radio ALL=(ALL) NOPASSWD: /bin/rm -f /etc/raspiwifi/host_mode, /usr/bin/rm -f /etc/raspiwifi/host_mode"; \
+      echo "radio ALL=(ALL) NOPASSWD: /bin/mkdir -p /etc/raspiwifi, /usr/bin/mkdir -p /etc/raspiwifi"; \
+      echo "radio ALL=(ALL) NOPASSWD: /bin/touch /etc/raspiwifi/host_mode, /usr/bin/touch /etc/raspiwifi/host_mode"; \
+    } > /etc/sudoers.d/radio && \
+    chmod 0440 /etc/sudoers.d/radio && \
+    visudo -c -f /etc/sudoers.d/radio
 
 # Copy requirements first for better caching
 COPY backend/requirements.lock backend/requirements-test.txt ./
@@ -74,9 +82,13 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 # liblgpio-dev is not in Debian trixie (only in Raspberry Pi OS repos).
 # curl and build-essential/gcc/make are already in the image.
 # Python's zipfile module extracts the zip without needing unzip.
+# Upstream lg.zip is unversioned and mutates in place: the pinned SHA-256
+# makes the build fail loudly on any upstream change (review it, then bump).
+ARG LG_ZIP_SHA256=bb31c6031b632911a4cbbd1d47ea326f1249b9f9efe1504eca83d1e0ef0394af
 RUN arch=$(dpkg --print-architecture) && \
     if [ "$arch" = "arm64" ]; then \
-        curl -fsSL http://abyz.me.uk/lg/lg.zip -o /tmp/lg.zip && \
+        curl -fsSL https://abyz.me.uk/lg/lg.zip -o /tmp/lg.zip && \
+        echo "${LG_ZIP_SHA256}  /tmp/lg.zip" | sha256sum -c - && \
         python3 -c "import zipfile; zipfile.ZipFile('/tmp/lg.zip').extractall('/tmp/')" && \
         cd /tmp/lg && make && make install && \
         ldconfig && \

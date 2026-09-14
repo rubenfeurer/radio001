@@ -47,6 +47,11 @@
 				<p class="text-destructive text-sm">{wifiState.error}</p>
 			</div>
 		{/if}
+		{#if radioState.error}
+			<div class="border border-destructive/50 bg-destructive/10 rounded-sm p-4 mb-6">
+				<p class="text-destructive text-sm">{radioState.error}</p>
+			</div>
+		{/if}
 
 		<!-- Title -->
 		<div class="flex items-center justify-between mb-6">

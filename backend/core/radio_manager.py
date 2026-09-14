@@ -41,6 +41,10 @@ class RadioManager:
     _instance: Optional["RadioManager"] = None
     _lock = asyncio.Lock()
 
+    # Stream reconnect policy: bounded retries with capped exponential backoff.
+    # Overridable per instance (tests inject near-zero delays).
+    RECONNECT_DELAYS: tuple = (1.0, 2.0, 4.0, 8.0, 15.0)
+
     def __init__(
         self,
         config: Any,
@@ -70,7 +74,9 @@ class RadioManager:
         # Initialize core components
         self._station_manager = StationManager(config.STATIONS_FILE)
         self._sound_manager = SoundManager(config.SOUNDS_DIR, mock_mode=mock_mode)
-        self._audio_player = AudioPlayer(mock_mode=mock_mode)
+        self._audio_player = AudioPlayer(
+            mock_mode=mock_mode, status_callback=self._handle_player_status
+        )
 
         # Initialize system status
         self._status = SystemStatus(
@@ -84,6 +90,7 @@ class RadioManager:
 
         # Internal state
         self._playback_lock = asyncio.Lock()
+        self._reconnect_task: Optional[asyncio.Task] = None
         self._startup_complete = False
         self._last_button_times: Dict[int, float] = {}  # debounce per slot
         self._state_file: Path = Path(getattr(config, "RADIO_STATE_FILE", "data/radio_state.json"))
@@ -112,8 +119,12 @@ class RadioManager:
         """
         async with cls._lock:
             if cls._instance is None:
-                cls._instance = cls(config, status_update_callback, mock_mode, wifi_manager)
-                await cls._instance._initialize()
+                # Register only after successful init: a failed _initialize
+                # must not leave a half-built instance serving every route,
+                # and leaving _instance unset lets a later call retry.
+                instance = cls(config, status_update_callback, mock_mode, wifi_manager)
+                await instance._initialize()
+                cls._instance = instance
             return cls._instance
 
     @classmethod
@@ -257,6 +268,7 @@ class RadioManager:
         Returns:
             True if playback started successfully
         """
+        self._cancel_reconnect()
         async with self._playback_lock:
             try:
                 # Get station from slot
@@ -306,6 +318,7 @@ class RadioManager:
         Returns:
             True if stopped successfully
         """
+        self._cancel_reconnect()
         async with self._playback_lock:
             try:
                 await self._audio_player.stop()
@@ -334,12 +347,17 @@ class RadioManager:
         Returns:
             True if currently playing the slot after toggle
         """
-        if self._status.current_station == slot and self._status.is_playing:
+        if (
+            self._status.current_station == slot
+            and self._status.is_playing
+            and self._status.playback_state == PlaybackState.PLAYING
+        ):
             # Currently playing this slot, so stop
             await self.stop_playback()
             return False
         else:
-            # Not playing this slot (or not playing at all), so play it
+            # Not playing this slot, not playing at all, or the session is
+            # dead/reconnecting (CONNECTING/ERROR) — (re)start it
             success = await self.play_station(slot)
             return success
 
@@ -398,10 +416,10 @@ class RadioManager:
             await self._sound_manager.play_success_sound()
 
             if is_client:
-                self._wifi_manager.switch_to_host_mode()
+                await self._wifi_manager.switch_to_host_mode()
                 logger.info("Switched to hotspot mode")
             else:
-                self._wifi_manager.switch_to_client_mode()
+                await self._wifi_manager.switch_to_client_mode()
                 logger.info("Switched to client mode")
 
         except Exception as e:
@@ -436,6 +454,83 @@ class RadioManager:
 
         except Exception as e:
             logger.error(f"Error handling volume change: {e}", exc_info=True)
+
+    # =============================================================================
+    # Stream Recovery
+    # =============================================================================
+
+    async def _handle_player_status(self, status: Dict[str, Any]):
+        """AudioPlayer status callback. Starts recovery on unexpected mpg123 exit."""
+        try:
+            if not status.get("unexpected_exit"):
+                return
+            # Only recover an outage of a session we believe is live
+            if self._status.playback_state != PlaybackState.PLAYING:
+                return
+            slot = self._status.current_station
+            if not slot:
+                return
+            if self._reconnect_task and not self._reconnect_task.done():
+                return
+
+            logger.warning(f"Stream for slot {slot} died unexpectedly — starting recovery")
+            self._status.is_playing = False
+            self._status.playback_state = PlaybackState.CONNECTING
+            await self._broadcast_status_update("playback_status")
+
+            self._reconnect_task = asyncio.create_task(self._reconnect_loop(slot))
+
+        except Exception as e:
+            logger.error(f"Error handling player status: {e}", exc_info=True)
+
+    async def _reconnect_loop(self, slot: int):
+        """Retry a dead stream with bounded backoff; give up into ERROR state."""
+        try:
+            for attempt, delay in enumerate(self.RECONNECT_DELAYS, start=1):
+                await asyncio.sleep(delay)
+
+                # User may have stopped or switched stations in the meantime
+                if (
+                    self._status.playback_state != PlaybackState.CONNECTING
+                    or self._status.current_station != slot
+                ):
+                    return
+
+                async with self._playback_lock:
+                    station = await self._station_manager.get_station(slot)
+                    if not station:
+                        break
+                    logger.info(
+                        f"Reconnect attempt {attempt}/{len(self.RECONNECT_DELAYS)} "
+                        f"for slot {slot}"
+                    )
+                    # Bypass the URL cache: an expired redirect is a likely cause
+                    success = await self._audio_player.play(station.url, refresh_cache=True)
+                    if success:
+                        self._status.is_playing = True
+                        self._status.playback_state = PlaybackState.PLAYING
+                        logger.info(f"Stream for slot {slot} recovered")
+                        await self._broadcast_status_update("playback_status")
+                        return
+
+            # Retry budget exhausted (or station vanished): give up loudly
+            logger.error(f"Stream recovery for slot {slot} failed — giving up")
+            self._status.is_playing = False
+            self._status.playback_state = PlaybackState.ERROR
+            # Keep current_station so the UI shows which station failed
+            await self._broadcast_status_update("playback_status")
+            await self._sound_manager.play_error_sound()
+
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"Error in stream reconnect loop: {e}", exc_info=True)
+
+    def _cancel_reconnect(self):
+        """Cancel an in-flight reconnect task (user command wins)."""
+        if self._reconnect_task and not self._reconnect_task.done():
+            self._reconnect_task.cancel()
+        self._reconnect_task = None
 
     # =============================================================================
     # Internal Methods
@@ -506,7 +601,8 @@ class RadioManager:
         try:
             logger.info("Shutting down RadioManager...")
 
-            # Stop playback
+            # Cancel any in-flight stream recovery, then stop playback
+            self._cancel_reconnect()
             await self.stop_playback()
 
             # Cleanup hardware

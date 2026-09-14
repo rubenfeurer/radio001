@@ -1,6 +1,0 @@
-[Allow radio user to control NetworkManager]
-Identity=unix-user:radio
-Action=org.freedesktop.NetworkManager.*
-ResultAny=yes
-ResultInactive=yes
-ResultActive=yes

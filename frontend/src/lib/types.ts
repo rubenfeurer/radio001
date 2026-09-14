@@ -30,7 +30,8 @@ export interface WiFiStatus {
 }
 
 export interface SavedNetwork {
-	id: number; // wpa_cli network ID
+	id: number; // list position (display only)
+	connection_name: string; // stable NetworkManager profile name — key for forget
 	ssid: string;
 	current: boolean; // Currently connected
 	disabled: boolean; // Network disabled in wpa_supplicant

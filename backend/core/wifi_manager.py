@@ -7,6 +7,8 @@ It provides a clean interface for scanning, connecting, and managing WiFi networ
 
 import asyncio
 import logging
+import os
+import tempfile
 from pathlib import Path
 from typing import List, Optional
 
@@ -75,7 +77,7 @@ class WiFiManager:
         host_mode_file: Optional[Path] = None,
         development_mode: bool = False,
         hotspot_ssid: str = "Radio-Setup",
-        hotspot_password: str = "Configure123!",
+        hotspot_password: str = "radio123",
         hotspot_ip: str = "192.168.4.1",
     ):
         self.interface = interface
@@ -383,6 +385,47 @@ class WiFiManager:
             logger.error(f"Error getting WiFi status: {e}")
             return WiFiStatus(mode="client", connected=False)
 
+    @staticmethod
+    def _validate_ssid(ssid: str) -> Optional[str]:
+        """Return an error message for an invalid SSID, or None if OK."""
+        if not ssid:
+            return "SSID must not be empty"
+        if len(ssid.encode("utf-8")) > 32:
+            return "SSID must be at most 32 bytes (802.11)"
+        if any(ord(c) < 0x20 or ord(c) == 0x7F for c in ssid):
+            return "SSID must not contain control characters"
+        return None
+
+    @staticmethod
+    def _write_psk_file(password: str) -> str:
+        """Write the PSK to a private 0600 temp file for nmcli's passwd-file.
+
+        Keeps the password out of process argv (/proc/<pid>/cmdline is
+        world-readable for the lifetime of the nmcli call). Caller must
+        delete the file in a finally block.
+        """
+        fd, path = tempfile.mkstemp(prefix="nm-psk-")
+        try:
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "w") as f:
+                f.write(f"802-11-wireless-security.psk:{password}\n")
+        except BaseException:
+            os.unlink(path)
+            raise
+        return path
+
+    async def _nmcli(self, *args: str) -> tuple[int, str, str]:
+        """Run sudo nmcli with args; return (returncode, stdout, stderr)."""
+        process = await asyncio.create_subprocess_exec(
+            "sudo",
+            "nmcli",
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await process.communicate()
+        return process.returncode, stdout.decode().strip(), stderr.decode().strip()
+
     async def connect_network(self, ssid: str, password: str = "") -> tuple[bool, str]:
         """
         Connect to WiFi network using nmcli (single attempt).
@@ -390,10 +433,20 @@ class WiFiManager:
         User can manually retry if connection fails.
         Validates connection BEFORE returning success.
 
+        The PSK is passed via a private passwd-file, never argv; the SSID is
+        only ever the value after the `ssid` property keyword, so names
+        starting with `-` cannot be parsed as nmcli options.
+
         Returns:
             tuple[bool, str]: (success, error_message)
         """
         last_error = ""
+
+        ssid_error = self._validate_ssid(ssid)
+        if ssid_error:
+            logger.warning(f"Rejected invalid SSID: {ssid_error}")
+            return False, ssid_error
+
         logger.info(f"Attempting to connect to {ssid}")
 
         try:
@@ -404,73 +457,68 @@ class WiFiManager:
             if existing:
                 connection_name = existing["connection_name"]
                 logger.info(f"Existing NM profile found for {ssid!r}: {connection_name!r}")
-                # Optionally update the stored password
+                # Bring up the profile; a supplied password goes via passwd-file
+                # (NM persists it on the profile under default psk-flags)
                 if password:
-                    process = await asyncio.create_subprocess_exec(
-                        "sudo",
-                        "nmcli",
-                        "connection",
-                        "modify",
-                        connection_name,
-                        "wifi-sec.key-mgmt",
-                        "wpa-psk",
-                        "wifi-sec.psk",
-                        password,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE,
+                    psk_path = self._write_psk_file(password)
+                    try:
+                        returncode, _, stderr = await self._nmcli(
+                            "connection", "up", connection_name, "passwd-file", psk_path
+                        )
+                    finally:
+                        try:
+                            os.unlink(psk_path)
+                        except OSError:
+                            pass
+                else:
+                    returncode, _, stderr = await self._nmcli(
+                        "connection", "up", connection_name
                     )
-                    await process.communicate()
 
-                # Bring up the connection using the exact NM profile name
-                process = await asyncio.create_subprocess_exec(
-                    "sudo",
-                    "nmcli",
-                    "connection",
-                    "up",
-                    connection_name,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                stdout, stderr = await process.communicate()
-
-                if process.returncode != 0:
-                    last_error = stderr.decode().strip()
+                if returncode != 0:
+                    last_error = stderr
                     logger.error(f"nmcli connection up failed: {last_error}")
                     return False, last_error
             else:
                 logger.info(f"Creating new connection for {ssid}...")
-                # Create new connection
+                connection_name = ssid
+                add_args = [
+                    "connection", "add",
+                    "type", "wifi",
+                    "con-name", connection_name,
+                    "ifname", self.interface,
+                    "ssid", ssid,
+                ]
                 if password:
-                    process = await asyncio.create_subprocess_exec(
-                        "sudo",
-                        "nmcli",
-                        "device",
-                        "wifi",
-                        "connect",
-                        ssid,
-                        "password",
-                        password,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE,
-                    )
+                    add_args += ["wifi-sec.key-mgmt", "wpa-psk"]
+
+                returncode, _, stderr = await self._nmcli(*add_args)
+                if returncode != 0:
+                    last_error = stderr
+                    logger.error(f"nmcli connection add failed: {last_error}")
+                    return False, last_error
+
+                if password:
+                    psk_path = self._write_psk_file(password)
+                    try:
+                        returncode, _, stderr = await self._nmcli(
+                            "connection", "up", connection_name, "passwd-file", psk_path
+                        )
+                    finally:
+                        try:
+                            os.unlink(psk_path)
+                        except OSError:
+                            pass
                 else:
-                    # Open network
-                    process = await asyncio.create_subprocess_exec(
-                        "sudo",
-                        "nmcli",
-                        "device",
-                        "wifi",
-                        "connect",
-                        ssid,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE,
+                    returncode, _, stderr = await self._nmcli(
+                        "connection", "up", connection_name
                     )
 
-                stdout, stderr = await process.communicate()
-
-                if process.returncode != 0:
-                    last_error = stderr.decode().strip()
-                    logger.error(f"nmcli connect failed: {last_error}")
+                if returncode != 0:
+                    last_error = stderr
+                    logger.error(f"nmcli connection up failed: {last_error}")
+                    # Don't accumulate half-configured profiles from failed attempts
+                    await self._nmcli("connection", "delete", connection_name)
                     return False, last_error
 
             # Wait for connection with 40s timeout
@@ -624,27 +672,32 @@ class WiFiManager:
             logger.error(f"Failed to list saved networks: {e}")
             return []
 
-    async def forget_network(self, network_id: int) -> bool:
+    async def forget_network(self, connection_name: str) -> bool:
         """
         Remove a saved WiFi network using nmcli.
 
+        Keyed by the stable NetworkManager connection name — a positional
+        index would resolve to the wrong profile whenever the connection
+        list changes between enumeration and deletion.
+
         Args:
-            network_id: Network ID (index) from list_saved_networks
+            connection_name: NM connection name from list_saved_networks
 
         Returns:
-            True if successfully removed
+            True if successfully removed; False if the name is unknown
         """
         try:
-            # Get list of saved networks to find the target
+            # Single enumeration: verify existence and read the current flag
             saved_networks = await self.list_saved_networks()
-
-            if network_id >= len(saved_networks):
-                logger.error(f"Network ID {network_id} out of range")
+            target_network = next(
+                (n for n in saved_networks if n["connection_name"] == connection_name),
+                None,
+            )
+            if target_network is None:
+                logger.error(f"No saved network named {connection_name!r}")
                 return False
 
-            target_network = saved_networks[network_id]
             ssid = target_network["ssid"]
-            connection_name = target_network["connection_name"]
 
             # Disconnect first if this is the currently active connection
             if target_network.get("current", False):
@@ -680,7 +733,7 @@ class WiFiManager:
             return True
 
         except Exception as e:
-            logger.error(f"Failed to remove network {network_id}: {e}")
+            logger.error(f"Failed to remove network {connection_name!r}: {e}")
             return False
 
     async def switch_to_client_mode(self):
@@ -691,11 +744,6 @@ class WiFiManager:
             return
 
         try:
-            # Stop dnsmasq before tearing down the hotspot.
-            await self._run_cmd("sudo", "systemctl", "stop", "dnsmasq", check=False)
-            await self._run_cmd("sudo", "systemctl", "mask", "dnsmasq", check=False)
-            logger.info("dnsmasq stopped")
-
             # Stop the nmcli hotspot connection
             await self._run_cmd(
                 "sudo", "nmcli", "connection", "down", "Hotspot", check=False
@@ -757,21 +805,13 @@ class WiFiManager:
             if rc != 0:
                 raise Exception(f"nmcli hotspot failed: {stderr}")
 
+            # nmcli's built-in DHCP hands clients the gateway IP; the UI is
+            # reachable at http://<hotspot_ip>:8000 (radio.local does not
+            # resolve in hotspot mode — mDNS is a client-mode feature)
             logger.info(
-                f"Hotspot mode active: SSID={self.hotspot_ssid}, IP={self.hotspot_ip}"
+                f"Hotspot mode active: SSID={self.hotspot_ssid}, "
+                f"UI at http://{self.hotspot_ip}:8000"
             )
-
-            # Start dnsmasq so radio.local resolves for hotspot clients.
-            rc_dns, _, stderr_dns = await self._run_cmd(
-                "sudo", "systemctl", "unmask", "dnsmasq", check=False
-            )
-            rc_dns, _, stderr_dns = await self._run_cmd(
-                "sudo", "systemctl", "start", "dnsmasq", check=False
-            )
-            if rc_dns != 0:
-                logger.warning(f"dnsmasq failed to start (radio.local may not resolve): {stderr_dns}")
-            else:
-                logger.info("dnsmasq started — radio.local resolves for hotspot clients")
 
         except Exception as e:
             logger.error(f"Failed to switch to host mode: {e}", exc_info=True)

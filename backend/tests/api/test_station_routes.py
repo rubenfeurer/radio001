@@ -190,7 +190,9 @@ class TestStationRoutes:
         result = response.json()
         assert result["success"] is True
         assert "action" in result["data"]
-        assert result["data"]["action"] in ["starting", "stopping"]
+        # Response reports the actual outcome (awaited), not a scheduled intent
+        assert result["data"]["action"] in ["started", "stopped"]
+        assert "is_playing" in result["data"]
         assert result["data"]["slot"] == 2
         assert "station_name" in result["data"]
 

@@ -849,3 +849,275 @@ class TestRadioManager:
         # Test default volume
         new_manager_config = Config
         assert new_manager_config.DEFAULT_VOLUME == Config.DEFAULT_VOLUME
+
+
+@pytest.mark.unit
+class TestLongPressWifiToggle:
+    """Long press must actually await the WiFi mode switch (regression:
+    the coroutines were created but never awaited — silent no-op)."""
+
+    async def _make_manager(self):
+        RadioManager._instance = None
+        with patch('core.station_manager.StationManager'), \
+             patch('core.sound_manager.SoundManager'), \
+             patch('hardware.audio_player.AudioPlayer'):
+            manager = await RadioManager.create_instance(
+                config=Config,
+                mock_mode=True
+            )
+        manager._sound_manager = AsyncMock()
+        manager._wifi_manager = AsyncMock()
+        return manager
+
+    async def test_client_mode_switches_to_host_mode(self, temp_data_dir):
+        manager = await self._make_manager()
+        try:
+            manager._wifi_manager.get_status.return_value = MagicMock(
+                mode="client", connected=True
+            )
+            await manager._handle_long_press_event(Config.ROTARY_SW)
+
+            manager._wifi_manager.switch_to_host_mode.assert_awaited_once()
+            manager._wifi_manager.switch_to_client_mode.assert_not_awaited()
+        finally:
+            await manager.shutdown()
+
+    async def test_hotspot_mode_switches_to_client_mode(self, temp_data_dir):
+        manager = await self._make_manager()
+        try:
+            manager._wifi_manager.get_status.return_value = MagicMock(
+                mode="host", connected=False
+            )
+            await manager._handle_long_press_event(Config.ROTARY_SW)
+
+            manager._wifi_manager.switch_to_client_mode.assert_awaited_once()
+            manager._wifi_manager.switch_to_host_mode.assert_not_awaited()
+        finally:
+            await manager.shutdown()
+
+    async def test_failed_mode_switch_plays_error_sound(self, temp_data_dir):
+        manager = await self._make_manager()
+        try:
+            manager._wifi_manager.get_status.return_value = MagicMock(
+                mode="client", connected=True
+            )
+            manager._wifi_manager.switch_to_host_mode.side_effect = RuntimeError("nmcli failed")
+            await manager._handle_long_press_event(Config.ROTARY_SW)
+
+            manager._sound_manager.play_error_sound.assert_awaited_once()
+        finally:
+            await manager.shutdown()
+
+
+@pytest.mark.unit
+class TestStreamRecovery:
+    """Unexpected mpg123 exit must drive CONNECTING → reconnect → PLAYING/ERROR."""
+
+    async def _make_manager(self):
+        RadioManager._instance = None
+        with patch('core.station_manager.StationManager'), \
+             patch('core.sound_manager.SoundManager'), \
+             patch('hardware.audio_player.AudioPlayer'):
+            manager = await RadioManager.create_instance(
+                config=Config,
+                mock_mode=True
+            )
+        manager._audio_player = AsyncMock()
+        manager._sound_manager = AsyncMock()
+        manager._station_manager = AsyncMock()
+        manager._status_update_callback = AsyncMock()
+        manager.RECONNECT_DELAYS = (0.001, 0.001, 0.001)
+        station = MagicMock()
+        station.url = "http://stream.example/radio"
+        manager._station_manager.get_station.return_value = station
+        return manager
+
+    def _set_playing(self, manager, slot=1):
+        manager._status.is_playing = True
+        manager._status.playback_state = PlaybackState.PLAYING
+        manager._status.current_station = slot
+
+    async def test_unexpected_exit_enters_connecting_and_broadcasts(self, temp_data_dir):
+        manager = await self._make_manager()
+        try:
+            self._set_playing(manager)
+            manager._audio_player.play.return_value = False
+
+            await manager._handle_player_status(
+                {"is_playing": False, "unexpected_exit": True}
+            )
+
+            assert manager._status.playback_state == PlaybackState.CONNECTING
+            assert manager._status.current_station == 1
+            manager._status_update_callback.assert_awaited_with(
+                "playback_status", manager._status.model_dump()
+            )
+            assert manager._reconnect_task is not None
+            await manager._reconnect_task
+        finally:
+            await manager.shutdown()
+
+    async def test_reconnect_succeeds_mid_schedule(self, temp_data_dir):
+        manager = await self._make_manager()
+        try:
+            self._set_playing(manager)
+            manager._audio_player.play.side_effect = [False, True]
+
+            await manager._handle_player_status(
+                {"is_playing": False, "unexpected_exit": True}
+            )
+            await manager._reconnect_task
+
+            assert manager._status.playback_state == PlaybackState.PLAYING
+            assert manager._status.is_playing is True
+            assert manager._audio_player.play.await_count == 2
+            # Reconnect attempts bypass the stale URL cache
+            for call in manager._audio_player.play.await_args_list:
+                assert call.kwargs.get("refresh_cache") is True
+        finally:
+            await manager.shutdown()
+
+    async def test_give_up_sets_error_and_plays_chime_once(self, temp_data_dir):
+        manager = await self._make_manager()
+        try:
+            self._set_playing(manager)
+            manager._audio_player.play.return_value = False
+
+            await manager._handle_player_status(
+                {"is_playing": False, "unexpected_exit": True}
+            )
+            await manager._reconnect_task
+
+            assert manager._status.playback_state == PlaybackState.ERROR
+            assert manager._status.is_playing is False
+            assert manager._status.current_station == 1  # kept: shows what failed
+            assert manager._audio_player.play.await_count == len(manager.RECONNECT_DELAYS)
+            manager._sound_manager.play_error_sound.assert_awaited_once()
+        finally:
+            await manager.shutdown()
+
+    async def test_event_ignored_when_not_playing(self, temp_data_dir):
+        manager = await self._make_manager()
+        try:
+            manager._status.is_playing = False
+            manager._status.playback_state = PlaybackState.STOPPED
+
+            await manager._handle_player_status(
+                {"is_playing": False, "unexpected_exit": True}
+            )
+
+            assert manager._reconnect_task is None
+            assert manager._status.playback_state == PlaybackState.STOPPED
+        finally:
+            await manager.shutdown()
+
+    async def test_expected_status_updates_ignored(self, temp_data_dir):
+        manager = await self._make_manager()
+        try:
+            self._set_playing(manager)
+            await manager._handle_player_status(
+                {"is_playing": False, "unexpected_exit": False}
+            )
+            assert manager._reconnect_task is None
+            assert manager._status.playback_state == PlaybackState.PLAYING
+        finally:
+            await manager.shutdown()
+
+    async def test_stop_playback_cancels_reconnect(self, temp_data_dir):
+        manager = await self._make_manager()
+        try:
+            self._set_playing(manager)
+            manager.RECONNECT_DELAYS = (5.0,)  # long enough to still be waiting
+            manager._audio_player.play.return_value = False
+
+            await manager._handle_player_status(
+                {"is_playing": False, "unexpected_exit": True}
+            )
+            task = manager._reconnect_task
+            await manager.stop_playback()
+
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            assert task.cancelled() or task.done()
+            assert manager._status.playback_state == PlaybackState.STOPPED
+            manager._audio_player.play.assert_not_awaited()
+        finally:
+            await manager.shutdown()
+
+    async def test_toggle_during_error_restarts_instead_of_stopping(self, temp_data_dir):
+        manager = await self._make_manager()
+        try:
+            manager._status.is_playing = False
+            manager._status.playback_state = PlaybackState.ERROR
+            manager._status.current_station = 1
+
+            with patch.object(manager, 'play_station', AsyncMock(return_value=True)) as play, \
+                 patch.object(manager, 'stop_playback', AsyncMock()) as stop:
+                result = await manager.toggle_station(1)
+
+            play.assert_awaited_once_with(1)
+            stop.assert_not_awaited()
+            assert result is True
+        finally:
+            await manager.shutdown()
+
+    async def test_toggle_during_connecting_restarts(self, temp_data_dir):
+        manager = await self._make_manager()
+        try:
+            manager._status.is_playing = False
+            manager._status.playback_state = PlaybackState.CONNECTING
+            manager._status.current_station = 1
+
+            with patch.object(manager, 'play_station', AsyncMock(return_value=True)) as play, \
+                 patch.object(manager, 'stop_playback', AsyncMock()) as stop:
+                await manager.toggle_station(1)
+
+            play.assert_awaited_once_with(1)
+            stop.assert_not_awaited()
+        finally:
+            await manager.shutdown()
+
+
+@pytest.mark.unit
+class TestSingletonInitSafety:
+    """A failed _initialize must not register a half-built singleton."""
+
+    async def test_failed_init_leaves_no_instance_and_allows_retry(self, temp_data_dir):
+        RadioManager._instance = None
+
+        with patch('core.station_manager.StationManager'), \
+             patch('core.sound_manager.SoundManager'), \
+             patch('hardware.audio_player.AudioPlayer'):
+
+            with patch.object(RadioManager, '_initialize',
+                              AsyncMock(side_effect=RuntimeError("boom"))):
+                with pytest.raises(RuntimeError):
+                    await RadioManager.create_instance(config=Config, mock_mode=True)
+
+            # No broken instance registered; get_instance raises
+            with pytest.raises(RuntimeError):
+                RadioManager.get_instance()
+
+            # A later create_instance can retry successfully
+            manager = await RadioManager.create_instance(config=Config, mock_mode=True)
+            try:
+                assert RadioManager.get_instance() is manager
+            finally:
+                await manager.shutdown()
+                RadioManager._instance = None
+
+    async def test_successful_init_returns_same_instance(self, temp_data_dir):
+        RadioManager._instance = None
+
+        with patch('core.station_manager.StationManager'), \
+             patch('core.sound_manager.SoundManager'), \
+             patch('hardware.audio_player.AudioPlayer'):
+            first = await RadioManager.create_instance(config=Config, mock_mode=True)
+            try:
+                second = await RadioManager.create_instance(config=Config, mock_mode=True)
+                assert first is second
+            finally:
+                await first.shutdown()
+                RadioManager._instance = None

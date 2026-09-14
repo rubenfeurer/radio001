@@ -178,122 +178,194 @@ class TestWiFiManagerStatus:
 
 
 class TestWiFiManagerConnection:
-    """Test WiFi connection functionality"""
+    """Test WiFi connection functionality.
+
+    The PSK must never appear in nmcli argv (passwd-file mechanism) and
+    SSIDs are only passed as the value after the `ssid` property keyword.
+    """
+
+    @staticmethod
+    def _spawn_recorder(calls, psk_files):
+        """Return a create_subprocess_exec side effect that records argv and
+        inspects any passwd-file at call time (perms + existence)."""
+        import os
+        import stat
+
+        async def spawn(*args, **kwargs):
+            calls.append(args)
+            if "passwd-file" in args:
+                path = args[args.index("passwd-file") + 1]
+                st = os.stat(path)
+                psk_files.append({
+                    "path": path,
+                    "mode": stat.S_IMODE(st.st_mode),
+                    "content": open(path).read(),
+                })
+            proc = AsyncMock()
+            proc.returncode = 0
+            proc.communicate = AsyncMock(return_value=(b"", b""))
+            return proc
+
+        return spawn
 
     @pytest.mark.asyncio
     async def test_connect_new_network(self):
-        """Test connecting to a new WiFi network"""
+        """New secured network: connection add + up with passwd-file; PSK not in argv"""
         manager = WiFiManager(development_mode=False)
+        calls, psk_files = [], []
 
         with (
-            patch("asyncio.create_subprocess_exec") as mock_subprocess,
-            patch.object(
-                manager, "wait_for_connection", return_value=True
-            ) as mock_wait,
+            patch.object(manager, "list_saved_networks", AsyncMock(return_value=[])),
+            patch("asyncio.create_subprocess_exec",
+                  side_effect=self._spawn_recorder(calls, psk_files)),
+            patch.object(manager, "wait_for_connection", return_value=True) as mock_wait,
         ):
-            # Mock connection list (network doesn't exist)
-            mock_list = AsyncMock()
-            mock_list.returncode = 0
-            mock_list.communicate = AsyncMock(return_value=(b"", b""))
-
-            # Mock connect command
-            mock_connect = AsyncMock()
-            mock_connect.returncode = 0
-            mock_connect.communicate = AsyncMock(
-                return_value=(b"Connection successfully activated", b"")
-            )
-
-            mock_subprocess.side_effect = [mock_list, mock_connect]
-
             result = await manager.connect_network("TestNetwork", "testpass123")
 
-            assert result[0] is True
-            mock_wait.assert_called_once_with("TestNetwork", timeout=40)
+        assert result[0] is True
+        mock_wait.assert_called_once_with("TestNetwork", timeout=40)
+
+        # PSK never in any argv
+        for args in calls:
+            assert "testpass123" not in args
+
+        # SSID only appears as the value after the `ssid` property keyword
+        add_call = next(a for a in calls if "add" in a)
+        assert add_call[add_call.index("ssid") + 1] == "TestNetwork"
+        assert "wifi-sec.key-mgmt" in add_call and "wpa-psk" in add_call
+
+        # passwd-file was 0600, contained the PSK, and is deleted afterwards
+        import os
+        assert len(psk_files) == 1
+        assert psk_files[0]["mode"] == 0o600
+        assert psk_files[0]["content"] == "802-11-wireless-security.psk:testpass123\n"
+        assert not os.path.exists(psk_files[0]["path"])
 
     @pytest.mark.asyncio
     async def test_connect_existing_network(self):
-        """Test reconnecting to an existing saved network"""
+        """Saved profile: connection up with passwd-file, no wifi-sec.psk argv"""
         manager = WiFiManager(development_mode=False)
+        calls, psk_files = [], []
 
         with (
-            patch("asyncio.create_subprocess_exec") as mock_subprocess,
-            patch.object(
-                manager, "wait_for_connection", return_value=True
-            ) as mock_wait,
+            patch.object(manager, "list_saved_networks", AsyncMock(return_value=[
+                {"id": 0, "ssid": "TestNetwork", "connection_name": "TestNetwork",
+                 "current": False},
+            ])),
+            patch("asyncio.create_subprocess_exec",
+                  side_effect=self._spawn_recorder(calls, psk_files)),
+            patch.object(manager, "wait_for_connection", return_value=True),
         ):
-            # Mock connection list (network exists)
-            mock_list = AsyncMock()
-            mock_list.returncode = 0
-            mock_list.communicate = AsyncMock(
-                return_value=(b"TestNetwork\nOtherNetwork", b"")
-            )
-
-            # Mock modify command
-            mock_modify = AsyncMock()
-            mock_modify.returncode = 0
-            mock_modify.communicate = AsyncMock(return_value=(b"", b""))
-
-            # Mock connection up command
-            mock_up = AsyncMock()
-            mock_up.returncode = 0
-            mock_up.communicate = AsyncMock(
-                return_value=(b"Connection successfully activated", b"")
-            )
-
-            mock_subprocess.side_effect = [mock_list, mock_modify, mock_up]
-
             result = await manager.connect_network("TestNetwork", "newpass456")
 
-            assert result[0] is True
+        assert result[0] is True
+        for args in calls:
+            assert "newpass456" not in args
+            assert "wifi-sec.psk" not in args
+        up_call = next(a for a in calls if "up" in a)
+        assert "passwd-file" in up_call
+        assert len(psk_files) == 1
 
     @pytest.mark.asyncio
     async def test_connect_open_network(self):
-        """Test connecting to an open network (no password)"""
+        """Open network: connection add without security, up without passwd-file"""
         manager = WiFiManager(development_mode=False)
+        calls, psk_files = [], []
 
         with (
-            patch("asyncio.create_subprocess_exec") as mock_subprocess,
+            patch.object(manager, "list_saved_networks", AsyncMock(return_value=[])),
+            patch("asyncio.create_subprocess_exec",
+                  side_effect=self._spawn_recorder(calls, psk_files)),
             patch.object(manager, "wait_for_connection", return_value=True),
         ):
-            mock_list = AsyncMock()
-            mock_list.returncode = 0
-            mock_list.communicate = AsyncMock(return_value=(b"", b""))
-
-            mock_connect = AsyncMock()
-            mock_connect.returncode = 0
-            mock_connect.communicate = AsyncMock(
-                return_value=(b"Connection successfully activated", b"")
-            )
-
-            mock_subprocess.side_effect = [mock_list, mock_connect]
-
             result = await manager.connect_network("OpenNetwork", "")
 
-            assert result[0] is True
+        assert result[0] is True
+        add_call = next(a for a in calls if "add" in a)
+        assert add_call[add_call.index("ssid") + 1] == "OpenNetwork"
+        assert "wifi-sec.key-mgmt" not in add_call
+        assert not psk_files
 
     @pytest.mark.asyncio
     async def test_connect_with_retry(self):
-        """Test that a failed wait_for_connection returns a failure tuple"""
+        """A failed wait_for_connection returns a failure tuple"""
         manager = WiFiManager(development_mode=False)
+        calls, psk_files = [], []
 
         with (
-            patch("asyncio.create_subprocess_exec") as mock_subprocess,
+            patch.object(manager, "list_saved_networks", AsyncMock(return_value=[])),
+            patch("asyncio.create_subprocess_exec",
+                  side_effect=self._spawn_recorder(calls, psk_files)),
             patch.object(manager, "wait_for_connection", return_value=False),
         ):
-            mock_list = AsyncMock()
-            mock_list.returncode = 0
-            mock_list.communicate = AsyncMock(return_value=(b"", b""))
-
-            mock_connect = AsyncMock()
-            mock_connect.returncode = 0
-            mock_connect.communicate = AsyncMock(return_value=(b"", b""))
-
-            mock_subprocess.side_effect = [mock_list, mock_connect]
-
             result = await manager.connect_network("TestNetwork", "testpass")
 
-            assert result[0] is False
-            assert "timeout" in result[1].lower() or "incorrect" in result[1].lower()
+        assert result[0] is False
+        assert "timeout" in result[1].lower() or "incorrect" in result[1].lower()
+
+    @pytest.mark.asyncio
+    async def test_dash_prefixed_ssid_is_position_safe(self):
+        """An SSID starting with `-` must only appear after the ssid keyword"""
+        manager = WiFiManager(development_mode=False)
+        calls, psk_files = [], []
+
+        with (
+            patch.object(manager, "list_saved_networks", AsyncMock(return_value=[])),
+            patch("asyncio.create_subprocess_exec",
+                  side_effect=self._spawn_recorder(calls, psk_files)),
+            patch.object(manager, "wait_for_connection", return_value=True),
+        ):
+            result = await manager.connect_network("-evil-ssid", "testpass123")
+
+        assert result[0] is True
+        for args in calls:
+            for i, tok in enumerate(args):
+                if tok == "-evil-ssid":
+                    assert args[i - 1] in ("ssid", "con-name", "delete", "up"), \
+                        f"SSID appeared positionally in {args}"
+
+    @pytest.mark.asyncio
+    async def test_control_character_ssid_rejected_before_subprocess(self):
+        manager = WiFiManager(development_mode=False)
+
+        with patch("asyncio.create_subprocess_exec") as mock_subprocess:
+            result = await manager.connect_network("bad\nssid", "pw12345678")
+
+        assert result[0] is False
+        mock_subprocess.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_overlong_and_empty_ssid_rejected(self):
+        manager = WiFiManager(development_mode=False)
+
+        with patch("asyncio.create_subprocess_exec") as mock_subprocess:
+            assert (await manager.connect_network("s" * 33, "pw12345678"))[0] is False
+            assert (await manager.connect_network("", "pw12345678"))[0] is False
+
+        mock_subprocess.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_failed_activation_deletes_new_profile(self):
+        """A new profile whose activation fails must not accumulate"""
+        manager = WiFiManager(development_mode=False)
+        calls = []
+
+        async def spawn(*args, **kwargs):
+            calls.append(args)
+            proc = AsyncMock()
+            # add succeeds, up fails, delete succeeds
+            proc.returncode = 1 if "up" in args else 0
+            proc.communicate = AsyncMock(return_value=(b"", b"activation failed"))
+            return proc
+
+        with (
+            patch.object(manager, "list_saved_networks", AsyncMock(return_value=[])),
+            patch("asyncio.create_subprocess_exec", side_effect=spawn),
+        ):
+            result = await manager.connect_network("TestNetwork", "testpass123")
+
+        assert result[0] is False
+        assert any("delete" in a for a in calls)
 
 
 class TestWiFiManagerSavedNetworks:
@@ -345,43 +417,81 @@ class TestWiFiManagerSavedNetworks:
                 assert networks[1]["current"] is False
 
     @pytest.mark.asyncio
-    async def test_forget_network(self):
-        """Test forgetting a saved network"""
+    async def test_forget_network_by_name(self):
+        """Forget deletes exactly the named profile (never a positional index)"""
+        manager = WiFiManager(development_mode=False)
+        calls = []
+
+        async def spawn(*args, **kwargs):
+            calls.append(args)
+            proc = AsyncMock()
+            proc.returncode = 0
+            proc.communicate = AsyncMock(return_value=(b"Connection deleted", b""))
+            return proc
+
+        with (
+            patch.object(manager, "list_saved_networks") as mock_list,
+            patch("asyncio.create_subprocess_exec", side_effect=spawn),
+        ):
+            mock_list.return_value = [
+                {"id": 0, "ssid": "HomeWiFi", "connection_name": "HomeWiFi", "current": False},
+                {"id": 1, "ssid": "GuestWiFi", "connection_name": "Guest WiFi 5GHz", "current": False},
+            ]
+
+            result = await manager.forget_network("Guest WiFi 5GHz")
+
+            assert result is True
+            delete_call = next(a for a in calls if "delete" in a)
+            assert delete_call[-1] == "Guest WiFi 5GHz"
+            # Single enumeration only
+            mock_list.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_forget_unknown_name_fails_without_delete(self):
+        """Unknown connection name returns False and spawns no subprocess"""
         manager = WiFiManager(development_mode=False)
 
         with (
             patch.object(manager, "list_saved_networks") as mock_list,
             patch("asyncio.create_subprocess_exec") as mock_subprocess,
         ):
-            # Mock saved networks
             mock_list.return_value = [
-                {"id": 0, "ssid": "HomeWiFi", "current": False},
-                {"id": 1, "ssid": "GuestWiFi", "current": False},
+                {"id": 0, "ssid": "HomeWiFi", "connection_name": "HomeWiFi", "current": False},
             ]
 
-            # Mock delete command
-            mock_delete = AsyncMock()
-            mock_delete.returncode = 0
-            mock_delete.communicate = AsyncMock(
-                return_value=(b"Connection deleted", b"")
-            )
-            mock_subprocess.return_value = mock_delete
-
-            result = await manager.forget_network(1)
-
-            assert result is True
-
-    @pytest.mark.asyncio
-    async def test_forget_current_network_fails(self):
-        """Test that forgetting the current network is prevented"""
-        manager = WiFiManager(development_mode=False)
-
-        with patch.object(manager, "list_saved_networks") as mock_list:
-            mock_list.return_value = [{"id": 0, "ssid": "HomeWiFi", "current": True}]
-
-            result = await manager.forget_network(0)
+            result = await manager.forget_network("NoSuchProfile")
 
             assert result is False
+            mock_subprocess.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_forget_current_network_disconnects_first(self):
+        """Forgetting the active network disconnects before deleting"""
+        manager = WiFiManager(development_mode=False)
+        calls = []
+
+        async def spawn(*args, **kwargs):
+            calls.append(args)
+            proc = AsyncMock()
+            proc.returncode = 0
+            proc.communicate = AsyncMock(return_value=(b"", b""))
+            return proc
+
+        with (
+            patch.object(manager, "list_saved_networks") as mock_list,
+            patch("asyncio.create_subprocess_exec", side_effect=spawn),
+        ):
+            mock_list.return_value = [
+                {"id": 0, "ssid": "HomeWiFi", "connection_name": "HomeWiFi", "current": True},
+            ]
+
+            result = await manager.forget_network("HomeWiFi")
+
+            assert result is True
+            assert any("disconnect" in a for a in calls)
+            disconnect_idx = next(i for i, a in enumerate(calls) if "disconnect" in a)
+            delete_idx = next(i for i, a in enumerate(calls) if "delete" in a)
+            assert disconnect_idx < delete_idx
 
 
 class TestWiFiManagerHelpers:

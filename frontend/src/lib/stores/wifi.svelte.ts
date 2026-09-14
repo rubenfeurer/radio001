@@ -251,12 +251,14 @@ export const getSavedNetworks = async () => {
 	}
 };
 
-export const forgetNetwork = async (networkId: number, ssid: string): Promise<boolean> => {
+export const forgetNetwork = async (connectionName: string, ssid: string): Promise<boolean> => {
 	wifiState.isLoadingSaved = true;
 	wifiState.error = null;
 
 	try {
-		const response = await fetch(`/api/wifi/saved/${networkId}`, { method: 'DELETE' });
+		const response = await fetch(`/api/wifi/saved/${encodeURIComponent(connectionName)}`, {
+			method: 'DELETE'
+		});
 		if (!response.ok) {
 			const result = await response.json();
 			throw new Error(result.detail || `HTTP ${response.status}`);

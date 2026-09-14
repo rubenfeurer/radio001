@@ -6,23 +6,67 @@ export const radioState = $state({
 	currentStation: null as RadioStation | null,
 	volume: 50,
 	isPlaying: false,
-	playbackStatus: null as PlaybackStatus | null
+	playbackStatus: null as PlaybackStatus | null,
+	error: null as string | null
 });
+
+// While the user drags a volume slider, WS volume_update echoes of earlier
+// values must not snap the bound slider backwards; external changes (rotary
+// encoder) still apply when idle.
+let volumeDragging = false;
+let volumeDragGraceTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function setVolumeDragging(dragging: boolean) {
+	if (volumeDragGraceTimer) {
+		clearTimeout(volumeDragGraceTimer);
+		volumeDragGraceTimer = null;
+	}
+	if (dragging) {
+		volumeDragging = true;
+	} else {
+		// Short grace period so in-flight echoes of drag values are ignored
+		volumeDragGraceTimer = setTimeout(() => {
+			volumeDragging = false;
+			volumeDragGraceTimer = null;
+		}, 500);
+	}
+}
+
+async function extractError(response: Response, fallback: string): Promise<string> {
+	try {
+		const body = await response.json();
+		return body.detail || body.message || fallback;
+	} catch {
+		return fallback;
+	}
+}
 
 export async function toggleStation(slot: number) {
 	try {
-		await fetch(`/api/radio/stations/${slot}/toggle`, { method: 'POST' });
+		const response = await fetch(`/api/radio/stations/${slot}/toggle`, { method: 'POST' });
+		if (!response.ok) {
+			radioState.error = await extractError(response, `Could not play station ${slot}`);
+			return;
+		}
+		radioState.error = null;
 		setTimeout(() => fetchStatus(), 500);
 	} catch (e) {
+		radioState.error = `Could not reach the radio (station ${slot})`;
 		console.error('Failed to toggle station:', e);
 	}
 }
 
 export async function stopPlayback() {
 	try {
-		await fetch('/api/radio/stop', { method: 'POST' });
+		const response = await fetch('/api/radio/stop', { method: 'POST' });
+		if (!response.ok) {
+			radioState.error = await extractError(response, 'Could not stop playback');
+			return;
+		}
+		radioState.error = null;
 		setTimeout(() => fetchStatus(), 500);
 	} catch (e) {
+		radioState.error = 'Could not reach the radio to stop playback';
 		console.error('Failed to stop playback:', e);
 	}
 }
@@ -30,12 +74,18 @@ export async function stopPlayback() {
 export async function setVolume(newVolume: number) {
 	radioState.volume = newVolume;
 	try {
-		await fetch('/api/radio/volume', {
+		const response = await fetch('/api/radio/volume', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ volume: newVolume })
 		});
+		if (!response.ok) {
+			radioState.error = await extractError(response, 'Could not set volume');
+			return;
+		}
+		radioState.error = null;
 	} catch (e) {
+		radioState.error = 'Could not reach the radio to set volume';
 		console.error('Failed to set volume:', e);
 	}
 }
@@ -76,6 +126,7 @@ export async function fetchStatus() {
 }
 
 export function updateVolume(newVolume: number) {
+	if (volumeDragging) return;
 	radioState.volume = newVolume;
 }
 

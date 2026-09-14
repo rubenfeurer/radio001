@@ -107,33 +107,39 @@ class StationManager:
                 logger.info(f"Loaded default station for slot {slot}: {self._default_stations[slot].name}")
 
     async def _save_stations(self):
-        """Save current stations to JSON file."""
+        """Save current stations to JSON file (acquires the lock)."""
         async with self._lock:
-            try:
-                # Ensure directory exists
-                self.stations_file.parent.mkdir(parents=True, exist_ok=True)
+            await self._save_stations_locked()
 
-                # Convert stations to serializable format
-                data = {}
-                for slot, station in self._stations.items():
-                    if station:
-                        data[str(slot)] = station.model_dump()
-                    else:
-                        data[str(slot)] = None
+    async def _save_stations_locked(self):
+        """Save current stations to JSON file. Caller must hold self._lock
+        (asyncio.Lock is non-reentrant — calling _save_stations from inside
+        a locked block would deadlock)."""
+        try:
+            # Ensure directory exists
+            self.stations_file.parent.mkdir(parents=True, exist_ok=True)
 
-                # Write to file atomically
-                temp_file = self.stations_file.with_suffix('.tmp')
-                with open(temp_file, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
+            # Convert stations to serializable format
+            data = {}
+            for slot, station in self._stations.items():
+                if station:
+                    data[str(slot)] = station.model_dump()
+                else:
+                    data[str(slot)] = None
 
-                # Atomic replace
-                temp_file.replace(self.stations_file)
+            # Write to file atomically
+            temp_file = self.stations_file.with_suffix('.tmp')
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
 
-                logger.info(f"Stations saved to {self.stations_file}")
+            # Atomic replace
+            temp_file.replace(self.stations_file)
 
-            except Exception as e:
-                logger.error(f"Error saving stations: {e}", exc_info=True)
-                raise
+            logger.info(f"Stations saved to {self.stations_file}")
+
+        except Exception as e:
+            logger.error(f"Error saving stations: {e}", exc_info=True)
+            raise
 
     # =============================================================================
     # Public API Methods
@@ -360,9 +366,7 @@ class StationManager:
             True if import was successful
         """
         try:
-            # Use asyncio wait_for to prevent hanging
-            async def _import_with_lock():
-                async with self._lock:
+            async with self._lock:
                     stations_data = data.get("stations", {})
 
                     for slot_str, station_data in stations_data.items():
@@ -393,17 +397,10 @@ class StationManager:
                             logger.warning(f"Failed to process slot {slot_str}: {e}")
                             continue
 
-                    await self._save_stations()
+                    await self._save_stations_locked()
                     logger.info("Stations imported successfully")
                     return True
 
-            # Use wait_for with timeout to prevent hanging
-            await asyncio.wait_for(_import_with_lock(), timeout=10.0)
-            return True
-
-        except asyncio.TimeoutError:
-            logger.error("Import stations operation timed out")
-            return False
         except Exception as e:
             logger.error(f"Error importing stations: {e}", exc_info=True)
             return False

@@ -20,6 +20,8 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from core.models import ApiResponse
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -126,29 +128,25 @@ async def get_system_metrics() -> Dict[str, Any]:
     except Exception as e:
         logger.debug(f"Could not read CPU temperature: {e}")
 
-    # Get WiFi status (import here to avoid circular dependency)
-    try:
-        from core.wifi_manager import WiFiManager
+    # Get WiFi status from the manager injected via set_system_wifi_manager().
+    # Constructing a throwaway WiFiManager here would spawn ~4 nmcli
+    # subprocesses per 5 s metrics tick, forever.
+    if wifi_manager is None:
+        logger.debug("No WiFi manager injected — omitting WiFi metrics")
+    else:
+        try:
+            wifi_status = await wifi_manager.get_status()
 
-        # Get the wifi_manager instance from main
-        # Since we can't import wifi_manager from main directly, create a temporary instance
-        wifi_mgr = WiFiManager(
-            interface=os.getenv("WIFI_INTERFACE", "wlan0"),
-            host_mode_file=Path("/etc/raspiwifi/host_mode"),
-            development_mode=os.getenv("NODE_ENV") == "development",
-        )
-        wifi_status = await wifi_mgr.get_status()
-
-        metrics["network"]["wifi"] = {
-            "wifiInterface": "wlan0",
-            "status": "connected" if wifi_status.connected else "disconnected",
-            "ssid": wifi_status.ssid,
-            "ip": wifi_status.ip_address,
-            "signal": wifi_status.signal_strength,
-            "mode": wifi_status.mode,
-        }
-    except Exception as e:
-        logger.warning(f"Could not get WiFi status: {e}")
+            metrics["network"]["wifi"] = {
+                "wifiInterface": wifi_manager.interface,
+                "status": "connected" if wifi_status.connected else "disconnected",
+                "ssid": wifi_status.ssid,
+                "ip": wifi_status.ip_address,
+                "signal": wifi_status.signal_strength,
+                "mode": wifi_status.mode,
+            }
+        except Exception as e:
+            logger.warning(f"Could not get WiFi status: {e}")
 
     return metrics
 
@@ -191,13 +189,6 @@ async def get_version():
     }
 
 
-class ApiResponse(BaseModel):
-    """Standard API response"""
-
-    success: bool
-    message: str
-    data: Any = None
-
 
 @router.post(
     "/hotspot-mode", response_model=ApiResponse, summary="Switch to hotspot mode"
@@ -227,7 +218,9 @@ async def activate_hotspot_mode():
             host_mode_file=Path("/etc/raspiwifi/host_mode"),
             development_mode=os.getenv("NODE_ENV") == "development",
             hotspot_ssid=os.getenv("HOTSPOT_SSID", "Radio-Setup"),
-            hotspot_password=os.getenv("HOTSPOT_PASSWORD", "Configure123!"),
+            # Single documented dev/CI default; real installs generate a
+            # random password into radio.conf (install.sh)
+            hotspot_password=os.getenv("HOTSPOT_PASSWORD", "radio123"),
             hotspot_ip=os.getenv("HOTSPOT_IP", "192.168.4.1"),
         )
 
@@ -241,7 +234,7 @@ async def activate_hotspot_mode():
             data={
                 "action": "hotspot_activated",
                 "mode": "hotspot",
-                "instructions": "Connect to 'Radio-Setup' WiFi and navigate to http://192.168.4.1",
+                "instructions": "Connect to 'Radio-Setup' WiFi and navigate to http://192.168.4.1:8000",
             },
         )
     except Exception as e:

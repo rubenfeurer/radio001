@@ -18,8 +18,8 @@ services:
       - ../config/radio.conf:/app/config/radio.conf:ro
       # Data directory for station storage (mounts to /app/data since workdir is /app)
       - ../data:/app/data:rw
-      # Station library and sounds from canonical config location
-      - ../config/stations.json:/app/assets/stations.json:ro
+      # Sounds overlay (station library comes from the ../backend source
+      # mount at /app/assets/stations.json — the canonical location)
       - ../config/sounds:/app/assets/sounds:ro
       # Python cache
       - radio_python_cache:/root/.cache/pip
@@ -31,9 +31,6 @@ services:
       - /run/dbus:/run/dbus:rw
       - /var/run/dbus:/var/run/dbus:rw
       - /etc/raspiwifi:/etc/raspiwifi:rw
-
-      # PolicyKit configuration for NetworkManager authorization
-      - ../config/polkit:/etc/polkit-1/localauthority/50-local.d:ro
 
       # Device access for WiFi management
       - /dev:/dev:rw
@@ -67,39 +64,6 @@ services:
 
   # Note: Frontend now runs locally with 'npm run dev:frontend'
   # Use 'docker-compose -f docker-compose.prod.yml up' for production deployment
-
-  # Optional: Traefik for local .local domain routing
-  traefik:
-    image: traefik:v3.0
-    container_name: radio-traefik
-    command:
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-    network_mode: host
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    profiles:
-      - traefik
-    restart: unless-stopped
-
-  # Optional: Avahi for mDNS (only on Linux hosts)
-  avahi:
-    image: solidnerd/avahi:latest
-    container_name: radio-avahi
-    hostname: radio
-    network_mode: host
-    environment:
-      - AVAHI_HOST_NAME=radio
-      - AVAHI_SERVICES=http:8000:path=/api
-    volumes:
-      - ../config/avahi:/etc/avahi:ro
-    profiles:
-      - mdns
-    restart: unless-stopped
-    depends_on:
-      - radio-backend
 
 # Named volumes for development
 volumes:

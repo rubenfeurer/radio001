@@ -257,22 +257,12 @@ class TestStationManager:
         is_empty = await station_manager.is_slot_empty(1)
         assert is_empty is False
 
-    @patch('aiohttp.ClientSession.get')
-    async def test_validate_station_url(self, mock_get, station_manager):
-        """Test station URL validation."""
-        # Mock successful HTTP response
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_get.return_value.__aenter__.return_value = mock_response
-
-        # Test valid URL
-        is_valid = await station_manager.validate_station_url("https://valid.example.com/stream")
-        # In mock mode, this might always return True
-        # The actual behavior depends on implementation
-
-        # Test invalid URL format
-        is_valid = await station_manager.validate_station_url("not-a-url")
-        # Should handle gracefully
+    async def test_validate_station_url(self, station_manager):
+        """Test station URL validation (string-based, no HTTP)."""
+        assert await station_manager.validate_station_url(
+            "https://valid.example.com/stream"
+        ) is True
+        assert await station_manager.validate_station_url("not-a-url") is False
 
     async def test_persistence_across_instances(self, temp_data_dir):
         """Test station persistence across manager instances."""
@@ -364,13 +354,37 @@ class TestStationManager:
             }
         }
 
+        import time
+        start = time.monotonic()
         success = await station_manager.import_stations(import_data)
-        # Implementation may vary - test based on actual method
+        elapsed = time.monotonic() - start
 
-        if hasattr(station_manager, 'import_stations'):
-            # Verify import worked if method exists
-            station = await station_manager.get_station(1)
-            # Test based on implementation
+        # Regression: the old implementation self-deadlocked on its own
+        # non-reentrant lock, hanging 10 s and returning False every time
+        assert success is True
+        assert elapsed < 1.0, f"import took {elapsed:.1f}s — lock deadlock is back"
+
+        station = await station_manager.get_station(1)
+        assert station is not None
+        assert station.name == "Imported Station"
+        assert station.url == "https://imported.example.com/stream"
+
+        # Import must persist: a fresh manager reading the same file sees it
+        from core.station_manager import StationManager
+        reloaded = StationManager(station_manager.stations_file)
+        await reloaded.initialize()
+        persisted = await reloaded.get_station(1)
+        assert persisted is not None
+        assert persisted.name == "Imported Station"
+
+    async def test_import_stations_invalid_payload_returns_false(self, station_manager):
+        """Invalid payloads fail fast without hanging."""
+        import time
+        start = time.monotonic()
+        success = await station_manager.import_stations({"stations": "not-a-dict"})
+        elapsed = time.monotonic() - start
+        assert success is False
+        assert elapsed < 1.0
 
     async def test_default_stations_loading(self, temp_data_dir):
         """Test that default stations are loaded correctly."""

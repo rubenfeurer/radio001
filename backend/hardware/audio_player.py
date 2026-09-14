@@ -98,12 +98,15 @@ class AudioPlayer:
                 except Exception as e:
                     logger.warning(f"Pre-cache failed for {url}: {e}")
 
-    async def play(self, url: str) -> bool:
+    async def play(self, url: str, refresh_cache: bool = False) -> bool:
         """
         Start playing an audio stream.
 
         Args:
             url: Stream URL to play
+            refresh_cache: Skip the resolved-URL cache and re-resolve (used by
+                reconnect attempts, where an expired redirect is a likely cause
+                of the previous failure)
 
         Returns:
             True if playback started successfully
@@ -122,9 +125,11 @@ class AudioPlayer:
 
             logger.info(f"Starting playback: {url}")
 
-            # Check cache first; resolve and cache on miss.
-            async with self._cache_lock:
-                resolved_url = self._url_cache.get(url)
+            # Check cache first; resolve and cache on miss (or forced refresh).
+            resolved_url = None
+            if not refresh_cache:
+                async with self._cache_lock:
+                    resolved_url = self._url_cache.get(url)
             if resolved_url:
                 logger.debug(f"Cache hit: {url}")
             else:
@@ -138,10 +143,12 @@ class AudioPlayer:
             else:
                 alsa_device = os.getenv("ALSA_DEVICE", "hw:Headphones")
                 cmd = ["mpg123", "-o", "alsa", "-a", alsa_device, "--quiet", resolved_url]
+            # stderr goes to DEVNULL: an undrained pipe would fill up and wedge
+            # mpg123 mid-stream; exit detection comes from process.wait().
             self._process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
             )
             self._current_url = url
             self._is_playing = True
@@ -202,27 +209,6 @@ class AudioPlayer:
             self._process = None
             await self._notify_status_change()
             return False
-
-    async def pause(self) -> bool:
-        """
-        Pause current playback. For streaming audio, pause is equivalent to stop.
-
-        Returns:
-            True if paused successfully
-        """
-        return await self.stop()
-
-    async def resume(self) -> bool:
-        """
-        Resume paused playback. Re-starts the stream from the current URL.
-
-        Returns:
-            True if resumed successfully
-        """
-        if self._current_url:
-            return await self.play(self._current_url)
-        logger.warning("Cannot resume: no URL to resume")
-        return False
 
     async def set_volume(self, volume: int) -> bool:
         """
@@ -331,24 +317,6 @@ class AudioPlayer:
         """Get current volume level."""
         return self._volume
 
-    def is_playing(self) -> bool:
-        """Check if audio is currently playing."""
-        return self._is_playing
-
-    def get_current_url(self) -> Optional[str]:
-        """Get currently playing stream URL."""
-        return self._current_url
-
-    async def get_playback_info(self) -> dict:
-        """Get detailed playback information."""
-        return {
-            "is_playing": self._is_playing,
-            "current_url": self._current_url,
-            "volume": self._volume,
-            "mock_mode": self.mock_mode,
-            "initialized": self._is_initialized,
-        }
-
     async def _monitor_process(self, process: asyncio.subprocess.Process):
         """Monitor the mpg123 process and update state if it exits unexpectedly."""
         try:
@@ -362,46 +330,27 @@ class AudioPlayer:
                 self._is_playing = False
                 self._current_url = None
                 self._process = None
-                await self._notify_status_change()
+                await self._notify_status_change(unexpected_exit=True)
 
-    async def _notify_status_change(self):
-        """Notify status callback of playback changes."""
+    async def _notify_status_change(self, unexpected_exit: bool = False):
+        """Notify status callback of playback changes.
+
+        Args:
+            unexpected_exit: Set only by the process monitor when mpg123 died
+                without a stop() we initiated — lets the owner distinguish an
+                outage from a normal transition.
+        """
         if self.status_callback:
             try:
                 status = {
                     "is_playing": self._is_playing,
                     "current_url": self._current_url,
                     "volume": self._volume,
+                    "unexpected_exit": unexpected_exit,
                 }
                 await self.status_callback(status)
             except Exception as e:
                 logger.error(f"Error in status callback: {e}", exc_info=True)
-
-    async def test_playback(self, url: str = None) -> bool:
-        """
-        Test audio playback with a test stream.
-
-        Args:
-            url: Optional test URL (uses default if None)
-
-        Returns:
-            True if test was successful
-        """
-        test_url = url or "https://stream.srg-ssr.ch/m/rsj/mp3_128"
-        logger.info(f"Testing audio playback with: {test_url}")
-        try:
-            success = await self.play(test_url)
-            if success:
-                await asyncio.sleep(2)
-                await self.stop()
-                logger.info("Audio playback test successful")
-                return True
-            else:
-                logger.error("Audio playback test failed")
-                return False
-        except Exception as e:
-            logger.error(f"Audio playback test error: {e}", exc_info=True)
-            return False
 
     async def cleanup(self):
         """Cleanup audio player resources."""

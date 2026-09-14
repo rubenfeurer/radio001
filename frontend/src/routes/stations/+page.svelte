@@ -11,12 +11,15 @@
 	let query = $state('');
 	let loading = $state(true);
 	let saving = $state(false);
+	let saveError = $state<string | null>(null);
 	let searchInput = $state<HTMLInputElement | null>(null);
 
 	$effect(() => {
-		slot = $page.url.searchParams.has('slot')
-			? parseInt($page.url.searchParams.get('slot')!, 10)
-			: null;
+		// Only integers 1-3 are valid slots; anything else (including NaN
+		// from ?slot=abc) means browse-only mode — never a NaN request URL
+		const raw = $page.url.searchParams.get('slot');
+		const parsed = raw !== null ? parseInt(raw, 10) : NaN;
+		slot = Number.isInteger(parsed) && parsed >= 1 && parsed <= 3 ? parsed : null;
 	});
 
 	const q = $derived(query.toLowerCase().trim());
@@ -63,15 +66,27 @@
 	async function selectStation(station: RadioStation) {
 		if (slot === null) return;
 		saving = true;
+		saveError = null;
 		try {
-			await fetch(`/api/radio/stations/${slot}`, {
+			const assignResponse = await fetch(`/api/radio/stations/${slot}`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ name: station.name, url: station.url, slot })
 			});
+			if (!assignResponse.ok) {
+				// Failure must not look like success: stay here, show the error
+				saveError = `Could not save "${station.name}" to slot ${slot}`;
+				saving = false;
+				return;
+			}
+			// Play failure is surfaced by the homepage's error/state display;
+			// the assignment itself succeeded, so navigating home is correct
 			await fetch(`/api/radio/stations/${slot}/play`, { method: 'POST' });
 		} catch (e) {
 			console.error('Failed to save/play station:', e);
+			saveError = `Could not save "${station.name}" — is the radio reachable?`;
+			saving = false;
+			return;
 		}
 		goto('/');
 	}
@@ -93,6 +108,11 @@
 					{slot !== null ? `Slot ${slot} — Pick a Station` : 'Station Library'}
 				</h1>
 			</div>
+			{#if saveError}
+				<div class="pb-3">
+					<p class="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{saveError}</p>
+				</div>
+			{/if}
 			<!-- Search -->
 			<div class="pb-4">
 				<input

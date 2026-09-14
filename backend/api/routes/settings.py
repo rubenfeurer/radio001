@@ -10,11 +10,14 @@ import asyncio
 import fcntl
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator, model_validator
+
+from core.config import parse_conf_lines
 
 logger = logging.getLogger(__name__)
 
@@ -54,39 +57,40 @@ def _conf_path() -> Path:
 
 def _read_conf(path: Path) -> Dict[str, str]:
     """Return allowlisted key→value pairs from radio.conf."""
-    result: Dict[str, str] = {}
     with open(path, "r") as f:
         fcntl.flock(f, fcntl.LOCK_SH)
         try:
-            for line in f:
-                stripped = line.strip()
-                if not stripped or stripped.startswith("#"):
-                    continue
-                if "=" not in stripped:
-                    continue
-                key, _, value = stripped.partition("=")
-                key = key.strip()
-                if key in ALLOWLIST:
-                    result[key] = value.strip()
+            parsed = parse_conf_lines(f)
         finally:
             fcntl.flock(f, fcntl.LOCK_UN)
-    return result
+    return {k: v for k, v in parsed.items() if k in ALLOWLIST}
 
 
 def _write_conf(path: Path, updates: Dict[str, str]) -> List[str]:
     """
-    Write only the keys in `updates` back to radio.conf in-place.
-    Returns list of keys that were actually changed.
+    Write only the keys in `updates` back to radio.conf atomically
+    (tmp file in the same directory + rename, so power loss mid-write
+    can never leave a truncated file). Returns keys actually changed.
     """
+    # Defence-in-depth: a newline in a value would inject arbitrary
+    # KEY=VALUE lines that main._load_radio_conf() loads into os.environ.
+    for key, value in updates.items():
+        if "\n" in value or "\r" in value:
+            raise ValueError(f"Control characters not allowed in value for {key}")
+
     changed: List[str] = []
 
-    with open(path, "r+") as f:
-        fcntl.flock(f, fcntl.LOCK_EX)
+    # Dedicated lock file serialises writers across the whole
+    # read → write-tmp → rename sequence (the conf file itself gets
+    # replaced by the rename, so its own inode can't carry the lock).
+    lock_path = path.with_name(path.name + ".lock")
+    with open(lock_path, "w") as lock_f:
+        fcntl.flock(lock_f, fcntl.LOCK_EX)
         try:
-            lines = f.readlines()
-            new_lines = []
-            written = set()
+            with open(path, "r") as f:
+                lines = f.readlines()
 
+            new_lines = []
             for line in lines:
                 stripped = line.strip()
                 if stripped and not stripped.startswith("#") and "=" in stripped:
@@ -95,20 +99,26 @@ def _write_conf(path: Path, updates: Dict[str, str]) -> List[str]:
                         old_val = stripped.partition("=")[2].strip()
                         new_val = updates[key]
                         if old_val != new_val:
-                            # Preserve any inline comment after the value
                             new_lines.append(f"{key}={new_val}\n")
                             changed.append(key)
                         else:
                             new_lines.append(line)
-                        written.add(key)
                         continue
                 new_lines.append(line)
 
-            f.seek(0)
-            f.writelines(new_lines)
-            f.truncate()
+            tmp = path.with_name(path.name + ".tmp")
+            try:
+                with open(tmp, "w") as f:
+                    f.writelines(new_lines)
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.chmod(tmp, path.stat().st_mode & 0o777)
+                tmp.replace(path)
+            except BaseException:
+                tmp.unlink(missing_ok=True)
+                raise
         finally:
-            fcntl.flock(f, fcntl.LOCK_UN)
+            fcntl.flock(lock_f, fcntl.LOCK_UN)
 
     return changed
 
@@ -136,11 +146,32 @@ class SettingsPayload(BaseModel):
     LONG_PRESS_DURATION: Optional[float] = None
     TRIPLE_PRESS_INTERVAL: Optional[float] = None
 
+    @field_validator("HOTSPOT_SSID", "HOTSPOT_PASSWORD")
+    @classmethod
+    def printable_ascii_only(cls, v, info):
+        # Newlines would inject arbitrary KEY=VALUE lines into radio.conf,
+        # which is loaded into os.environ at startup; other control chars
+        # and non-ASCII break the plain key=value parseback.
+        if v is not None and not re.fullmatch(r"[\x20-\x7e]*", v):
+            raise ValueError(
+                f"{info.field_name} must contain only printable ASCII characters"
+            )
+        return v
+
+    @field_validator("HOTSPOT_SSID")
+    @classmethod
+    def ssid_length(cls, v):
+        if v is not None and not (1 <= len(v.encode("utf-8")) <= 32):
+            raise ValueError("HOTSPOT_SSID must be 1-32 bytes (802.11)")
+        return v
+
     @field_validator("HOTSPOT_PASSWORD")
     @classmethod
-    def password_min_length(cls, v):
+    def password_length(cls, v):
         if v is not None and len(v) < 8:
             raise ValueError("HOTSPOT_PASSWORD must be at least 8 characters (WPA2)")
+        if v is not None and len(v) > 63:
+            raise ValueError("HOTSPOT_PASSWORD must be at most 63 characters (WPA2)")
         return v
 
     @field_validator("DEFAULT_VOLUME", "MIN_VOLUME", "MAX_VOLUME", "NOTIFICATION_VOLUME")
