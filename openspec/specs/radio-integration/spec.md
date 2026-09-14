@@ -1,8 +1,11 @@
 ## ADDED Requirements
 
+## Purpose
+Defines requirements for radio playback integration: audio backend, stream lifecycle, status updates, and recovery.
+## Requirements
 ### Requirement: Radio Station Management
 
-The system must provide a 3-slot radio station management system with persistent storage and real-time audio streaming capabilities.
+The system MUST provide a 3-slot radio station management system with persistent storage and real-time audio streaming capabilities.
 
 #### Scenario: Station Storage and Retrieval
 
@@ -27,7 +30,7 @@ The system must provide a 3-slot radio station management system with persistent
 
 ### Requirement: Real-time Radio Status
 
-The system must provide live updates of radio playback status to connected clients without polling.
+The system must provide live updates of radio playback status to connected clients without polling, and delivery to any one client MUST NOT be blocked by another client's connection.
 
 #### Scenario: WebSocket Status Broadcasting
 
@@ -43,9 +46,23 @@ The system must provide live updates of radio playback status to connected clien
 - **AND** they receive the current station configuration
 - **AND** they are synchronized with the actual audio output state
 
+#### Scenario: Stalled Client Isolation
+
+- **WHEN** one connected WebSocket client stops reading (stalled TCP buffer) or errors during a broadcast
+- **THEN** each individual send SHALL be bounded by a per-send timeout
+- **AND** the stalled or failed connection SHALL be removed from the active connection set
+- **AND** all other connected clients SHALL still receive the broadcast message
+- **AND** subsequent broadcasts SHALL proceed without the removed connection
+
+#### Scenario: Consistent Connection-Set Access
+
+- **WHEN** broadcasts, connects, and disconnects occur concurrently
+- **THEN** all reads and mutations of the active connection set SHALL be serialized under the connection manager's lock (snapshots may be taken under the lock and sends performed outside it)
+- **AND** the lock SHALL NOT be held while awaiting a network send
+
 ### Requirement: Hardware Controls Integration
 
-The system must support physical hardware controls for radio operation without requiring the web interface.
+The system MUST support physical hardware controls for radio operation without requiring the web interface.
 
 #### Scenario: Hardware Button Control
 
@@ -84,12 +101,13 @@ The system must support physical hardware controls for radio operation without r
 
 ### Requirement: Audio Backend Integration
 
-The system must provide reliable audio streaming using mpg123 (subprocess) with amixer for ALSA volume control.
+The system must provide reliable audio streaming using mpg123 (subprocess) with amixer for ALSA volume control. The mpg123 subprocess SHALL be spawned with both stdout and stderr redirected to `DEVNULL` (or actively drained) so that unread pipe buffers can never stall playback. Unexpected subprocess exits SHALL be reported to `RadioManager` via the `AudioPlayer` status callback.
 
 #### Scenario: Stream Initialization
 
 - **WHEN** a radio station is selected for playback
 - **THEN** a mpg123 subprocess is spawned with the stream URL
+- **AND** the subprocess's stdout and stderr are redirected to `DEVNULL` (no unread `PIPE` is left attached)
 - **AND** connection failures are handled gracefully with user feedback
 - **AND** the process is monitored for unexpected exits
 
@@ -103,13 +121,20 @@ The system must provide reliable audio streaming using mpg123 (subprocess) with 
 #### Scenario: Stream Recovery
 
 - **WHEN** an active radio stream fails or the mpg123 process exits unexpectedly
-- **THEN** the system updates playback state to reflect the failure
-- **AND** it provides clear status updates about connection state
-- **AND** it falls back to stopped state
+- **THEN** the `AudioPlayer` process monitor invokes the status callback wired into `RadioManager`, marking the exit as unexpected
+- **AND** `RadioManager` updates its playback state to `connecting` (keeping the current station) and broadcasts the change over WebSocket
+- **AND** automatic reconnection is attempted per the Stream Auto-Reconnect requirement
+- **AND** if reconnection ultimately fails, the system enters `error` state rather than silently claiming to be playing
+
+#### Scenario: Exit during user-initiated stop is not a failure
+
+- **WHEN** the mpg123 process exits because `stop()` (or a station switch) terminated it
+- **THEN** no unexpected-exit event is raised
+- **AND** no reconnection is attempted
 
 ### Requirement: Station Persistence
 
-The system must reliably store and retrieve radio station configurations across system restarts.
+The system MUST reliably store and retrieve radio station configurations across system restarts.
 
 #### Scenario: Station Data Storage
 
@@ -190,3 +215,84 @@ The system SHALL persist the active station slot and volume to a JSON state file
 - **WHEN** the state file is written
 - **THEN** the system writes to a `.tmp` file first and then renames it to the target path
 - **AND** a partial write cannot leave the state file in a corrupt state
+
+### Requirement: Stream Auto-Reconnect
+
+The system SHALL automatically attempt to reconnect an interrupted stream after an unexpected mpg123 exit, using a bounded number of retries with increasing backoff delays. After the retry budget is exhausted, the system SHALL give up: set playback state to `error`, broadcast the state over WebSocket, and play the error notification sound once. User commands SHALL always take precedence over an in-flight reconnect.
+
+#### Scenario: Reconnect succeeds within retry budget
+
+- **WHEN** a stream dies unexpectedly and a reconnect attempt succeeds before the retry budget (default 5 attempts with backoff of 1s, 2s, 4s, 8s, 15s) is exhausted
+- **THEN** playback resumes on the same station slot
+- **AND** playback state returns to `playing` and is broadcast over WebSocket
+- **AND** no error sound is played
+
+#### Scenario: Reconnect gives up after bounded retries
+
+- **WHEN** all reconnect attempts for an outage fail
+- **THEN** playback state is set to `error` with `is_playing` false, keeping `current_station` so clients can show which station failed
+- **AND** the state change is broadcast over WebSocket
+- **AND** the error notification sound is played exactly once
+
+#### Scenario: Stale cached URL is re-resolved during reconnect
+
+- **WHEN** a reconnect attempt follows an unexpected exit
+- **THEN** the stream URL is re-resolved (bypassing the pre-cached redirect URL) on retry, so an expired redirect cannot make every attempt fail
+
+#### Scenario: User command cancels reconnect
+
+- **WHEN** the user issues stop or selects a station (via button, API, or UI) while a reconnect is in progress
+- **THEN** the in-flight reconnect task is cancelled before the command is executed
+- **AND** the user's command takes effect normally
+
+#### Scenario: Button press on a dead session restarts instead of stopping
+
+- **WHEN** the station button for the current slot is pressed while that slot is in `connecting` (reconnecting) or `error` state
+- **THEN** `toggle_station` treats the slot as not playing and starts fresh playback of that slot
+- **AND** it never issues a stop against the dead session
+
+### Requirement: Notification Sound Playback
+
+The system SHALL play notification chimes (WAV files) through a WAV-capable player matching the active audio backend — `paplay` when the PipeWire/PulseAudio socket is available, `aplay` on the direct-ALSA fallback — never through mpg123. The `volume` parameter of `SoundManager.play_sound` SHALL be honored on backends that support per-invocation volume (`paplay`), and documented as best-effort where the backend does not (`aplay`).
+
+#### Scenario: Chime playback via PipeWire backend
+
+- **WHEN** a notification sound is played and the PipeWire/PulseAudio socket is present
+- **THEN** the WAV file is played via `paplay`
+- **AND** the requested volume (0-100) is mapped to `paplay --volume` (0-65536) and applied
+
+#### Scenario: Chime playback via ALSA fallback
+
+- **WHEN** a notification sound is played and no PipeWire/PulseAudio socket is present
+- **THEN** the WAV file is played via `aplay` against the configured ALSA device
+
+#### Scenario: Player availability probe at initialization
+
+- **WHEN** `SoundManager.initialize()` runs outside mock mode
+- **THEN** it verifies the WAV-capable player for the detected backend is available (both `aplay` and `paplay` are installed by `docker/Dockerfile.backend`)
+- **AND** it falls back to mock mode (logging a warning) if no suitable player is found
+
+### Requirement: Truthful Mutating API Responses
+
+Mutating radio API endpoints (volume set, station play/toggle) SHALL execute the requested action before responding, and the response SHALL reflect the actual outcome. The API SHALL NOT report success for an action that has not yet run or that failed.
+
+#### Scenario: Volume set reflects actual outcome
+
+- **WHEN** a client calls `POST /api/radio/volume`
+- **THEN** the server SHALL await the volume change before responding
+- **AND** respond with `success=True` and the applied (limit-clamped) volume only if the audio backend accepted the change
+- **AND** respond with an error (`success=False` or HTTP 5xx) if the volume change failed
+
+#### Scenario: Station toggle reflects actual resulting state
+
+- **WHEN** a client calls `POST /api/radio/stations/{slot}/play`
+- **THEN** the server SHALL await the toggle before responding
+- **AND** the response action ("started" or "stopped") SHALL be derived from the state before mutation together with the toggle's actual result, never computed after scheduling a background task
+- **AND** the response SHALL report the resulting playback state for the slot
+- **AND** a failed stream start SHALL NOT be reported as started
+
+#### Scenario: No fire-and-forget success
+
+- **WHEN** any mutating radio endpoint handles a request
+- **THEN** it SHALL NOT schedule the state change as a background task and return success beforehand
+

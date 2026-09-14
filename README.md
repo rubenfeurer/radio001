@@ -96,6 +96,11 @@ radio001/
 # Backend (Docker)
 docker compose -f docker/compose.dev.yml up radio-backend -d
 
+# Backend (bare-metal alternative, no Docker — GPIO/WiFi/audio mocked)
+python3 -m venv .venv
+.venv/bin/pip install --require-hashes -r backend/requirements.lock -r backend/requirements-test.txt
+cd backend && NODE_ENV=development ../.venv/bin/python -m uvicorn main:app --port 8000
+
 # Frontend (local)
 cd frontend && npm install && npm run dev
 # → http://localhost:3000
@@ -122,13 +127,20 @@ Interactive docs at `http://<pi-ip>:8000/docs`
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/radio/status` | Current play state, volume, active slot |
+| GET | `/api/radio/library` | Full station library (28k+ stations) |
 | GET | `/api/radio/stations/` | All 3 station slots |
+| POST | `/api/radio/stations/{slot}` | Save station to slot |
 | POST | `/api/radio/stations/{slot}/play` | Play station in slot |
 | POST | `/api/radio/stations/{slot}/toggle` | Toggle playback for slot |
 | POST | `/api/radio/volume` | Set volume |
-| POST | `/api/radio/stations/{slot}` | Save station to slot |
+| POST | `/api/radio/stop` | Stop playback |
 | GET | `/api/wifi/status` | WiFi connection status |
+| POST | `/api/wifi/scan` | Scan for networks |
 | POST | `/api/wifi/connect` | Connect to network |
+| GET | `/api/wifi/saved` | List saved networks |
+| DELETE | `/api/wifi/saved/{connection_name}` | Forget saved network (by NM connection name, URL-encoded) |
+| GET/PUT | `/api/system/settings` | Read/write radio.conf settings |
+| GET | `/api/system/version` | Running image version |
 | POST | `/api/system/hotspot-mode` | Switch to hotspot AP |
 | GET | `/health` | Health check |
 | WS | `/ws/` | Real-time status updates |

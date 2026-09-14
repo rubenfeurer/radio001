@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Frontend Design System
+
+## Purpose
+Defines requirements for the frontend design system: shadcn-svelte components, styling, and UI consistency.
+
+## Requirements
 
 ### Requirement: shadcn-svelte component library is installed and configured
 The system SHALL use shadcn-svelte as the UI component library with components copied into `src/lib/components/ui/`. Tailwind CSS SHALL be configured to use shadcn CSS variables for theming. The default neutral (black/white) palette SHALL be used.

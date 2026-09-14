@@ -88,7 +88,7 @@ No GHCR write access is needed at any point; do **not** re-tag old digests as `:
 
 ```
 /opt/radio/
-├── docker-compose.yml    # Written by install.sh; references GHCR image
+├── docker-compose.yml    # Downloaded from docker/compose.prod.yml by install.sh
 ├── config/
 │   └── radio.conf        # User-editable config (never overwritten by updates)
 └── data/                 # Station data, radio state (persisted across updates)
@@ -113,13 +113,14 @@ The script (`scripts/install.sh`) is fully self-contained — no git clone, Node
 
 1. Installs Docker if not already present
 2. Creates `/opt/radio/config/` and `/opt/radio/data/`
-2. Writes `/opt/radio/docker-compose.yml` (references GHCR image + Watchtower)
-3. Writes `/opt/radio/config/radio.conf` with safe defaults (skipped if file already exists)
-4. Writes `/etc/systemd/system/radio.service`
-5. Runs `docker compose pull && docker compose up -d`
-6. Runs `systemctl daemon-reload && systemctl enable --now radio.service`
+3. Downloads `docker/compose.prod.yml` from the repo to `/opt/radio/docker-compose.yml` (validated, atomic — a failed download leaves any existing file untouched)
+4. Writes `/opt/radio/config/radio.conf` with safe defaults and a **random per-device hotspot password** (skipped if the file already exists)
+5. Writes `/etc/systemd/system/radio.service`
+6. Pulls the image and sets data-dir ownership to the container user
+7. Runs `systemctl daemon-reload && systemctl enable --now radio.service`
+8. Prints the UI URLs (`:8000`) and the hotspot SSID + password in the summary
 
-The script is **idempotent** — running it again preserves `radio.conf` and all station data.
+The script is **idempotent** — running it again preserves `radio.conf` (including the generated hotspot password) and all station data. On any failure it names the failed step; re-running is safe.
 
 ---
 
