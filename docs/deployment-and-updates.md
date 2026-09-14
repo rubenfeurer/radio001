@@ -61,7 +61,26 @@ The `VERSION` build-arg is passed by CI and baked in as `ENV VERSION=<tag>`. It 
 
 `:stable` is tracked by Pi's Watchtower for nightly auto-updates and is only updated on an explicit GitHub Release. `:latest` is for manual verification on a test Pi before releasing.
 
-Trivy scans the filesystem on every CI run and uploads results to GitHub Security (SARIF). Known OS-level CVEs where the fix exists upstream but hasn't landed in Debian yet are listed in `.trivyignore`.
+Trivy scans the filesystem on every CI run and uploads results to GitHub Security (SARIF). In `release.yml` the image itself is additionally scanned **before** any tag is pushed (build → scan → push): a HIGH/CRITICAL finding with an upstream fix fails the workflow and nothing is published. Known OS-level CVEs where the fix exists upstream but hasn't landed in Debian yet are listed in `.trivyignore`.
+
+### Rolling back a bad `:stable` release
+
+Prerequisite: at least one prior tagged release (`vX.Y.Z`) exists. Semver tags are immutable — they never move after being pushed. Available versions are listed under the GHCR package versions for `ghcr.io/rubenfeurer/radio001`.
+
+Because `WATCHTOWER_CLEANUP=true` removes the previous local image after each update, rollback re-pulls the old version from GHCR:
+
+1. Edit the Pi's compose file to pin the last known-good semver tag — change `image: ghcr.io/rubenfeurer/radio001:stable` to e.g. `:v1.2.3`. The file is root-owned; use the no-sudo pattern:
+   ```bash
+   scp docker/compose.prod.yml radio-d:/tmp/docker-compose.yml   # after editing the tag locally
+   ssh radio-d "docker run --rm -v /opt/radio:/opt/radio -v /tmp:/tmp alpine cp /tmp/docker-compose.yml /opt/radio/docker-compose.yml"
+   ```
+2. Pull and restart:
+   ```bash
+   ssh radio-d "docker compose -f /opt/radio/docker-compose.yml pull && docker compose -f /opt/radio/docker-compose.yml up -d"
+   ```
+3. While pinned, Watchtower keeps checking the pinned semver tag — which never changes — so nightly updates are effectively frozen. After publishing a fixed release, revert the compose file to `:stable` and repeat step 2.
+
+No GHCR write access is needed at any point; do **not** re-tag old digests as `:stable` in the registry.
 
 ---
 
@@ -137,7 +156,6 @@ curl http://radio.local/api/system/version
 # → {"version": "v1.2.3", "image": "ghcr.io/rubenfeurer/radio001"}
 ```
 
-The version is also displayed on the Settings page of the UI.
 
 ---
 
@@ -163,7 +181,7 @@ sudo systemctl restart radio
 
 ## Required Host Devices
 
-The container declares these devices explicitly so audio and hardware access survive if `privileged: true` is ever removed:
+The container runs **unprivileged** — no `privileged: true`, no blanket `/dev` mount. Hardware access comes solely from these explicit grants (plus `cap_add: NET_ADMIN, NET_RAW` and `group_add: 986` for GPIO):
 
 | Device | Purpose |
 |--------|---------|
@@ -177,4 +195,5 @@ The container declares these devices explicitly so audio and hardware access sur
 
 - Trivy scans the codebase on every CI run; results are uploaded to GitHub Security (SARIF). Known CVEs pending Debian package distribution are listed in `.trivyignore`.
 - Dependencies are pinned with hashes in `backend/requirements.lock`; CI verifies the lock file is in sync with `requirements.in` before building
-- The radio container runs as a non-root `radio` user inside the image
+- The radio container runs as a non-root `radio` user inside the image, unprivileged, with sudo restricted to `nmcli` and the exact host-mode marker commands
+- Build inputs are pinned: base images by digest, the lgpio source archive by SHA-256 (HTTPS), frontend npm dependencies by committed lockfile (`npm ci`), and Watchtower by version tag
