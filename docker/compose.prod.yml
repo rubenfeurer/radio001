@@ -11,7 +11,6 @@ services:
       - /opt/radio/config:/app/config:rw
       - /opt/radio/data:/app/data
       - /etc/raspiwifi:/etc/raspiwifi:rw
-      - /dev:/dev:rw
       - /sys/class/net:/sys/class/net:ro
       - /run/dbus:/run/dbus:ro
       - /run/user/1000/pulse/native:/run/user/1000/pulse/native:rw
@@ -29,7 +28,6 @@ services:
     group_add:
       - "986"
     restart: unless-stopped
-    privileged: true
     cap_add:
       - NET_ADMIN
       - NET_RAW
@@ -45,7 +43,7 @@ services:
       start_period: 30s
 
   watchtower:
-    image: containrrr/watchtower
+    image: containrrr/watchtower:1.7.1
     container_name: radio-watchtower
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
