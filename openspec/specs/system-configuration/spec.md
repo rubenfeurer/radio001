@@ -1,8 +1,13 @@
-## ADDED Requirements
+# System Configuration
+
+## Purpose
+Defines requirements for system-level configuration: radio.conf format, environment loading, and defaults.
+
+## Requirements
 
 ### Requirement: System Configuration Management
 
-The system must provide a unified configuration file that controls all aspects of WiFi, radio, and system behavior with clear documentation and validation.
+The system MUST provide a unified configuration file that controls all aspects of WiFi, radio, and system behavior with clear documentation and validation.
 
 #### Scenario: Configuration File Setup
 

@@ -1,8 +1,11 @@
 ## ADDED Requirements
 
+## Purpose
+Defines requirements for WiFi management via NetworkManager: scanning, connecting, saved networks, and mode switching.
+## Requirements
 ### Requirement: WiFi Network Discovery and Connection
 
-The system must provide reliable WiFi network scanning, connection, and management capabilities using NetworkManager.
+The system must provide reliable WiFi network scanning, connection, and management capabilities using NetworkManager. Connection operations MUST NOT expose credentials via process arguments and MUST pass API-supplied SSIDs to nmcli in a position-safe form.
 
 #### Scenario: WiFi Network Scanning
 
@@ -14,8 +17,10 @@ The system must provide reliable WiFi network scanning, connection, and manageme
 
 #### Scenario: WiFi Network Connection — new network
 
-- **WHEN** a user attempts to connect to a network with no existing NM profile
-- **THEN** the system SHALL use `nmcli device wifi connect <ssid> password <pw>` to create a new profile
+- **WHEN** a user attempts to connect to a secured network with no existing NM profile
+- **THEN** the system SHALL create a profile with `nmcli connection add type wifi ... ssid <ssid>` (SSID passed as the value of the `ssid` property, never as a bare positional argument) and activate it with `nmcli connection up <name> passwd-file <path>`
+- **AND** the password SHALL NOT appear anywhere in the argv of any spawned process
+- **AND** if activation fails, the just-created profile is deleted so failed attempts do not accumulate
 - **AND** provides immediate feedback on connection success or failure
 - **AND** allows user-controlled retry rather than automatic retry loops
 - **AND** validates the connection before returning success
@@ -25,6 +30,7 @@ The system must provide reliable WiFi network scanning, connection, and manageme
 - **WHEN** a user attempts to connect to a network that has an existing NM profile
 - **THEN** the system SHALL call `list_saved_networks()` to find the exact `connection_name` for that SSID
 - **AND** if a match is found, use `nmcli connection up <connection_name>` (NOT `<ssid>`)
+- **AND** if the user supplied a new password, it SHALL be provided via `passwd-file` on `connection up` (not via `nmcli connection modify ... wifi-sec.psk` in argv)
 - **AND** SHALL NOT use substring matching to detect profile existence
 - **AND** validates the connection before returning success
 
@@ -38,33 +44,42 @@ The system must provide reliable WiFi network scanning, connection, and manageme
 
 ### Requirement: Saved Network Management
 
-The system must allow users to view and manage previously connected WiFi networks stored in NetworkManager, including forgetting the currently active connection.
+The system must allow users to view and manage previously connected WiFi networks stored in NetworkManager, including forgetting the currently active connection. Forget operations SHALL be keyed by the NetworkManager connection name (a stable identifier), never by a positional index into an enumeration.
 
 #### Scenario: Saved Networks Retrieval
 
 - **WHEN** a user requests the list of saved WiFi networks
 - **THEN** the system queries NetworkManager's saved connections
 - **AND** returns network names, last used dates, and auto-connect settings
+- **AND** each entry SHALL include its NetworkManager `connection_name` for use as the stable key in subsequent operations
 - **AND** excludes hotspot and system connections from the user-visible list
 
 #### Scenario: Network Forgetting — non-current network
 
 - **WHEN** a user chooses to forget a saved WiFi network that is not currently active
-- **THEN** the system SHALL resolve the NM connection profile name via `list_saved_networks` and pass `connection_name` (not SSID) to `nmcli connection delete`
+- **THEN** the client SHALL identify the network by its `connection_name` (URL-encoded in `DELETE /api/wifi/saved/{connection_name}`)
+- **AND** the system SHALL pass that `connection_name` (not an SSID and not a positional index) to `nmcli connection delete`
+- **AND** the system SHALL NOT re-enumerate saved networks to resolve a positional index between request validation and deletion
 - **AND** provides confirmation of successful removal
 - **AND** the network will require re-entering credentials on next connection
 
 #### Scenario: Network Forgetting — currently connected network
 
-- **WHEN** a user chooses to forget the currently active WiFi network
+- **WHEN** a user chooses to forget the currently active WiFi network, identified by `connection_name`
 - **THEN** the system SHALL first run `nmcli device disconnect <interface>` to drop the connection
 - **AND** then delete the NM connection profile using `connection_name`
 - **AND** return success; the device will be left without a WiFi connection
 - **AND** no HTTP 400 or backend guard SHALL prevent this operation
 
+#### Scenario: Network Forgetting — unknown connection name
+
+- **WHEN** a forget request names a `connection_name` that does not match any saved NetworkManager WiFi profile
+- **THEN** the API SHALL respond 404 without deleting anything
+- **AND** no other saved profile SHALL be affected
+
 ### Requirement: WiFi Interface Management
 
-The system must properly manage WiFi interface states and handle transitions between client and hotspot modes.
+The system MUST properly manage WiFi interface states and handle transitions between client and hotspot modes.
 
 #### Scenario: Interface State Control
 
@@ -92,7 +107,7 @@ The system must properly manage WiFi interface states and handle transitions bet
 
 ### Requirement: Boot-time WiFi Behavior
 
-The system must automatically establish WiFi connectivity on boot with appropriate fallback to hotspot mode.
+The system MUST automatically establish WiFi connectivity on boot with appropriate fallback to hotspot mode.
 
 #### Scenario: Boot WiFi Check
 
@@ -120,7 +135,7 @@ The system must automatically establish WiFi connectivity on boot with appropria
 
 ### Requirement: WiFi Error Handling and Recovery
 
-The system must provide robust error handling for WiFi operations with clear user feedback and automatic recovery where appropriate.
+The system MUST provide robust error handling for WiFi operations with clear user feedback and automatic recovery where appropriate.
 
 #### Scenario: Connection Failure Handling
 
@@ -161,3 +176,27 @@ The WiFi Settings page dialog SHALL expose a Forget Network action for all saved
 - **WHEN** a user opens the dialog for a saved network that is not currently connected
 - **THEN** the dialog SHALL show "Cancel", "Connect", and "Forget Network" buttons
 - **AND** tapping "Forget Network" SHALL trigger a confirmation prompt before proceeding
+
+### Requirement: WiFi Credential and SSID Input Safety
+
+The system MUST keep WiFi credentials out of process argument lists and MUST validate API-supplied SSIDs before they reach any subprocess.
+
+#### Scenario: PSK never in process argv
+
+- **WHEN** the system performs any nmcli operation that requires a WiFi password (new connection or password update)
+- **THEN** the password is supplied via a NetworkManager `passwd-file` (or equivalent non-argv channel), never as a command-line argument
+- **AND** the passwd-file is created with mode 0600
+- **AND** the passwd-file is deleted immediately after the nmcli call completes, including on failure
+
+#### Scenario: SSID validation
+
+- **WHEN** an API request supplies an SSID for connection
+- **THEN** the system rejects SSIDs that are empty, longer than 32 bytes, or contain control characters (including `\n` and `\r`) before spawning any subprocess
+- **AND** the rejection produces a clear error message to the caller
+
+#### Scenario: Dash-prefixed SSID handled safely
+
+- **WHEN** an API request supplies a syntactically valid SSID beginning with `-` (e.g. `-mynetwork`)
+- **THEN** the SSID is passed to nmcli only as the value following the `ssid` property keyword, so it cannot be interpreted as an nmcli option
+- **AND** the connection attempt proceeds normally for that SSID
+
