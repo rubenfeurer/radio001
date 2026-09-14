@@ -87,7 +87,35 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
-      - name: Build and push
+      # Build → scan → push: no tag is published before the freshly built image
+      # passes the Trivy gate. The push step below is a cache-hit re-assembly of
+      # the exact image scanned here.
+      - name: Build image for scanning (no push)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.backend
+          platforms: linux/arm64
+          push: false
+          load: true
+          tags: radio001:scan
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan built image with Trivy
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: radio001:scan
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+        env:
+          TRIVY_PLATFORM: linux/arm64
+
+      - name: Push scanned image
         id: build
         uses: docker/build-push-action@v5
         with:
@@ -100,15 +128,3 @@ jobs:
           build-args: |
             VERSION=${{ steps.meta.outputs.version }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Scan image with Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          format: table
-          exit-code: "1"
-          ignore-unfixed: true
-          severity: HIGH,CRITICAL
-        env:
-          TRIVY_PLATFORM: linux/arm64
