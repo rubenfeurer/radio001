@@ -355,7 +355,21 @@ async def shutdown_radio_system(background_tasks: BackgroundTasks):
         )
 
 
-_LIBRARY_FILE = Path(os.environ.get("LIBRARY_FILE", "/app/assets/stations.json"))
+def _resolve_library_file() -> Path:
+    """Docker path first, then the repo location for bare-metal dev runs."""
+    if "LIBRARY_FILE" in os.environ:
+        return Path(os.environ["LIBRARY_FILE"])
+    candidates = [
+        Path("/app/assets/stations.json"),
+        Path(__file__).parent.parent.parent / "assets" / "stations.json",
+    ]
+    for p in candidates:
+        if p.exists():
+            return p
+    return candidates[0]
+
+
+_LIBRARY_FILE = _resolve_library_file()
 
 
 @router.get("/library", summary="Get station library")
