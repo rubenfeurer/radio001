@@ -8,14 +8,33 @@ export interface WebSocketMessage {
 
 export const wsState = $state({ isConnected: false });
 
+const RECONNECT_BASE_DELAY = 1000;
+const RECONNECT_MAX_DELAY = 30000;
+const PING_INTERVAL = 15000;
+const LIVENESS_TIMEOUT = 10000;
+
 class WebSocketClient {
 	private ws: WebSocket | null = null;
 	private reconnectTimer: number | null = null;
-	private readonly reconnectDelay = 3000;
+	private pingTimer: number | null = null;
+	private livenessTimer: number | null = null;
+	private reconnectDelay = RECONNECT_BASE_DELAY;
 	private shouldReconnect = true;
 
 	connect() {
-		if (this.ws?.readyState === WebSocket.OPEN) return;
+		// connect() states the intent "I want a live connection" — it must
+		// undo a prior disconnect(), or one visit to a disconnecting page
+		// would permanently disable reconnection for the SPA session
+		this.shouldReconnect = true;
+
+		// An in-flight CONNECTING socket will resolve on its own; creating a
+		// second one would orphan it with live handlers (state flapping)
+		if (
+			this.ws?.readyState === WebSocket.OPEN ||
+			this.ws?.readyState === WebSocket.CONNECTING
+		) {
+			return;
+		}
 
 		const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 		const wsUrl = `${protocol}//${window.location.host}/ws/`;
@@ -25,14 +44,17 @@ class WebSocketClient {
 
 			this.ws.onopen = () => {
 				wsState.isConnected = true;
+				this.reconnectDelay = RECONNECT_BASE_DELAY;
 				if (this.reconnectTimer) {
 					clearTimeout(this.reconnectTimer);
 					this.reconnectTimer = null;
 				}
+				this.startPing();
 				setTimeout(() => this.send({ type: 'get_status' }), 100);
 			};
 
 			this.ws.onmessage = (event) => {
+				this.markAlive();
 				try {
 					const message: WebSocketMessage = JSON.parse(event.data);
 					handleMessage(message);
@@ -44,6 +66,7 @@ class WebSocketClient {
 			this.ws.onclose = () => {
 				wsState.isConnected = false;
 				this.ws = null;
+				this.stopPing();
 				if (this.shouldReconnect) this.scheduleReconnect();
 			};
 
@@ -67,12 +90,46 @@ class WebSocketClient {
 		}
 	}
 
+	// Half-open TCP connections (WiFi blips, hotspot transitions) look
+	// connected forever; ping and force-close if nothing comes back.
+	// Any inbound message counts as liveness, not just pong.
+	private startPing() {
+		this.stopPing();
+		this.pingTimer = window.setInterval(() => {
+			this.send({ type: 'ping' });
+			if (this.livenessTimer === null) {
+				this.livenessTimer = window.setTimeout(() => {
+					console.warn('WebSocket liveness timeout — forcing reconnect');
+					this.livenessTimer = null;
+					this.ws?.close();
+				}, LIVENESS_TIMEOUT);
+			}
+		}, PING_INTERVAL);
+	}
+
+	private markAlive() {
+		if (this.livenessTimer !== null) {
+			clearTimeout(this.livenessTimer);
+			this.livenessTimer = null;
+		}
+	}
+
+	private stopPing() {
+		if (this.pingTimer !== null) {
+			clearInterval(this.pingTimer);
+			this.pingTimer = null;
+		}
+		this.markAlive();
+	}
+
 	private scheduleReconnect() {
 		if (!this.reconnectTimer && this.shouldReconnect) {
 			this.reconnectTimer = window.setTimeout(() => {
 				this.reconnectTimer = null;
 				this.connect();
 			}, this.reconnectDelay);
+			// Exponential backoff, reset to base on successful open
+			this.reconnectDelay = Math.min(this.reconnectDelay * 2, RECONNECT_MAX_DELAY);
 		}
 	}
 
@@ -82,6 +139,7 @@ class WebSocketClient {
 			clearTimeout(this.reconnectTimer);
 			this.reconnectTimer = null;
 		}
+		this.stopPing();
 		if (this.ws) {
 			this.ws.close();
 			this.ws = null;

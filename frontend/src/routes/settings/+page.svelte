@@ -2,7 +2,8 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { wifiState, getStatus } from '$lib/stores/wifi.svelte';
-	import { radioState, setVolume, fetchStatus } from '$lib/stores/radio.svelte';
+	import { radioState, setVolume, setVolumeDragging, fetchStatus } from '$lib/stores/radio.svelte';
+	import { formatUptime, formatBytes } from '$lib/format';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { Input } from '$lib/components/ui/input';
@@ -105,25 +106,35 @@
 		showBanner = false;
 	}
 
-	const formatUptime = (seconds: number) => {
-		const days = Math.floor(seconds / 86400);
-		const hours = Math.floor((seconds % 86400) / 3600);
-		const minutes = Math.floor((seconds % 3600) / 60);
-		if (days > 0) return `${days}d ${hours}h ${minutes}m`;
-		if (hours > 0) return `${hours}h ${minutes}m`;
-		return `${minutes}m`;
-	};
-
-	const formatBytes = (bytes: number) => {
-		const sizes = ['B', 'KB', 'MB', 'GB'];
-		if (bytes === 0) return '0 B';
-		const i = Math.floor(Math.log(bytes) / Math.log(1024));
-		return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + ' ' + sizes[i];
-	};
+	// Throttled (trailing edge): a drag produces a bounded request stream and
+	// the final released value is always sent
+	let volumeSendTimer: ReturnType<typeof setTimeout> | null = null;
+	let pendingVolume: number | null = null;
 
 	function handleVolumeInput(e: Event) {
 		const target = e.target as HTMLInputElement;
+		setVolumeDragging(true);
+		pendingVolume = parseInt(target.value, 10);
+		if (!volumeSendTimer) {
+			volumeSendTimer = setTimeout(() => {
+				volumeSendTimer = null;
+				if (pendingVolume !== null) {
+					setVolume(pendingVolume);
+					pendingVolume = null;
+				}
+			}, 200);
+		}
+	}
+
+	function handleVolumeRelease(e: Event) {
+		const target = e.target as HTMLInputElement;
+		if (volumeSendTimer) {
+			clearTimeout(volumeSendTimer);
+			volumeSendTimer = null;
+		}
+		pendingVolume = null;
 		setVolume(parseInt(target.value, 10));
+		setVolumeDragging(false);
 	}
 
 	onMount(async () => {
@@ -211,6 +222,7 @@
 							max="100"
 							value={radioState.volume}
 							oninput={handleVolumeInput}
+							onchange={handleVolumeRelease}
 							class="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-secondary accent-primary"
 						/>
 						<span class="text-xs text-muted-foreground w-10 text-right flex-shrink-0">{radioState.volume}%</span>

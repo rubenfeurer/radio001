@@ -21,7 +21,7 @@
 	interface CombinedNetwork extends WiFiNetwork {
 		isSaved?: boolean;
 		isCurrent?: boolean;
-		savedId?: number;
+		savedConnectionName?: string;
 	}
 
 	let selectedNetwork = $state<CombinedNetwork | null>(null);
@@ -40,7 +40,7 @@
 						...network,
 						isSaved: !!savedNetwork,
 						isCurrent: savedNetwork?.current || false,
-						savedId: savedNetwork?.id
+						savedConnectionName: savedNetwork?.connection_name
 					} as CombinedNetwork);
 				}
 				return acc;
@@ -79,8 +79,8 @@
 	};
 
 	const handleForget = async () => {
-		if (!selectedNetwork?.savedId) return;
-		const success = await forgetNetwork(selectedNetwork.savedId, selectedNetwork.ssid);
+		if (!selectedNetwork?.savedConnectionName) return;
+		const success = await forgetNetwork(selectedNetwork.savedConnectionName, selectedNetwork.ssid);
 		if (success) {
 			selectedNetwork = null;
 			confirmingForget = false;
@@ -337,7 +337,8 @@
 									<li>Reboot the system</li>
 								</ul>
 								<p class="text-sm text-muted-foreground mt-2">
-									After reboot, connect to "Radio-Setup" and navigate to <strong>http://radio.local</strong>
+									After reboot, connect to "Radio-Setup" (password is in your Settings page
+									under Hotspot) and navigate to <strong>http://192.168.4.1:8000</strong>
 								</p>
 							</div>
 							<div class="flex gap-3">
