@@ -30,4 +30,4 @@ aiofiles==23.2.1
 faker==40.18.0
 
 # Testing FastAPI applications
-fastapi[testing]==0.136.1
+fastapi[testing]==0.141.1
