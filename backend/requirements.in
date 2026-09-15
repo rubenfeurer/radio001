@@ -11,7 +11,7 @@ uvicorn[standard]==0.47.0
 pydantic==2.13.4
 
 # Additional dependencies for compatibility
-typing-extensions>=4.15.0
+typing-extensions>=4.16.0
 annotated-types>=0.7.0
 
 # Optional: Development dependencies (install with --dev flag)
